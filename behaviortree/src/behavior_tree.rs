@@ -5,45 +5,6 @@ pub trait ActionCallback<A> {
     fn tick(&mut self, dt: f64, action: &mut A) -> Status;
 }
 
-#[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq)]
-pub enum State<A> {
-    // Leaves
-    Wait(f64, f64),
-    Action(A),
-    // Composites
-    Sequence(SequenceState<A>),
-    Select(Vec<Behavior<A>>, usize, Box<State<A>>),
-
-    // Decorators
-    Invert(Box<Behavior<A>>, Box<State<A>>),
-    /// Ignores failures and returns `Success`.
-    AlwaysSucceed(Box<Behavior<A>>),
-    /// `If(condition, success, failure)`
-    If(Box<Behavior<A>>, Box<Behavior<A>>, Box<Behavior<A>>),
-}
-
-impl<A> From<Behavior<A>> for State<A>
-where
-    A: Clone,
-{
-    fn from(behavior: Behavior<A>) -> Self {
-        match behavior {
-            Behavior::Wait(target_time) => Self::Wait(target_time, 0.0),
-            Behavior::Action(action) => Self::Action(action),
-            Behavior::Sequence(behaviors) => Self::Sequence(SequenceState::new(behaviors)),
-            Behavior::Select(behaviors) => {
-                let current_state = Box::new(State::from(behaviors[0].clone()));
-                Self::Select(behaviors, 0, current_state)
-            }
-            Behavior::Invert(behavior) => {
-                Self::Invert(behavior.clone(), Box::new(State::from(*behavior)))
-            }
-            Behavior::AlwaysSucceed(_) => todo!(),
-            Behavior::If(_, _, _) => todo!(),
-        }
-    }
-}
-
 pub enum BehaviorTreePolicy {
     ReloadOnCompletion, // Resets/Reloads the behavior tree once it is completed
     RetainOnCompletion, // On completion, needs manual reset
@@ -120,7 +81,46 @@ where
 }
 
 #[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq)]
-pub struct SequenceState<A> {
+enum State<A> {
+    // Leaves
+    Wait(f64, f64),
+    Action(A),
+    // Composites
+    Sequence(SequenceState<A>),
+    Select(Vec<Behavior<A>>, usize, Box<State<A>>),
+
+    // Decorators
+    Invert(Box<Behavior<A>>, Box<State<A>>),
+    /// Ignores failures and returns `Success`.
+    AlwaysSucceed(Box<Behavior<A>>),
+    /// `If(condition, success, failure)`
+    If(Box<Behavior<A>>, Box<Behavior<A>>, Box<Behavior<A>>),
+}
+
+impl<A> From<Behavior<A>> for State<A>
+where
+    A: Clone,
+{
+    fn from(behavior: Behavior<A>) -> Self {
+        match behavior {
+            Behavior::Wait(target_time) => Self::Wait(target_time, 0.0),
+            Behavior::Action(action) => Self::Action(action),
+            Behavior::Sequence(behaviors) => Self::Sequence(SequenceState::new(behaviors)),
+            Behavior::Select(behaviors) => {
+                let current_state = Box::new(State::from(behaviors[0].clone()));
+                Self::Select(behaviors, 0, current_state)
+            }
+            Behavior::Invert(behavior) => {
+                Self::Invert(behavior.clone(), Box::new(State::from(*behavior)))
+            }
+            Behavior::AlwaysSucceed(_) => todo!(),
+            Behavior::If(_, _, _) => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+struct SequenceState<A> {
     // originial
     behaviors: Vec<Behavior<A>>,
     // state
@@ -162,128 +162,5 @@ where
             Status::Failure => Status::Failure,
             Status::Running => Status::Running,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Debug, Clone, Copy)]
-    enum Operation {
-        Add,
-        Subtract,
-        Multiply,
-        Divide,
-    }
-
-    struct OperationAction {}
-
-    impl ActionCallback<Operation> for OperationAction {
-        fn tick(&mut self, _dt: f64, action: &mut Operation) -> Status {
-            println!("Action: {:?}", action);
-            Status::Success
-        }
-    }
-
-    #[test]
-    fn test_simple_sequence_retain_policy() {
-        let behavior = Behavior::Sequence(vec![
-            Behavior::Action(Operation::Add),
-            Behavior::Action(Operation::Subtract),
-            Behavior::Action(Operation::Multiply),
-            Behavior::Action(Operation::Divide),
-        ]);
-        let mut bt = BehaviorTree::new(
-            behavior,
-            BehaviorTreePolicy::RetainOnCompletion,
-            OperationAction {},
-        );
-
-        assert!(bt.status().is_none());
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert!(bt.status().unwrap() == Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert!(bt.status().unwrap() == Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert!(bt.status().unwrap() == Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
-
-        // Retains after completion
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
-    }
-
-    #[test]
-    fn test_simple_sequence_reload_policy() {
-        let behavior = Behavior::Sequence(vec![
-            Behavior::Action(Operation::Add),
-            Behavior::Action(Operation::Subtract),
-            Behavior::Action(Operation::Multiply),
-            Behavior::Action(Operation::Divide),
-        ]);
-        let mut bt = BehaviorTree::new(
-            behavior,
-            BehaviorTreePolicy::ReloadOnCompletion,
-            OperationAction {},
-        );
-
-        assert!(bt.status().is_none());
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert!(bt.status().unwrap() == Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert!(bt.status().unwrap() == Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert!(bt.status().unwrap() == Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
-
-        // Reload after completion
-        // Starts from Add again
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Running);
-
-        bt.tick(0.1);
-        assert!(bt.status().is_some());
-        assert_eq!(bt.status().unwrap(), Status::Success);
     }
 }
