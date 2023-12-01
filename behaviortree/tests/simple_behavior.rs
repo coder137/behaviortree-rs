@@ -65,6 +65,25 @@ fn test_simple_sequence_retain_policy() {
     bt.tick(0.1);
     assert!(bt.status().is_some());
     assert_eq!(bt.status().unwrap(), Status::Success);
+
+    // Manually reset
+    bt.reset();
+
+    bt.tick(0.1);
+    assert!(bt.status().is_some());
+    assert_eq!(bt.status().unwrap(), Status::Running);
+
+    bt.tick(0.1);
+    assert!(bt.status().is_some());
+    assert_eq!(bt.status().unwrap(), Status::Running);
+
+    bt.tick(0.1);
+    assert!(bt.status().is_some());
+    assert_eq!(bt.status().unwrap(), Status::Running);
+
+    bt.tick(0.1);
+    assert!(bt.status().is_some());
+    assert_eq!(bt.status().unwrap(), Status::Success);
 }
 
 #[test]
