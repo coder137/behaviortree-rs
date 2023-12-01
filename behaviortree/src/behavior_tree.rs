@@ -133,7 +133,7 @@ where
     A: Clone,
 {
     fn new(behaviors: Vec<Behavior<A>>) -> Self {
-        assert!(behaviors.len() != 0);
+        assert!(!behaviors.is_empty());
         let current_state = Box::new(State::from(behaviors[0].clone()));
         Self {
             behaviors,
