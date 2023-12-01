@@ -30,10 +30,7 @@ where
         match behavior {
             Behavior::Wait(target_time) => Self::Wait(target_time, 0.0),
             Behavior::Action(action) => Self::Action(action),
-            Behavior::Sequence(behaviors) => {
-                let current_state = Box::new(State::from(behaviors[0].clone()));
-                Self::Sequence(SequenceState::new(behaviors))
-            }
+            Behavior::Sequence(behaviors) => Self::Sequence(SequenceState::new(behaviors)),
             Behavior::Select(behaviors) => {
                 let current_state = Box::new(State::from(behaviors[0].clone()));
                 Self::Select(behaviors, 0, current_state)
@@ -82,16 +79,8 @@ where
         }
     }
 
-    pub fn run_once(state: &mut State<A>, dt: f64, callback: &mut C) -> Status {
-        match state {
-            State::Action(action) => callback.tick(dt, action),
-            State::Sequence(sequence_state) => sequence_state.tick(dt, callback),
-            _ => todo!(),
-        }
-    }
-
     pub fn tick(&mut self, dt: f64) {
-        let new_status = match self.status {
+        match self.status {
             Some(Status::Success) | Some(Status::Failure) => {
                 match self.behavior_policy {
                     BehaviorTreePolicy::ReloadOnCompletion => {
@@ -119,6 +108,14 @@ where
 
     pub fn status(&self) -> Option<Status> {
         self.status
+    }
+
+    fn run_once(state: &mut State<A>, dt: f64, callback: &mut C) -> Status {
+        match state {
+            State::Action(action) => callback.tick(dt, action),
+            State::Sequence(sequence_state) => sequence_state.tick(dt, callback),
+            _ => todo!(),
+        }
     }
 }
 
@@ -149,20 +146,6 @@ where
     where
         C: ActionCallback<A>,
     {
-        let status = self.run_once(dt, callback);
-        // match status {
-        //     Status::Success | Status::Failure => {
-        //         self.reset();
-        //     }
-        //     Status::Running => {}
-        // }
-        status
-    }
-
-    fn run_once<C>(&mut self, dt: f64, callback: &mut C) -> Status
-    where
-        C: ActionCallback<A>,
-    {
         let status = BehaviorTree::run_once(&mut self.current_state, dt, callback);
         match status {
             Status::Success => {
@@ -180,11 +163,6 @@ where
             Status::Running => Status::Running,
         }
     }
-
-    // fn reset(&mut self) {
-    //     self.index = 0;
-    //     self.current_state = Box::new(State::from(self.behaviors[0].clone()));
-    // }
 }
 
 #[cfg(test)]
