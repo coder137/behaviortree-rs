@@ -1,6 +1,6 @@
-use behaviortree::{ActionCallback, Behavior, BehaviorTree, BehaviorTreePolicy, Status};
+use behaviortree::{Action, Behavior, BehaviorTree, BehaviorTreePolicy, Status};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
 enum Operation {
     Add,
     Subtract,
@@ -8,12 +8,35 @@ enum Operation {
     Divide,
 }
 
-struct OperationAction {}
-
-impl ActionCallback<Operation> for OperationAction {
-    fn tick(&mut self, _dt: f64, action: &mut Operation) -> Status {
-        println!("Action: {:?}", action);
+impl Action for Operation {
+    fn tick(&mut self, _dt: f64) -> Status {
+        println!("Action: {:?}", self);
+        match self {
+            Operation::Add => {}
+            Operation::Subtract => {}
+            Operation::Multiply => {}
+            Operation::Divide => {}
+        }
         Status::Success
+    }
+
+    fn halt(&mut self) {
+        match self {
+            Operation::Add => {}
+            Operation::Subtract => {}
+            Operation::Multiply => {}
+            Operation::Divide => {}
+        }
+        println!("{:?} has been reset", self);
+    }
+
+    fn status(&self) -> Option<Status> {
+        match self {
+            Operation::Add => todo!(),
+            Operation::Subtract => todo!(),
+            Operation::Multiply => todo!(),
+            Operation::Divide => todo!(),
+        }
     }
 }
 
@@ -25,11 +48,10 @@ fn test_simple_sequence_retain_policy() {
         Behavior::Action(Operation::Multiply),
         Behavior::Action(Operation::Divide),
     ]);
-    let mut bt = BehaviorTree::new(
-        behavior,
-        BehaviorTreePolicy::RetainOnCompletion,
-        OperationAction {},
-    );
+    let behavior_data = serde_json::to_string_pretty(&behavior).unwrap();
+    println!("Data: {}", behavior_data);
+
+    let mut bt = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
     assert!(bt.status().is_none());
 
@@ -73,6 +95,13 @@ fn test_simple_sequence_retain_policy() {
     assert!(bt.status().is_some());
     assert_eq!(bt.status().unwrap(), Status::Running);
 
+    // Test
+    bt.reset();
+
+    bt.tick(0.1);
+    assert!(bt.status().is_some());
+    assert_eq!(bt.status().unwrap(), Status::Running);
+
     bt.tick(0.1);
     assert!(bt.status().is_some());
     assert_eq!(bt.status().unwrap(), Status::Running);
@@ -94,11 +123,7 @@ fn test_simple_sequence_reload_policy() {
         Behavior::Action(Operation::Multiply),
         Behavior::Action(Operation::Divide),
     ]);
-    let mut bt = BehaviorTree::new(
-        behavior,
-        BehaviorTreePolicy::ReloadOnCompletion,
-        OperationAction {},
-    );
+    let mut bt = BehaviorTree::new(behavior, BehaviorTreePolicy::ReloadOnCompletion);
 
     assert!(bt.status().is_none());
 
