@@ -1,19 +1,19 @@
-use crate::{Behavior, Status};
+use crate::{Action, Behavior, Shared, Status, ToAction};
 
-pub trait Action {
-    /// Function is invoked as long as `Status::Running` is returned.
-    ///
-    /// No longer invoked after `Status::Success` or `Status::Failure` is returned,
-    /// unless reset
-    ///
-    /// NOTE: See `BehaviorTree` implementation. User is not expected to invoke this manually
-    fn tick(&mut self, dt: f64) -> Status;
-
-    /// Function is only invoked when a `Status::Running` action is halted.
-    fn halt(&mut self);
-
-    // TODO, Try to remove dependency on this!
-    fn status(&self) -> Option<Status>;
+impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
+where
+    A: ToAction<S> + Clone + 'static,
+    S: Shared + 'static,
+{
+    fn from(behavior: Behavior<A>) -> Self {
+        match behavior {
+            Behavior::Action(action) => action.to_action(),
+            Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
+            _ => {
+                todo!()
+            }
+        }
+    }
 }
 
 pub enum BehaviorTreePolicy {
@@ -21,24 +21,27 @@ pub enum BehaviorTreePolicy {
     RetainOnCompletion, // On completion, needs manual reset
 }
 
-pub struct BehaviorTree<A> {
+pub struct BehaviorTree<A, S> {
     behavior: Behavior<A>,
     behavior_policy: BehaviorTreePolicy,
 
     // State
+    shared: S,
     status: Option<Status>,
-    action: Box<dyn Action>,
+    action: Box<dyn Action<S>>,
 }
 
-impl<A> BehaviorTree<A>
+impl<A, S> BehaviorTree<A, S>
 where
-    A: Action + Clone + 'static,
+    A: ToAction<S> + Clone + 'static,
+    S: Shared + 'static,
 {
-    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self {
-        let action = get_action_impl(behavior.clone());
+    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy, shared: S) -> Self {
+        let action = Box::from(behavior.clone());
         Self {
             behavior,
             behavior_policy,
+            shared,
             status: None,
             action,
         }
@@ -47,14 +50,14 @@ where
     pub fn tick(&mut self, dt: f64) {
         match self.status {
             None | Some(Status::Running) => {
-                let status = self.action.tick(dt);
+                let status = self.action.tick(dt, &mut self.shared);
                 self.status = Some(status);
             }
             Some(Status::Success) | Some(Status::Failure) => {
                 match self.behavior_policy {
                     BehaviorTreePolicy::ReloadOnCompletion => {
                         self.reset();
-                        let status = self.action.tick(dt);
+                        let status = self.action.tick(dt, &mut self.shared);
                         self.status = Some(status);
                     }
                     BehaviorTreePolicy::RetainOnCompletion => {
@@ -67,10 +70,22 @@ where
     }
 
     pub fn reset(&mut self) {
-        // TODO, halt
+        if let Some(status) = self.status {
+            if status == Status::Running {
+                self.action.halt();
+            }
+        }
         self.status = None;
-        // ! FIXME, It would be cleaner for the Behaviors to just reset themselves rather than reloading the entire behavior all over again
-        self.action = get_action_impl(self.behavior.clone());
+        // *, It would be cleaner for the Behaviors to just reset themselves rather than reloading the entire behavior all over again?
+        // Pros (more efficient maybe? Reset is propagated down the tree resetting all the children)
+        // Cons (requires another trait fn -> Action::reset())
+        // For now, the action is re-constructed,
+        // TODO optimize by reusing the Box
+        self.action = Box::from(self.behavior.clone());
+    }
+
+    pub fn get_shared(&self) -> &S {
+        &self.shared
     }
 
     pub fn status(&self) -> Option<Status> {
@@ -78,82 +93,84 @@ where
     }
 }
 
-fn get_action_impl<A>(behavior: Behavior<A>) -> Box<dyn Action>
-where
-    A: Action + Clone + 'static,
-{
-    match behavior {
-        Behavior::Action(action) => Box::new(action),
-        Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
-        _ => {
-            todo!()
-        }
-    }
-}
-
-pub struct SequenceState<A> {
+pub struct SequenceState<A, S> {
     // originial
     behaviors: Vec<Behavior<A>>,
     // state
-    index: usize,
-    current_action: Box<dyn Action>,
     status: Option<Status>,
+
+    // state for child actions
+    index: usize,
+    current_action: Box<dyn Action<S>>,
+    current_action_status: Option<Status>,
 }
 
-impl<A> Action for SequenceState<A>
+impl<A, S> Action<S> for SequenceState<A, S>
 where
-    A: Action + Clone + 'static,
+    A: ToAction<S> + Clone + 'static,
+    S: Shared + 'static,
 {
-    fn tick(&mut self, dt: f64) -> Status {
-        // TODO, If complete return the completed status
-        let status = self.current_action.tick(dt);
-        let status = match status {
+    fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+        // Once sequence is complete return the completed status
+        if let Some(status) = self.status {
+            if status == Status::Success || status == Status::Failure {
+                return status;
+            }
+        }
+
+        let next_status = self.current_action.tick(dt, shared);
+        let new_status = match next_status {
             Status::Success => {
                 let next_index = self.index + 1;
                 match self.behaviors.get(next_index) {
                     Some(b) => {
                         self.index = next_index;
-                        self.current_action = get_action_impl(b.clone());
+                        self.current_action = Box::from(b.clone());
+                        self.current_action_status = None;
                         Status::Running
                     }
-                    None => Status::Success,
+                    None => {
+                        // current_action `cannot run`
+                        // No actions left to tick, success since sequence is completed
+                        self.current_action_status = None;
+                        Status::Success
+                    }
                 }
             }
-            Status::Failure => Status::Failure,
-            Status::Running => Status::Running,
+            _ => {
+                // Failure | Running
+                self.current_action_status = Some(next_status);
+                next_status
+            }
         };
-        self.status = Some(status);
-        status
+        self.status = Some(new_status);
+        new_status
     }
 
     fn halt(&mut self) {
-        if let Some(status) = self.current_action.status() {
+        if let Some(status) = self.current_action_status {
             if status == Status::Running {
                 self.current_action.halt();
             }
         }
         self.status = None;
     }
-
-    // TODO, We also need a reset
-
-    fn status(&self) -> Option<Status> {
-        self.status
-    }
 }
 
-impl<A> SequenceState<A>
+impl<A, S> SequenceState<A, S>
 where
-    A: Action + Clone + 'static,
+    A: ToAction<S> + Clone + 'static,
+    S: Shared + 'static,
 {
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());
-        let current_action = get_action_impl(behaviors[0].clone());
+        let current_action = Box::from(behaviors[0].clone());
         Self {
             behaviors,
+            status: None,
             index: 0,
             current_action,
-            status: None,
+            current_action_status: None,
         }
     }
 }

@@ -4,8 +4,11 @@ pub use status::*;
 mod behavior;
 pub use behavior::*;
 
-mod behavior_tree;
-pub use behavior_tree::*;
-
 mod blackboard;
 pub use blackboard::*;
+
+mod behavior_interface;
+pub use behavior_interface::*;
+
+mod behavior_tree;
+pub use behavior_tree::*;
