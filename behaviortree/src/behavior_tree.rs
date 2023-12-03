@@ -26,7 +26,6 @@ pub struct BehaviorTree<A, S> {
     behavior_policy: BehaviorTreePolicy,
 
     // State
-    shared: S, // TODO, Shared data only needs to be passed into the `tick` function, we do not need to keep it tied to the BehaviorTree structure!
     status: Option<Status>,
     action: Box<dyn Action<S>>,
 }
@@ -36,28 +35,27 @@ where
     A: ToAction<S> + Clone + 'static,
     S: Shared + 'static,
 {
-    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy, shared: S) -> Self {
+    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self {
         let action = Box::from(behavior.clone());
         Self {
             behavior,
             behavior_policy,
-            shared,
             status: None,
             action,
         }
     }
 
-    pub fn tick(&mut self, dt: f64) {
+    pub fn tick(&mut self, dt: f64, shared: &mut S) {
         match self.status {
             None | Some(Status::Running) => {
-                let status = self.action.tick(dt, &mut self.shared);
+                let status = self.action.tick(dt, shared);
                 self.status = Some(status);
             }
             Some(Status::Success) | Some(Status::Failure) => {
                 match self.behavior_policy {
                     BehaviorTreePolicy::ReloadOnCompletion => {
                         self.reset();
-                        let status = self.action.tick(dt, &mut self.shared);
+                        let status = self.action.tick(dt, shared);
                         self.status = Some(status);
                     }
                     BehaviorTreePolicy::RetainOnCompletion => {
@@ -82,10 +80,6 @@ where
         // For now, the action is re-constructed,
         // TODO optimize by reusing the Box
         self.action = Box::from(self.behavior.clone());
-    }
-
-    pub fn get_shared(&self) -> &S {
-        &self.shared
     }
 
     pub fn status(&self) -> Option<Status> {

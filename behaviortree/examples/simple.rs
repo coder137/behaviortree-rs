@@ -88,26 +88,20 @@ fn main() {
     let mut bt = BehaviorTree::new(
         behavior,
         behaviortree::BehaviorTreePolicy::RetainOnCompletion,
-        OperationShared::default(),
     );
 
+    let mut shared = OperationShared::default();
     // Shared data can be out, we don't need to keep shared data t
     let now = Instant::now();
-    bt.tick(0.1);
+    bt.tick(0.1, &mut shared);
     assert_eq!(bt.status().unwrap(), Status::Running);
-    let data: usize = bt
-        .get_shared()
-        .read(Input::Blackboard("add".into()))
-        .unwrap();
+    let data: usize = shared.blackboard.read(&"add".into()).unwrap();
     assert_eq!(data, 30);
     println!("Elapsed: {:?}", now.elapsed());
 
-    bt.tick(0.1);
+    bt.tick(0.1, &mut shared);
     assert_eq!(bt.status().unwrap(), Status::Success);
-    let data: usize = bt
-        .get_shared()
-        .read(Input::Blackboard("sub".into()))
-        .unwrap();
+    let data: usize = shared.blackboard.read(&"sub".into()).unwrap();
     assert_eq!(data, 10);
     println!("Elapsed: {:?}", now.elapsed());
 }
