@@ -94,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn test_blackboard_storage() {
+    fn test_blackboard_read_and_write_good() {
         let mut blackboard = Blackboard::new();
 
         // Floats
@@ -118,12 +118,21 @@ mod tests {
         assert_eq!(tuple.unwrap(), (12, "test", 34.56));
 
         // Structs
-        let mut tester = Tester::new();
-        tester.fill_random(20);
-        println!("Tester: {:?}", tester);
+        let tester = Tester::new();
+        assert_eq!(tester.map.keys().len(), 0);
         blackboard.write("tester".into(), tester);
+
         // NOTE, As per design, since Tester is not clone we cannot use the `read` API and are forced to use the `read_ref` API
         // This makes it so that there is no unnecessary expensive clones taking place unless explicitly required
+
+        // We also read by ref mut and modify this tester, when we re-read from blackboard the internal values should be automatically updated!
+        let tester = blackboard.read_ref_mut::<Tester>(&"tester".into());
+        assert!(tester.is_some());
+        let tester = tester.unwrap();
+        tester.fill_random(20);
+        println!("Tester: {:?}", tester);
+
+        // Re-reading here
         let tester = blackboard.read_ref::<Tester>(&"tester".into());
         assert!(tester.is_some());
         let tester = tester.unwrap();
@@ -141,5 +150,43 @@ mod tests {
         let rc = blackboard.read::<Rc<i32>>(&"rc_u32".into());
         assert!(rc.is_some());
         assert_eq!(*rc.unwrap(), 10);
+    }
+
+    #[test]
+    fn test_blackboard_bad_read() {
+        let mut blackboard = Blackboard::new();
+
+        // * Value does not exist
+        let read_string = blackboard.read::<String>(&"string".into());
+        assert_eq!(read_string, None);
+
+        let read_string = blackboard.read_ref_mut::<String>(&"string".into());
+        assert_eq!(read_string, None);
+
+        let string = "String".to_owned();
+        blackboard.write("string".into(), string);
+
+        // * The type is incorrect which makes us give a bad value
+        let read_usize = blackboard.read::<usize>(&"string".into());
+        assert_eq!(read_usize, None);
+
+        let read_usize = blackboard.read_ref_mut::<usize>(&"string".into());
+        assert_eq!(read_usize, None);
+    }
+
+    #[test]
+    fn test_blackboard_write_overwrite() {
+        let mut blackboard = Blackboard::new();
+
+        let string = "Test".to_owned();
+        blackboard.write("string".into(), string);
+        let string = blackboard.read::<String>(&"string".into()).unwrap();
+        assert_eq!(string, "Test".to_owned());
+
+        // Overwrite the same location with a different data and different type
+        let number = 123.34;
+        blackboard.write("string".into(), number);
+        let number = blackboard.read::<f64>(&"string".into()).unwrap();
+        assert_eq!(number, 123.34);
     }
 }
