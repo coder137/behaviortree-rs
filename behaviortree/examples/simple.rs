@@ -104,4 +104,12 @@ fn main() {
     let data: usize = shared.blackboard.read(&"sub".into()).unwrap();
     assert_eq!(data, 10);
     println!("Elapsed: {:?}", now.elapsed());
+
+    // NOTE, Since our policy is to retain on completion, ticking the behavior tree again does nothing!
+    bt.tick(0.1, &mut shared);
+    assert_eq!(bt.status().unwrap(), Status::Success);
+
+    // In this case we need to manually reset
+    bt.reset();
+    assert_eq!(bt.status(), None);
 }

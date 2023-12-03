@@ -17,8 +17,10 @@ where
 }
 
 pub enum BehaviorTreePolicy {
-    ReloadOnCompletion, // Resets/Reloads the behavior tree once it is completed
-    RetainOnCompletion, // On completion, needs manual reset
+    /// Resets/Reloads the behavior tree once it is completed
+    ReloadOnCompletion,
+    /// On completion, needs manual reset
+    RetainOnCompletion,
 }
 
 pub struct BehaviorTree<A, S> {
