@@ -11,14 +11,13 @@ pub trait Shared {
         }
     }
 
+    // TODO, Add a read_ref_mut version here!
+
     fn read<T>(&self, input: Input<T>) -> Option<T>
     where
         T: Clone + 'static,
     {
-        match input {
-            Input::Literal(data) => Some(data),
-            Input::Blackboard(key) => self.get_local_blackboard().read(&key),
-        }
+        self.read_ref(&input).cloned()
     }
 
     fn write<T>(&mut self, output: Output, data: T)
