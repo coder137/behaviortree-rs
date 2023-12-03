@@ -43,22 +43,10 @@ impl Blackboard {
     }
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Input<T> {
     Literal(T),
     Blackboard(String),
-}
-
-impl<T> Clone for Input<T>
-where
-    T: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::Literal(data) => Self::Literal(data.clone()),
-            Self::Blackboard(key) => Self::Blackboard(key.clone()),
-        }
-    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
