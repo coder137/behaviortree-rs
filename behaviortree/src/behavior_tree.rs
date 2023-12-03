@@ -26,7 +26,7 @@ pub struct BehaviorTree<A, S> {
     behavior_policy: BehaviorTreePolicy,
 
     // State
-    shared: S,
+    shared: S, // TODO, Shared data only needs to be passed into the `tick` function, we do not need to keep it tied to the BehaviorTree structure!
     status: Option<Status>,
     action: Box<dyn Action<S>>,
 }

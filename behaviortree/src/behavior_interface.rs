@@ -21,7 +21,7 @@ pub trait Shared {
         }
     }
 
-    fn write<T>(&mut self, output: Output<T>, data: T)
+    fn write<T>(&mut self, output: Output, data: T)
     where
         T: 'static,
     {
@@ -29,7 +29,6 @@ pub trait Shared {
             Output::Blackboard(key) => {
                 self.get_mut_local_blackboard().write(key, data);
             }
-            Output::Debug(_) => unimplemented!(),
         }
     }
 

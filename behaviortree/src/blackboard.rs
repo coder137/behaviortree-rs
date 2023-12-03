@@ -62,9 +62,8 @@ where
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub enum Output<T> {
+pub enum Output {
     Blackboard(String),
-    Debug(T),
 }
 
 #[cfg(test)]
