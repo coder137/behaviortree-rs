@@ -16,4 +16,3 @@ pub use behavior_tree::*;
 // Not meant to be used externally
 
 mod behavior_nodes;
-use behavior_nodes::*;

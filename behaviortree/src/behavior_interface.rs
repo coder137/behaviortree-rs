@@ -1,4 +1,7 @@
-use crate::{Blackboard, Input, Output, Status};
+use crate::{
+    behavior_nodes::{InvertState, SequenceState},
+    Behavior, Blackboard, Input, Output, Status,
+};
 
 #[cfg(test)]
 use mockall::automock;
@@ -43,20 +46,45 @@ pub trait Action<S>
 where
     S: Shared,
 {
-    /// Function is invoked as long as `Status::Running` is returned by the action.
+    /// Ticks the action
     ///
-    /// No longer invoked after `Status::Success` or `Status::Failure` is returned,
-    /// unless reset
+    /// "Work" is done as long as `Status::Running` is returned by the action.
+    ///
+    /// `Status::Success` or `Status::Failure` indicates whether the work was a success/failure
+    ///
+    /// Invoking `tick` after action has return ed`Status::Success` or `Status::Failure` should
+    /// return the same value without actually doing any "work"
     ///
     /// NOTE: See `BehaviorTree` implementation. User is not expected to invoke this manually
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status;
 
-    /// Function is only invoked when a `Status::Running` action is halted.
+    /// Halts the current action and `status` will be reported as None
+    ///
+    /// Function is only invoked when action is in `Status::Running` state
+    ///
+    /// Ticking after halting == `resume` operation
     fn halt(&mut self) {}
 }
 
 pub trait ToAction<S> {
     fn to_action(self) -> Box<dyn Action<S>>;
+}
+
+impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
+where
+    A: ToAction<S> + 'static,
+    S: Shared + 'static,
+{
+    fn from(behavior: Behavior<A>) -> Self {
+        match behavior {
+            Behavior::Action(action) => action.to_action(),
+            Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
+            Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
+            _ => {
+                todo!()
+            }
+        }
+    }
 }
 
 #[cfg(test)]
