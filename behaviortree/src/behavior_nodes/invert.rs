@@ -15,7 +15,7 @@ where
 {
     pub fn new<A>(behavior: Behavior<A>) -> Self
     where
-        A: ToAction<S> + Clone + 'static,
+        A: ToAction<S> + 'static,
     {
         let current_action = Box::from(behavior);
         Self {

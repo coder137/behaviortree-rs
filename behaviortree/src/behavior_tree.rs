@@ -1,20 +1,4 @@
-use crate::{Action, Behavior, SequenceState, Shared, Status, ToAction};
-
-impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
-where
-    A: ToAction<S> + Clone + 'static,
-    S: Shared + 'static,
-{
-    fn from(behavior: Behavior<A>) -> Self {
-        match behavior {
-            Behavior::Action(action) => action.to_action(),
-            Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
-            _ => {
-                todo!()
-            }
-        }
-    }
-}
+use crate::{Action, Behavior, Shared, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed

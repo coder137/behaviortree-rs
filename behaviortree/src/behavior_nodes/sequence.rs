@@ -1,21 +1,22 @@
+use std::collections::VecDeque;
+
 use crate::{Action, Behavior, Shared, Status, ToAction};
 
 pub struct SequenceState<A, S> {
     // originial
-    behaviors: Vec<Behavior<A>>,
+    behaviors: VecDeque<Behavior<A>>,
 
     // state
     status: Option<Status>,
 
     // state for child actions
-    index: usize,
     current_action: Box<dyn Action<S>>,
     current_action_status: Option<Status>,
 }
 
 impl<A, S> Action<S> for SequenceState<A, S>
 where
-    A: ToAction<S> + Clone + 'static,
+    A: ToAction<S> + 'static,
     S: Shared + 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
@@ -29,11 +30,9 @@ where
         let child_status = self.current_action.tick(dt, shared);
         let new_status = match child_status {
             Status::Success => {
-                let next_index = self.index + 1;
-                match self.behaviors.get(next_index) {
+                match self.behaviors.pop_front() {
                     Some(b) => {
-                        self.index = next_index;
-                        self.current_action = Box::from(b.clone());
+                        self.current_action = Box::from(b);
                         self.current_action_status = None;
                         Status::Running
                     }
@@ -67,28 +66,21 @@ where
         self.status = None;
         // Current action and index are left untouched for `resume` operation
     }
-
-    // fn reset(&mut self) {
-    //     self.halt();
-    //     // Current action and index are `reset` to default states
-    //     self.index = 0;
-    //     self.current_action = Box::from(self.behaviors[0].clone());
-    //     self.current_action_status = None;
-    // }
 }
 
 impl<A, S> SequenceState<A, S>
 where
-    A: ToAction<S> + Clone + 'static,
+    A: ToAction<S> + 'static,
     S: Shared + 'static,
 {
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());
-        let current_action = Box::from(behaviors[0].clone());
+        let mut behaviors = VecDeque::from(behaviors);
+        let b = behaviors.pop_front().unwrap();
+        let current_action = Box::from(b);
         Self {
             behaviors,
             status: None,
-            index: 0,
             current_action,
             current_action_status: None,
         }
