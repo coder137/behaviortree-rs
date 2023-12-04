@@ -1,0 +1,11 @@
+[package]
+name = "behaviortree"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1.0"
+mockall = "0.11.4"

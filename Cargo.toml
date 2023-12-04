@@ -1,0 +1,7 @@
+[workspace]
+members = ["behaviortree"]
+resolver = "2"
+
+[workspace.dependencies]
+# Serialization and Deserialization
+serde = { version = "1.0", features = ["derive"] }
