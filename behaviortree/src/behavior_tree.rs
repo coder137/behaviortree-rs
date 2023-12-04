@@ -32,25 +32,24 @@ where
     }
 
     pub fn tick(&mut self, dt: f64, shared: &mut S) {
-        match self.status {
-            None | Some(Status::Running) => {
-                let status = self.action.tick(dt, shared);
-                self.status = Some(status);
-            }
-            Some(Status::Success) | Some(Status::Failure) => {
+        if let Some(status) = self.status {
+            if status == Status::Success || status == Status::Failure {
                 match self.behavior_policy {
                     BehaviorTreePolicy::ReloadOnCompletion => {
                         self.reset();
-                        let status = self.action.tick(dt, shared);
-                        self.status = Some(status);
+                        // Ticks the action below
                     }
                     BehaviorTreePolicy::RetainOnCompletion => {
                         // Do nothing!
                         // `status` returns the already completed value
+                        return;
                     }
                 }
             }
         }
+
+        let child_status = self.action.tick(dt, shared);
+        self.status = Some(child_status);
     }
 
     pub fn reset(&mut self) {
