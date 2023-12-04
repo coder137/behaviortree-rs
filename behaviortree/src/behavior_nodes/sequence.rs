@@ -3,6 +3,7 @@ use crate::{Action, Behavior, Shared, Status, ToAction};
 pub struct SequenceState<A, S> {
     // originial
     behaviors: Vec<Behavior<A>>,
+
     // state
     status: Option<Status>,
 
@@ -57,10 +58,23 @@ where
     fn halt(&mut self) {
         if let Some(status) = self.current_action_status {
             if status == Status::Running {
+                // Halt and Reset the child
+                // When resuming we tick the child from its good state again!
                 self.current_action.halt();
+                self.current_action_status = None;
             }
         }
+        self.status = None;
+        // Current action and index are left untouched for `resume` operation
     }
+
+    // fn reset(&mut self) {
+    //     self.halt();
+    //     // Current action and index are `reset` to default states
+    //     self.index = 0;
+    //     self.current_action = Box::from(self.behaviors[0].clone());
+    //     self.current_action_status = None;
+    // }
 }
 
 impl<A, S> SequenceState<A, S>
@@ -133,5 +147,59 @@ mod tests {
     }
 
     #[test]
-    fn test_sequence_run_then_halt() {}
+    fn test_sequence_run_then_halt() {
+        let custom_action1 = TestActions::Simulate(|mut mock| {
+            mock.expect_tick()
+                .once()
+                .returning(|_dt, _shared| Status::Running);
+            mock.expect_halt().once().returning(|| {});
+            mock
+        });
+        let mut sequence = SequenceState::new(vec![Behavior::Action(custom_action1)]);
+        assert_eq!(sequence.status, None);
+
+        let mut shared = TestShared::default();
+
+        let status = sequence.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        sequence.halt();
+        assert_eq!(sequence.status, None);
+
+        // * When `resuming` this current action needs to restart
+        // TODO, What happens after `halt` -> `resume`
+    }
+
+    #[test]
+    fn test_sequence_multiple_children() {
+        let mut sequence = SequenceState::new(vec![
+            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Success),
+        ]);
+        assert_eq!(sequence.status, None);
+
+        let mut shared = TestShared::default();
+        let status = sequence.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = sequence.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+
+    #[test]
+    fn test_sequence_multiple_children_early_failure() {
+        let mut sequence = SequenceState::new(vec![
+            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Failure),
+            Behavior::Action(TestActions::Success),
+        ]);
+        assert_eq!(sequence.status, None);
+
+        let mut shared = TestShared::default();
+        let status = sequence.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = sequence.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+    }
 }
