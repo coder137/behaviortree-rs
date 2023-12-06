@@ -4,12 +4,12 @@
 /// Can also be used for game AI.
 #[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub enum Behavior<A> {
+    /// A high level description of an action.
+    Action(A),
     /// Waits an amount of time before continuing.
     ///
     /// f64: Time in seconds
     Wait(f64),
-    /// A high level description of an action.
-    Action(A),
 
     /// Runs behaviors one by one until all succeeded.
     ///
@@ -26,8 +26,4 @@ pub enum Behavior<A> {
 
     /// Converts `Success` into `Failure` and vice versa.
     Invert(Box<Behavior<A>>),
-    /// Ignores failures and returns `Success`.
-    AlwaysSucceed(Box<Behavior<A>>),
-    /// `If(condition, success, failure)`
-    If(Box<Behavior<A>>, Box<Behavior<A>>, Box<Behavior<A>>),
 }

@@ -2,25 +2,23 @@ use std::collections::VecDeque;
 
 use crate::{Action, Behavior, Shared, Status, ToAction};
 
-pub struct SequenceState<A, S> {
-    // originial
+pub struct SelectState<A, S> {
     behaviors: VecDeque<Behavior<A>>,
 
     // state
     status: Option<Status>,
 
-    // state for child actions
+    // child state
     current_action: Box<dyn Action<S>>,
     current_action_status: Option<Status>,
 }
 
-impl<A, S> Action<S> for SequenceState<A, S>
+impl<A, S> Action<S> for SelectState<A, S>
 where
     A: ToAction<S> + 'static,
     S: Shared + 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
-        // Once sequence is complete return the completed status
         if let Some(status) = self.status {
             if status == Status::Success || status == Status::Failure {
                 return status;
@@ -29,7 +27,8 @@ where
 
         let child_status = self.current_action.tick(dt, shared);
         let new_status = match child_status {
-            Status::Success => {
+            Status::Failure => {
+                // Go to next
                 match self.behaviors.pop_front() {
                     Some(b) => {
                         self.current_action = Box::from(b);
@@ -37,15 +36,14 @@ where
                         Status::Running
                     }
                     None => {
-                        // current_action `cannot run`
-                        // No actions left to tick, success since sequence is completed
+                        //
                         self.current_action_status = None;
-                        Status::Success
+                        Status::Failure
                     }
                 }
             }
             _ => {
-                // Failure | Running
+                // Success | Running
                 self.current_action_status = Some(child_status);
                 child_status
             }
@@ -68,7 +66,7 @@ where
     }
 }
 
-impl<A, S> SequenceState<A, S>
+impl<A, S> SelectState<A, S>
 where
     A: ToAction<S> + 'static,
     S: Shared + 'static,
@@ -76,8 +74,7 @@ where
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());
         let mut behaviors = VecDeque::from(behaviors);
-        let b = behaviors.pop_front().unwrap();
-        let current_action = Box::from(b);
+        let current_action = Box::from(behaviors.pop_front().unwrap());
         Self {
             behaviors,
             status: None,
@@ -89,57 +86,55 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::test_behavior_interface::{TestActions, TestShared};
+
     use super::*;
-    use crate::{
-        test_behavior_interface::{TestActions, TestShared},
-        Action, Behavior, Status,
-    };
 
     #[test]
-    fn test_sequence_success() {
-        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::Success)]);
-        assert_eq!(sequence.status, None);
+    fn test_select_success() {
+        let mut select = SelectState::new(vec![Behavior::Action(TestActions::Success)]);
+        assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
 
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
     }
 
     #[test]
-    fn test_sequence_failure() {
-        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::Failure)]);
-        assert_eq!(sequence.status, None);
+    fn test_select_failure() {
+        let mut select = SelectState::new(vec![Behavior::Action(TestActions::Failure)]);
+        assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
 
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
     }
 
     #[test]
-    fn test_sequence_run_then_status() {
-        let mut sequence =
-            SequenceState::new(vec![Behavior::Action(TestActions::Run(2, Status::Failure))]);
-        assert_eq!(sequence.status, None);
+    fn test_select_run_then_status() {
+        let mut select =
+            SelectState::new(vec![Behavior::Action(TestActions::Run(2, Status::Failure))]);
+        assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
     }
 
     #[test]
-    fn test_sequence_run_then_halt() {
+    fn test_select_run_then_halt() {
         let custom_action1 = TestActions::Simulate(|mut mock| {
             mock.expect_tick()
                 .once()
@@ -147,51 +142,51 @@ mod tests {
             mock.expect_halt().once().returning(|| {});
             mock
         });
-        let mut sequence = SequenceState::new(vec![Behavior::Action(custom_action1)]);
-        assert_eq!(sequence.status, None);
+        let mut select = SelectState::new(vec![Behavior::Action(custom_action1)]);
+        assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
 
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        sequence.halt();
-        assert_eq!(sequence.status, None);
+        select.halt();
+        assert_eq!(select.status, None);
 
         // * When `resuming` this current action needs to restart
         // TODO, What happens after `halt` -> `resume`
     }
 
     #[test]
-    fn test_sequence_multiple_children() {
-        let mut sequence = SequenceState::new(vec![
-            Behavior::Action(TestActions::Success),
-            Behavior::Action(TestActions::Success),
+    fn test_select_multiple_children() {
+        let mut select = SelectState::new(vec![
+            Behavior::Action(TestActions::Failure),
+            Behavior::Action(TestActions::Failure),
         ]);
-        assert_eq!(sequence.status, None);
+        assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        let status = sequence.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Success);
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
     }
 
     #[test]
-    fn test_sequence_multiple_children_early_failure() {
-        let mut sequence = SequenceState::new(vec![
-            Behavior::Action(TestActions::Success),
+    fn test_select_multiple_children_early_success() {
+        let mut select = SelectState::new(vec![
             Behavior::Action(TestActions::Failure),
             Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Failure),
         ]);
-        assert_eq!(sequence.status, None);
+        assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
-        let status = sequence.tick(0.1, &mut shared);
+        let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        let status = sequence.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Failure);
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
     }
 }
