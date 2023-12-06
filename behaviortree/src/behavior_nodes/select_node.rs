@@ -83,3 +83,110 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_behavior_interface::{TestActions, TestShared};
+
+    use super::*;
+
+    #[test]
+    fn test_select_success() {
+        let mut select = SelectState::new(vec![Behavior::Action(TestActions::Success)]);
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+
+    #[test]
+    fn test_select_failure() {
+        let mut select = SelectState::new(vec![Behavior::Action(TestActions::Failure)]);
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+    }
+
+    #[test]
+    fn test_select_run_then_status() {
+        let mut select =
+            SelectState::new(vec![Behavior::Action(TestActions::Run(2, Status::Failure))]);
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+    }
+
+    #[test]
+    fn test_select_run_then_halt() {
+        let custom_action1 = TestActions::Simulate(|mut mock| {
+            mock.expect_tick()
+                .once()
+                .returning(|_dt, _shared| Status::Running);
+            mock.expect_halt().once().returning(|| {});
+            mock
+        });
+        let mut select = SelectState::new(vec![Behavior::Action(custom_action1)]);
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        select.halt();
+        assert_eq!(select.status, None);
+
+        // * When `resuming` this current action needs to restart
+        // TODO, What happens after `halt` -> `resume`
+    }
+
+    #[test]
+    fn test_select_multiple_children() {
+        let mut select = SelectState::new(vec![
+            Behavior::Action(TestActions::Failure),
+            Behavior::Action(TestActions::Failure),
+        ]);
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+    }
+
+    #[test]
+    fn test_select_multiple_children_early_success() {
+        let mut select = SelectState::new(vec![
+            Behavior::Action(TestActions::Failure),
+            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Failure),
+        ]);
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+}
