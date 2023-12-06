@@ -31,3 +31,26 @@ impl WaitState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_behavior_interface::TestShared;
+
+    use super::*;
+
+    #[test]
+    fn test_tick_simple() {
+        let mut shared = TestShared::default();
+
+        let mut wait = WaitState::new(2.0);
+
+        let status = wait.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = wait.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Success);
+
+        let status = wait.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+}
