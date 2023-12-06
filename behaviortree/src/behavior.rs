@@ -26,6 +26,4 @@ pub enum Behavior<A> {
 
     /// Converts `Success` into `Failure` and vice versa.
     Invert(Box<Behavior<A>>),
-    /// Ignores failures and returns `Success`.
-    AlwaysSucceed(Box<Behavior<A>>),
 }

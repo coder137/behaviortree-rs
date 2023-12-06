@@ -82,9 +82,6 @@ where
             Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
             Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
             Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
-            _ => {
-                todo!()
-            }
         }
     }
 }
