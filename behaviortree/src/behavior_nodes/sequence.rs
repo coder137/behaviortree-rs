@@ -76,8 +76,7 @@ where
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());
         let mut behaviors = VecDeque::from(behaviors);
-        let b = behaviors.pop_front().unwrap();
-        let current_action = Box::from(b);
+        let current_action = Box::from(behaviors.pop_front().unwrap());
         Self {
             behaviors,
             status: None,
