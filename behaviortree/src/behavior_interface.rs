@@ -1,5 +1,5 @@
 use crate::{
-    behavior_nodes::{InvertState, SequenceState},
+    behavior_nodes::{InvertState, SelectState, SequenceState},
     Behavior, Blackboard, Input, Output, Status,
 };
 
@@ -79,6 +79,7 @@ where
         match behavior {
             Behavior::Action(action) => action.to_action(),
             Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
+            Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
             Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
             _ => {
                 todo!()
