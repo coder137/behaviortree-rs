@@ -1,14 +1,11 @@
-use crate::{Action, Shared, Status};
+use crate::{Action, Status};
 
 pub struct WaitState {
     target: f64,
     elapsed: f64,
 }
 
-impl<S> Action<S> for WaitState
-where
-    S: Shared,
-{
+impl<S> Action<S> for WaitState {
     fn tick(&mut self, dt: f64, _shared: &mut S) -> Status {
         if self.elapsed >= self.target {
             return Status::Success;

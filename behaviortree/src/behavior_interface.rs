@@ -42,10 +42,7 @@ pub trait Shared {
 }
 
 #[cfg_attr(test, automock)]
-pub trait Action<S>
-where
-    S: Shared,
-{
+pub trait Action<S> {
     /// Ticks the action
     ///
     /// "Work" is done as long as `Status::Running` is returned by the action.
@@ -79,7 +76,7 @@ pub trait ToAction<S> {
 impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
 where
     A: ToAction<S> + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     fn from(behavior: Behavior<A>) -> Self {
         match behavior {
@@ -99,16 +96,6 @@ pub mod test_behavior_interface {
     #[derive(Default)]
     pub struct TestShared {
         blackboard: Blackboard,
-    }
-
-    impl Shared for TestShared {
-        fn get_local_blackboard(&self) -> &crate::Blackboard {
-            &self.blackboard
-        }
-
-        fn get_mut_local_blackboard(&mut self) -> &mut crate::Blackboard {
-            &mut self.blackboard
-        }
     }
 
     #[derive(Clone)]
