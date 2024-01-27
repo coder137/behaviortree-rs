@@ -99,3 +99,33 @@ where
         self.status
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_behavior_interface::{TestActions, TestShared};
+
+    #[test]
+    fn behavior_tree() {
+        let behavior = Behavior::Sequence(vec![
+            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::Success),
+        ]);
+        let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
+
+        let mut shared = TestShared::default();
+        let mut observer = |status: Status, state: &State| {
+            println!("Status: {:?}, State: {:#?}", status, state);
+        };
+
+        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+
+        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+
+        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+
+        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+    }
+}

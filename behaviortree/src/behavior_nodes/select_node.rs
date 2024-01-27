@@ -118,6 +118,7 @@ mod tests {
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
+        matches!(select.state(), State::Sequence(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
 
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
