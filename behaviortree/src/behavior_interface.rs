@@ -1,45 +1,10 @@
 use crate::{
     behavior_nodes::{InvertState, SelectState, SequenceState, WaitState},
-    Behavior, Blackboard, Input, Output, State, Status,
+    Behavior, State, Status,
 };
 
 #[cfg(test)]
 use mockall::automock;
-
-pub trait Shared {
-    fn read_ref<'a, T>(&'a self, input: &'a Input<T>) -> Option<&T>
-    where
-        T: 'static,
-    {
-        match input {
-            Input::Literal(data) => Some(data),
-            Input::Blackboard(key) => self.get_local_blackboard().read_ref(key),
-        }
-    }
-
-    // TODO, Add a read_ref_mut version here!
-
-    fn read<T>(&self, input: Input<T>) -> Option<T>
-    where
-        T: Clone + 'static,
-    {
-        self.read_ref(&input).cloned()
-    }
-
-    fn write<T>(&mut self, output: Output, data: T)
-    where
-        T: 'static,
-    {
-        match output {
-            Output::Blackboard(key) => {
-                self.get_mut_local_blackboard().write(key, data);
-            }
-        }
-    }
-
-    fn get_local_blackboard(&self) -> &Blackboard;
-    fn get_mut_local_blackboard(&mut self) -> &mut Blackboard;
-}
 
 #[cfg_attr(test, automock)]
 pub trait Action<S> {
@@ -94,9 +59,7 @@ pub mod test_behavior_interface {
     use super::*;
 
     #[derive(Default)]
-    pub struct TestShared {
-        blackboard: Blackboard,
-    }
+    pub struct TestShared {}
 
     #[derive(Clone)]
     pub enum TestActions {
