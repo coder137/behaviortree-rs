@@ -1,6 +1,6 @@
 use crate::{
     behavior_nodes::{InvertState, SelectState, SequenceState, WaitState},
-    Behavior, Blackboard, Input, Output, Status,
+    Behavior, Blackboard, Input, Output, State, Status,
 };
 
 #[cfg(test)]
@@ -64,6 +64,12 @@ where
     ///
     /// Ticking after halting == `resume` operation
     fn halt(&mut self) {}
+
+    /// Decorator and Control type nodes need to know the state of its child(ren)
+    /// User defined Action nodes do not need to override this function
+    fn state(&self) -> State {
+        State::NoChild
+    }
 }
 
 pub trait ToAction<S> {
@@ -127,17 +133,20 @@ pub mod test_behavior_interface {
                     mock.expect_tick()
                         .once()
                         .returning(|_dt, _shared| Status::Success);
+                    mock.expect_state().returning(|| State::NoChild);
                 }
                 TestActions::Failure => {
                     mock.expect_tick()
                         .once()
                         .returning(|_dt, _shared| Status::Failure);
+                    mock.expect_state().returning(|| State::NoChild);
                 }
                 TestActions::Run(times, status) => {
                     mock.expect_tick()
                         .times(times)
                         .returning(|_dt, _shared| Status::Running);
                     mock.expect_tick().return_once(move |_dt, _shared| status);
+                    mock.expect_state().returning(|| State::NoChild);
                 }
                 TestActions::Simulate(cb) => {
                     mock = cb(mock);

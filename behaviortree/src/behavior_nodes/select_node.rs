@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{Action, Behavior, Shared, Status, ToAction};
+use crate::{Action, Behavior, ChildState, Shared, State, Status, ToAction};
 
 pub struct SelectState<A, S> {
     behaviors: VecDeque<Behavior<A>>,
@@ -11,6 +11,7 @@ pub struct SelectState<A, S> {
     // child state
     current_action: Box<dyn Action<S>>,
     current_action_status: Option<Status>,
+    child_states: Vec<ChildState>,
 }
 
 impl<A, S> Action<S> for SelectState<A, S>
@@ -20,12 +21,15 @@ where
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {
-            if status == Status::Success || status == Status::Failure {
+            if status != Status::Running {
                 return status;
             }
         }
 
+        // Tick and get child status and state
         let child_status = self.current_action.tick(dt, shared);
+        let child_state = self.current_action.state();
+        *self.child_states.last_mut().unwrap() = ChildState::new(child_state, Some(child_status));
         let new_status = match child_status {
             Status::Failure => {
                 // Go to next
@@ -33,11 +37,15 @@ where
                     Some(b) => {
                         self.current_action = Box::from(b);
                         self.current_action_status = None;
+                        self.child_states.push(ChildState::new(
+                            self.current_action.state(),
+                            self.current_action_status,
+                        ));
                         Status::Running
                     }
                     None => {
                         //
-                        self.current_action_status = None;
+                        self.current_action_status = Some(child_status);
                         Status::Failure
                     }
                 }
@@ -59,10 +67,16 @@ where
                 // When resuming we tick the child from its good state again!
                 self.current_action.halt();
                 self.current_action_status = None;
+                *self.child_states.last_mut().unwrap() =
+                    ChildState::new(self.current_action.state(), self.current_action_status);
             }
         }
         self.status = None;
-        // Current action and index are left untouched for `resume` operation
+        // Current action is left untouched for `resume` operation
+    }
+
+    fn state(&self) -> State {
+        State::Select(self.child_states.clone())
     }
 }
 
@@ -74,12 +88,18 @@ where
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());
         let mut behaviors = VecDeque::from(behaviors);
-        let current_action = Box::from(behaviors.pop_front().unwrap());
+        let current_action: Box<dyn Action<S>> = Box::from(behaviors.pop_front().unwrap());
+        let current_action_status = None;
+        let child_states = vec![ChildState::new(
+            current_action.state(),
+            current_action_status,
+        )];
         Self {
             behaviors,
             status: None,
             current_action,
-            current_action_status: None,
+            current_action_status,
+            child_states,
         }
     }
 }
@@ -98,6 +118,7 @@ mod tests {
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
+        matches!(select.state(), State::Sequence(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
 
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
@@ -140,6 +161,7 @@ mod tests {
                 .once()
                 .returning(|_dt, _shared| Status::Running);
             mock.expect_halt().once().returning(|| {});
+            mock.expect_state().returning(|| State::NoChild);
             mock
         });
         let mut select = SelectState::new(vec![Behavior::Action(custom_action1)]);
