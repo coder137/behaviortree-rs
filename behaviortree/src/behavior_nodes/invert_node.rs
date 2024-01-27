@@ -1,4 +1,4 @@
-use crate::{Action, Behavior, ChildState, Shared, State, Status, ToAction};
+use crate::{Action, Behavior, ChildState, State, Status, ToAction};
 
 pub struct InvertState<S> {
     // state
@@ -11,7 +11,7 @@ pub struct InvertState<S> {
 
 impl<S> InvertState<S>
 where
-    S: Shared + 'static,
+    S: 'static,
 {
     pub fn new<A>(behavior: Behavior<A>) -> Self
     where
@@ -29,7 +29,7 @@ where
 
 impl<S> Action<S> for InvertState<S>
 where
-    S: Shared + 'static,
+    S: 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {

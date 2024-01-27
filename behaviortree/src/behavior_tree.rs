@@ -1,4 +1,4 @@
-use crate::{Action, Behavior, Shared, State, Status, ToAction};
+use crate::{Action, Behavior, State, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -20,7 +20,7 @@ pub struct BehaviorTree<A, S> {
 impl<A, S> Action<S> for BehaviorTree<A, S>
 where
     A: ToAction<S> + Clone + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {
@@ -62,7 +62,7 @@ where
 impl<A, S> BehaviorTree<A, S>
 where
     A: ToAction<S> + Clone + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self {
         let action: Box<dyn Action<S>> = Box::from(behavior.clone());

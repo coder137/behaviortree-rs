@@ -49,9 +49,32 @@ pub enum Input<T> {
     Blackboard(String),
 }
 
+impl<T> Input<T>
+where
+    T: 'static,
+{
+    pub fn read_ref<'a>(&'a self, blackboard: &'a Blackboard) -> Option<&T> {
+        match self {
+            Input::Literal(data) => Some(data),
+            Input::Blackboard(key) => blackboard.read_ref(key),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Output {
     Blackboard(String),
+}
+
+impl Output {
+    pub fn write<T>(&self, blackboard: &mut Blackboard, data: T)
+    where
+        T: 'static,
+    {
+        match self {
+            Output::Blackboard(key) => blackboard.write(key.clone(), data),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{Action, Behavior, ChildState, Shared, State, Status, ToAction};
+use crate::{Action, Behavior, ChildState, State, Status, ToAction};
 
 pub struct SequenceState<A, S> {
     // originial
@@ -18,7 +18,7 @@ pub struct SequenceState<A, S> {
 impl<A, S> Action<S> for SequenceState<A, S>
 where
     A: ToAction<S> + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         // Once sequence is complete return the completed status
@@ -86,7 +86,7 @@ where
 impl<A, S> SequenceState<A, S>
 where
     A: ToAction<S> + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());

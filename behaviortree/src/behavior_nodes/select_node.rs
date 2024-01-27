@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{Action, Behavior, ChildState, Shared, State, Status, ToAction};
+use crate::{Action, Behavior, ChildState, State, Status, ToAction};
 
 pub struct SelectState<A, S> {
     behaviors: VecDeque<Behavior<A>>,
@@ -17,7 +17,7 @@ pub struct SelectState<A, S> {
 impl<A, S> Action<S> for SelectState<A, S>
 where
     A: ToAction<S> + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {
@@ -83,7 +83,7 @@ where
 impl<A, S> SelectState<A, S>
 where
     A: ToAction<S> + 'static,
-    S: Shared + 'static,
+    S: 'static,
 {
     pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
         assert!(!behaviors.is_empty());

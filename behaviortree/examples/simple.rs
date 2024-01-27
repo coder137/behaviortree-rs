@@ -1,8 +1,6 @@
 use std::time::Instant;
 
-use behaviortree::{
-    Action, Behavior, BehaviorTree, Blackboard, Input, Output, Shared, Status, ToAction,
-};
+use behaviortree::{Action, Behavior, BehaviorTree, Blackboard, Input, Output, Status, ToAction};
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Operation {
@@ -15,16 +13,6 @@ pub enum Operation {
 #[derive(Default)]
 struct OperationShared {
     blackboard: Blackboard,
-}
-
-impl Shared for OperationShared {
-    fn get_local_blackboard(&self) -> &behaviortree::Blackboard {
-        &self.blackboard
-    }
-
-    fn get_mut_local_blackboard(&mut self) -> &mut behaviortree::Blackboard {
-        &mut self.blackboard
-    }
 }
 
 // Convert Operation data to functionality
@@ -40,15 +28,15 @@ impl ToAction<OperationShared> for Operation {
 struct AddState(Input<usize>, Input<usize>, Output);
 impl Action<OperationShared> for AddState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
-        let a = shared.read(self.0.clone());
-        let b = shared.read(self.1.clone());
+        let a = self.0.read_ref(&shared.blackboard);
+        let b = self.1.read_ref(&shared.blackboard);
 
         if a.is_none() || b.is_none() {
             return Status::Failure;
         }
 
         let c = a.unwrap() + b.unwrap();
-        shared.write(self.2.clone(), c);
+        self.2.write(&mut shared.blackboard, c);
         Status::Success
     }
 }
@@ -56,15 +44,15 @@ impl Action<OperationShared> for AddState {
 struct SubState(Input<usize>, Input<usize>, Output);
 impl Action<OperationShared> for SubState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
-        let a = shared.read(self.0.clone());
-        let b = shared.read(self.1.clone());
+        let a = self.0.read_ref(&shared.blackboard);
+        let b = self.1.read_ref(&shared.blackboard);
 
         if a.is_none() || b.is_none() {
             return Status::Failure;
         }
 
         let c = a.unwrap() - b.unwrap();
-        shared.write(self.2.clone(), c);
+        self.2.write(&mut shared.blackboard, c);
         Status::Success
     }
 }
