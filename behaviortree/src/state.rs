@@ -18,9 +18,10 @@ impl ChildState {
 pub enum State {
     // Leaf nodes
     NoChild,
-    // Control nodes
-    Sequence(Vec<ChildState>),
-    Select(Vec<ChildState>),
+
     // Decorator nodes
-    Invert(Box<ChildState>),
+    SingleChild(Box<ChildState>),
+
+    // Control nodes
+    MultipleChildren(Vec<ChildState>),
 }
