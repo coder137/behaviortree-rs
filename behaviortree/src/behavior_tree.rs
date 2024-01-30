@@ -95,6 +95,10 @@ where
         self.action = Box::from(self.behavior.clone());
     }
 
+    pub fn behavior(&self) -> &Behavior<A> {
+        &self.behavior
+    }
+
     pub fn status(&self) -> Option<Status> {
         self.status
     }
