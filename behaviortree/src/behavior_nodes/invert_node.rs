@@ -60,7 +60,7 @@ where
     }
 
     fn state(&self) -> State {
-        State::Invert(Box::new(ChildState::new(
+        State::SingleChild(Box::new(ChildState::new(
             self.current_action.state(),
             self.current_action_status,
         )))
@@ -80,14 +80,14 @@ mod tests {
         let mut invert = InvertState::new(Behavior::Action(TestActions::Success));
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(State::NoChild, None)))
+            State::SingleChild(Box::new(ChildState::new(State::NoChild, None)))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Success)
             )))
@@ -97,7 +97,7 @@ mod tests {
         assert_eq!(status, Status::Failure);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Success)
             )))
@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(status, Status::Success);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Failure)
             )))
@@ -134,7 +134,7 @@ mod tests {
         assert_eq!(status, Status::Running);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Running)
             )))
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(status, Status::Success);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Failure)
             )))
@@ -154,7 +154,7 @@ mod tests {
         assert_eq!(status, Status::Success);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Failure)
             )))
@@ -178,7 +178,7 @@ mod tests {
         assert_eq!(status, Status::Running);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(
+            State::SingleChild(Box::new(ChildState::new(
                 State::NoChild,
                 Some(Status::Running)
             )))
@@ -188,7 +188,7 @@ mod tests {
         assert_eq!(invert.status, None);
         assert_eq!(
             invert.state(),
-            State::Invert(Box::new(ChildState::new(State::NoChild, None)))
+            State::SingleChild(Box::new(ChildState::new(State::NoChild, None)))
         );
     }
 }

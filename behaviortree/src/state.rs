@@ -2,8 +2,8 @@ use crate::Status;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct ChildState {
-    child_state: State,
-    child_status: Option<Status>,
+    pub child_state: State,
+    pub child_status: Option<Status>,
 }
 impl ChildState {
     pub fn new(child_state: State, child_status: Option<Status>) -> Self {
@@ -18,9 +18,10 @@ impl ChildState {
 pub enum State {
     // Leaf nodes
     NoChild,
-    // Control nodes
-    Sequence(Vec<ChildState>),
-    Select(Vec<ChildState>),
+
     // Decorator nodes
-    Invert(Box<ChildState>),
+    SingleChild(Box<ChildState>),
+
+    // Control nodes
+    MultipleChildren(Vec<ChildState>),
 }

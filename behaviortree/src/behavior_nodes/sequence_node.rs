@@ -79,7 +79,7 @@ where
     }
 
     fn state(&self) -> State {
-        State::Sequence(self.child_states.clone())
+        State::MultipleChildren(self.child_states.clone())
     }
 }
 
@@ -123,7 +123,7 @@ mod tests {
         let mut shared = TestShared::default();
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        matches!(sequence.state(), State::Sequence(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
+        matches!(sequence.state(), State::MultipleChildren(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
