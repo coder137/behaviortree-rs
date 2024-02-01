@@ -13,7 +13,6 @@ pub struct BehaviorTree<A, S> {
 
     // State
     status: Option<Status>,
-    child_state: State,
     action: Box<dyn Action<S>>,
 }
 
@@ -41,7 +40,6 @@ where
 
         let status = self.action.tick(dt, shared);
         self.status = Some(status);
-        self.child_state = self.action.state();
         status
     }
 
@@ -55,7 +53,7 @@ where
     }
 
     fn state(&self) -> State {
-        self.child_state.clone()
+        self.action.state()
     }
 }
 
@@ -66,22 +64,21 @@ where
 {
     pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self {
         let action: Box<dyn Action<S>> = Box::from(behavior.clone());
-        let child_state = action.state();
         Self {
             behavior,
             behavior_policy,
             status: None,
-            child_state,
             action,
         }
     }
 
     pub fn tick_with_observer<O>(&mut self, dt: f64, shared: &mut S, observer: &mut O) -> Status
     where
-        O: FnMut(Status, &State),
+        O: FnMut(Status, State),
     {
         let status = self.tick(dt, shared);
-        observer(status, &self.child_state);
+        let state = self.state();
+        observer(status, state);
         status
     }
 
@@ -120,7 +117,7 @@ mod tests {
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
         let mut shared = TestShared::default();
-        let mut observer = |status: Status, state: &State| {
+        let mut observer = |status: Status, state: State| {
             println!("Status: {:?}, State: {:#?}", status, state);
         };
 
