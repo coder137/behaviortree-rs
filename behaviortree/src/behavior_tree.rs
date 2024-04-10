@@ -16,11 +16,7 @@ pub struct BehaviorTree<A, S> {
     action: Box<dyn Action<S>>,
 }
 
-impl<A, S> Action<S> for BehaviorTree<A, S>
-where
-    A: ToAction<S> + Clone + 'static,
-    S: 'static,
-{
+impl<A, S> Action<S> for BehaviorTree<A, S> {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {
             if status == Status::Success || status == Status::Failure {

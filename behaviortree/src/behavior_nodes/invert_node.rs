@@ -8,13 +8,11 @@ pub struct InvertState<S> {
     status: Option<Status>,
 }
 
-impl<S> InvertState<S>
-where
-    S: 'static,
-{
+impl<S> InvertState<S> {
     pub fn new<A>(behavior: Behavior<A>) -> Self
     where
         A: ToAction<S> + 'static,
+        S: 'static,
     {
         let action: Box<dyn Action<S>> = Box::from(behavior);
         Self {

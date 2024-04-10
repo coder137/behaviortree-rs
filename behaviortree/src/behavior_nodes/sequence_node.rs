@@ -8,10 +8,7 @@ pub struct SequenceState<S> {
     status: Option<Status>,
 }
 
-impl<S> Action<S> for SequenceState<S>
-where
-    S: 'static,
-{
+impl<S> Action<S> for SequenceState<S> {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         // Once sequence is complete return the completed status
         if let Some(status) = self.status {
@@ -61,13 +58,11 @@ where
     }
 }
 
-impl<S> SequenceState<S>
-where
-    S: 'static,
-{
+impl<S> SequenceState<S> {
     pub fn new<A>(mut behaviors: Vec<Behavior<A>>) -> Self
     where
         A: ToAction<S> + 'static,
+        S: 'static,
     {
         assert!(!behaviors.is_empty());
         let children = behaviors
