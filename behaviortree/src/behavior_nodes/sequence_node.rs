@@ -69,7 +69,7 @@ impl<S> SequenceState<S> {
             .drain(..)
             .map(|behavior| {
                 let action: Box<dyn Action<S>> = Box::from(behavior);
-                Child::new(action, None)
+                Child::new(action)
             })
             .collect::<Vec<Child<S>>>();
         Self {

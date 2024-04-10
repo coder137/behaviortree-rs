@@ -1,4 +1,4 @@
-use crate::{Action, Behavior, Child, State, Status, ToAction};
+use crate::{Action, Child, State, Status};
 
 pub struct InvertState<S> {
     //
@@ -9,14 +9,12 @@ pub struct InvertState<S> {
 }
 
 impl<S> InvertState<S> {
-    pub fn new<A>(behavior: Behavior<A>) -> Self
+    pub fn new(child: Child<S>) -> Self
     where
-        A: ToAction<S> + 'static,
         S: 'static,
     {
-        let action: Box<dyn Action<S>> = Box::from(behavior);
         Self {
-            child: Child::new(action, None),
+            child,
             status: None,
         }
     }
@@ -54,7 +52,7 @@ impl<S> Action<S> for InvertState<S> {
 mod tests {
     use crate::{
         test_behavior_interface::{TestActions, TestShared},
-        ChildState,
+        Behavior, ChildState,
     };
 
     use super::*;
@@ -63,7 +61,8 @@ mod tests {
     fn test_invert_success() {
         let mut shared = TestShared::default();
 
-        let mut invert = InvertState::new(Behavior::Action(TestActions::SuccessTimes { ticks: 1 }));
+        let behavior = Behavior::Action(TestActions::SuccessTimes { ticks: 1 });
+        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
         assert_eq!(
             invert.state(),
             State::SingleChild(Box::new(ChildState::new(State::NoChild, None)))
@@ -94,7 +93,8 @@ mod tests {
     fn test_invert_failure() {
         let mut shared = TestShared::default();
 
-        let mut invert = InvertState::new(Behavior::Action(TestActions::FailureTimes { ticks: 1 }));
+        let behavior = Behavior::Action(TestActions::FailureTimes { ticks: 1 });
+        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
@@ -114,10 +114,11 @@ mod tests {
     fn test_invert_running_status() {
         let mut shared = TestShared::default();
 
-        let mut invert = InvertState::new(Behavior::Action(TestActions::Run {
+        let behavior = Behavior::Action(TestActions::Run {
             times: 1,
             output: Status::Failure,
-        }));
+        });
+        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);

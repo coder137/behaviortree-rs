@@ -48,7 +48,10 @@ where
             Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
             Behavior::Select(_) => todo!(),
             // Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
-            Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
+            Behavior::Invert(behavior) => {
+                let action = Self::from(*behavior);
+                Box::new(InvertState::new(Child::new(action)))
+            }
         }
     }
 }
@@ -68,8 +71,9 @@ pub struct Child<S> {
 }
 
 impl<S> Child<S> {
-    pub fn new(action: Box<dyn Action<S>>, status: Option<Status>) -> Self {
-        let state = ChildState::new(action.state(), None);
+    pub fn new(action: Box<dyn Action<S>>) -> Self {
+        let status = None;
+        let state = ChildState::new(action.state(), status);
         Self {
             action,
             status,
