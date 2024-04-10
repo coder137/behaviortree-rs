@@ -45,7 +45,16 @@ where
         match behavior {
             Behavior::Action(action) => action.to_action(),
             Behavior::Wait(target) => Box::new(WaitState::new(target)),
-            Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
+            Behavior::Sequence(mut behaviors) => {
+                let behaviors = behaviors
+                    .drain(..)
+                    .map(|b| {
+                        let action = Self::from(b);
+                        Child::new(action)
+                    })
+                    .collect::<Vec<Child<S>>>();
+                Box::new(SequenceState::new(behaviors))
+            }
             Behavior::Select(_) => todo!(),
             // Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
             Behavior::Invert(behavior) => {
