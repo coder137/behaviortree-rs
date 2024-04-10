@@ -1,8 +1,7 @@
-use crate::{Action, Behavior, ChildState, State, Status, ToAction};
+use crate::{Action, Behavior, Child, ChildState, State, Status, ToAction};
 
 pub struct SequenceState<S> {
-    // actions
-    actions: Vec<(Box<dyn Action<S>>, Option<Status>, ChildState)>,
+    children: Vec<Child<S>>,
     index: usize,
 
     // state
@@ -21,19 +20,12 @@ where
             }
         }
 
-        let (current_action, current_action_status, current_action_state) =
-            &mut self.actions[self.index];
-        let new_child_status = current_action.tick(dt, shared);
-        let new_child_state = current_action.state();
-
-        *current_action_status = Some(new_child_status);
-        current_action_state.child_state = new_child_state;
-        current_action_state.child_status = Some(new_child_status);
-
+        let child = &mut self.children[self.index];
+        let new_child_status = child.tick(dt, shared);
         let new_status = match new_child_status {
             Status::Success => {
                 self.index += 1;
-                match self.actions.get(self.index) {
+                match self.children.get(self.index) {
                     Some(_) => Status::Running,
                     None => Status::Success,
                 }
@@ -51,11 +43,7 @@ where
     fn reset(&mut self) {
         // Reset all children
         for i in 0..=self.index {
-            let (action, status, state) = &mut self.actions[i];
-            action.reset();
-            *status = None;
-            state.child_state = action.state();
-            state.child_status = *status;
+            self.children[i].reset();
         }
 
         self.index = 0;
@@ -64,10 +52,10 @@ where
 
     fn state(&self) -> State {
         let child_states = self
-            .actions
+            .children
             .iter()
             .take(self.index + 1)
-            .map(|(_, _, cs)| cs.clone())
+            .map(|child| child.child_state())
             .collect::<Vec<ChildState>>();
         State::MultipleChildren(child_states)
     }
@@ -82,19 +70,16 @@ where
         A: ToAction<S> + 'static,
     {
         assert!(!behaviors.is_empty());
-        let actions = behaviors
+        let children = behaviors
             .drain(..)
             .map(|behavior| {
-                let behavior: Box<dyn Action<S>> = Box::from(behavior);
-                let status = None;
-                let child_state = ChildState::new(behavior.state(), status);
-                (behavior, status, child_state)
+                let action: Box<dyn Action<S>> = Box::from(behavior);
+                Child::new(action, None)
             })
-            .collect::<Vec<(Box<dyn Action<S>>, Option<Status>, ChildState)>>();
-        let index = 0;
+            .collect::<Vec<Child<S>>>();
         Self {
-            actions,
-            index,
+            children,
+            index: 0,
             status: None,
         }
     }

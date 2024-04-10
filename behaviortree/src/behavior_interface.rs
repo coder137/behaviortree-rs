@@ -1,6 +1,6 @@
 use crate::{
     behavior_nodes::{SequenceState, WaitState},
-    Behavior, State, Status,
+    Behavior, ChildState, State, Status,
 };
 
 #[cfg(test)]
@@ -62,6 +62,48 @@ where
             // Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
             // Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
         }
+    }
+}
+
+/// Tracking Child action, status and state
+///
+/// Decorator and Control nodes need to track 1 or more children
+/// This wrapper makes it easier to work with child nodes
+/// Bundles
+/// - Action: Boxed action trait (converted from Behavior)
+/// - Status: Running child status
+/// - Child State
+pub struct Child<S> {
+    action: Box<dyn Action<S>>,
+    status: Option<Status>,
+    state: ChildState,
+}
+
+impl<S> Child<S> {
+    pub fn new(action: Box<dyn Action<S>>, status: Option<Status>) -> Self {
+        let state = ChildState::new(action.state(), None);
+        Self {
+            action,
+            status,
+            state,
+        }
+    }
+
+    pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+        let status = self.action.tick(dt, shared);
+        self.status = Some(status);
+        self.state.child_status = Some(status);
+        status
+    }
+
+    pub fn child_state(&self) -> ChildState {
+        self.state.clone()
+    }
+
+    pub fn reset(&mut self) {
+        self.action.reset();
+        self.status = None;
+        self.state.child_status = None;
     }
 }
 
