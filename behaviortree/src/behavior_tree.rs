@@ -43,15 +43,6 @@ where
         status
     }
 
-    fn halt(&mut self) {
-        if let Some(status) = self.status {
-            if status == Status::Running {
-                self.action.halt();
-            }
-        }
-        self.status = None;
-    }
-
     fn reset(&mut self) {
         self.action.reset();
     }

@@ -25,17 +25,6 @@ pub trait Action<S> {
     /// Functionally equal to calling `Self::new(..)`
     fn reset(&mut self);
 
-    /// Halts the current action and `status` will be reported as None
-    ///
-    /// Function is only invoked when action is in `Status::Running` state
-    ///
-    /// Ticking after halting == `resume` operation
-    /// TODO, Do we need this?
-    /// * It might be good to have in the case of halt and resume operations
-    fn halt(&mut self) {}
-
-    // TODO, on_start, on_end, on_halt, on_reset
-
     /// Decorator and Control type nodes need to know the state of its child(ren)
     /// User defined Action nodes do not need to override this function
     fn state(&self) -> State {
