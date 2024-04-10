@@ -52,6 +52,10 @@ where
         self.status = None;
     }
 
+    fn reset(&mut self) {
+        self.action.reset();
+    }
+
     fn state(&self) -> State {
         self.action.state()
     }
@@ -82,16 +86,6 @@ where
         status
     }
 
-    pub fn reset(&mut self) {
-        self.halt();
-        // *, It would be cleaner for the Behaviors to just reset themselves rather than reloading the entire behavior all over again?
-        // Pros (more efficient maybe? Reset is propagated down the tree resetting all the children)
-        // Cons (requires another trait fn -> Action::reset())
-        // For now, the action is re-constructed,
-        // TODO optimize by reusing the Box
-        self.action = Box::from(self.behavior.clone());
-    }
-
     pub fn behavior(&self) -> &Behavior<A> {
         &self.behavior
     }
@@ -109,10 +103,10 @@ mod tests {
     #[test]
     fn behavior_tree() {
         let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestActions::Success),
-            Behavior::Action(TestActions::Success),
-            Behavior::Action(TestActions::Success),
-            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
         ]);
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 

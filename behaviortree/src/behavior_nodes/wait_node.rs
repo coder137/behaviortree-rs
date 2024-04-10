@@ -18,6 +18,10 @@ impl<S> Action<S> for WaitState {
             Status::Running
         }
     }
+
+    fn reset(&mut self) {
+        self.elapsed = 0.0;
+    }
 }
 
 impl WaitState {

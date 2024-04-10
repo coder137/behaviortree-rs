@@ -1,23 +1,16 @@
-use std::collections::VecDeque;
-
 use crate::{Action, Behavior, ChildState, State, Status, ToAction};
 
-pub struct SequenceState<A, S> {
-    // originial
-    behaviors: VecDeque<Behavior<A>>,
+pub struct SequenceState<S> {
+    // actions
+    actions: Vec<(Box<dyn Action<S>>, Option<Status>, ChildState)>,
+    index: usize,
 
     // state
     status: Option<Status>,
-
-    // state for child actions
-    current_action: Box<dyn Action<S>>,
-    current_action_status: Option<Status>,
-    child_states: Vec<ChildState>,
 }
 
-impl<A, S> Action<S> for SequenceState<A, S>
+impl<S> Action<S> for SequenceState<S>
 where
-    A: ToAction<S> + 'static,
     S: 'static,
 {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
@@ -28,81 +21,81 @@ where
             }
         }
 
-        // Tick and get child status and state
-        let child_status = self.current_action.tick(dt, shared);
-        let child_state = self.current_action.state();
-        *self.child_states.last_mut().unwrap() = ChildState::new(child_state, Some(child_status));
+        let (current_action, current_action_status, current_action_state) =
+            &mut self.actions[self.index];
+        let new_child_status = current_action.tick(dt, shared);
+        let new_child_state = current_action.state();
 
-        let new_status = match child_status {
+        *current_action_status = Some(new_child_status);
+        current_action_state.child_state = new_child_state;
+        current_action_state.child_status = Some(new_child_status);
+
+        let new_status = match new_child_status {
             Status::Success => {
-                match self.behaviors.pop_front() {
-                    Some(b) => {
-                        self.current_action = Box::from(b);
-                        self.current_action_status = None;
-                        self.child_states.push(ChildState::new(
-                            self.current_action.state(),
-                            self.current_action_status,
-                        ));
-                        Status::Running
-                    }
-                    None => {
-                        // current_action `cannot run`
-                        // No actions left to tick, success since sequence is completed
-                        self.current_action_status = Some(child_status);
-                        Status::Success
-                    }
+                self.index += 1;
+                match self.actions.get(self.index) {
+                    Some(_) => Status::Running,
+                    None => Status::Success,
                 }
             }
-            _ => {
-                // Failure | Running
-                self.current_action_status = Some(child_status);
-                child_status
+            Status::Failure => {
+                self.index += 1;
+                Status::Failure
             }
+            Status::Running => Status::Running,
         };
         self.status = Some(new_status);
         new_status
     }
 
-    fn halt(&mut self) {
-        if let Some(status) = self.current_action_status {
-            if status == Status::Running {
-                // Halt and Reset the child
-                // When resuming we tick the child from its good state again!
-                self.current_action.halt();
-                self.current_action_status = None;
-                *self.child_states.last_mut().unwrap() =
-                    ChildState::new(self.current_action.state(), self.current_action_status);
-            }
+    fn reset(&mut self) {
+        // Reset all children
+        for i in 0..=self.index {
+            let (action, status, state) = &mut self.actions[i];
+            action.reset();
+            *status = None;
+            state.child_state = action.state();
+            state.child_status = *status;
         }
+
+        self.index = 0;
         self.status = None;
-        // Current action is left untouched for `resume` operation
     }
 
     fn state(&self) -> State {
-        State::MultipleChildren(self.child_states.clone())
+        let child_states = self
+            .actions
+            .iter()
+            .take(self.index + 1)
+            .map(|(_, _, cs)| cs.clone())
+            .collect::<Vec<ChildState>>();
+        State::MultipleChildren(child_states)
     }
 }
 
-impl<A, S> SequenceState<A, S>
+impl<S> SequenceState<S>
 where
-    A: ToAction<S> + 'static,
     S: 'static,
 {
-    pub fn new(behaviors: Vec<Behavior<A>>) -> Self {
+    pub fn new<A>(mut behaviors: Vec<Behavior<A>>) -> Self
+    where
+        A: ToAction<S> + 'static,
+    {
         assert!(!behaviors.is_empty());
-        let mut behaviors = VecDeque::from(behaviors);
-        let current_action: Box<dyn Action<S>> = Box::from(behaviors.pop_front().unwrap());
-        let current_action_status = None;
-        let child_states = vec![ChildState::new(
-            current_action.state(),
-            current_action_status,
-        )];
+        let actions = behaviors
+            .drain(..)
+            .map(|behavior| {
+                let behavior: Box<dyn Action<S>> = Box::from(behavior);
+                let status = None;
+                let child_state = ChildState::new(behavior.state(), status);
+                (behavior, status, child_state)
+            })
+            .collect::<Vec<(Box<dyn Action<S>>, Option<Status>, ChildState)>>();
+        let index = 0;
         Self {
-            behaviors,
+            actions,
+            index,
             status: None,
-            current_action,
-            current_action_status,
-            child_states,
         }
     }
 }
@@ -117,12 +110,15 @@ mod tests {
 
     #[test]
     fn test_sequence_success() {
-        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::Success)]);
+        let mut shared = TestShared::default();
+        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::SuccessTimes {
+            ticks: 1,
+        })]);
         assert_eq!(sequence.status, None);
 
-        let mut shared = TestShared::default();
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
+        assert_eq!(sequence.status, Some(Status::Success));
         matches!(sequence.state(), State::MultipleChildren(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
 
         let status = sequence.tick(0.1, &mut shared);
@@ -131,12 +127,15 @@ mod tests {
 
     #[test]
     fn test_sequence_failure() {
-        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::Failure)]);
+        let mut shared = TestShared::default();
+        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::FailureTimes {
+            ticks: 1,
+        })]);
         assert_eq!(sequence.status, None);
 
-        let mut shared = TestShared::default();
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
+        assert_eq!(sequence.status, Some(Status::Failure));
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
@@ -144,90 +143,67 @@ mod tests {
 
     #[test]
     fn test_sequence_run_then_status() {
-        let mut sequence =
-            SequenceState::new(vec![Behavior::Action(TestActions::Run(2, Status::Failure))]);
+        let mut shared = TestShared::default();
+        let mut sequence = SequenceState::new(vec![Behavior::Action(TestActions::Run {
+            times: 2,
+            output: Status::Failure,
+        })]);
         assert_eq!(sequence.status, None);
 
-        let mut shared = TestShared::default();
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
+        println!("State: {:?}", sequence.state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
+        println!("State: {:?}", sequence.state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-    }
-
-    #[test]
-    fn test_sequence_run_then_halt() {
-        let custom_action1 = TestActions::Simulate(|mut mock| {
-            mock.expect_tick()
-                .once()
-                .returning(|_dt, _shared| Status::Running);
-            mock.expect_halt().once().returning(|| {});
-            mock.expect_tick()
-                .once()
-                .returning(|_dt, _shared| Status::Running);
-            mock.expect_tick()
-                .once()
-                .returning(|_dt, _shared| Status::Success);
-            mock.expect_state().returning(|| State::NoChild);
-            mock
-        });
-        let mut sequence = SequenceState::new(vec![Behavior::Action(custom_action1)]);
-        assert_eq!(sequence.status, None);
-
-        let mut shared = TestShared::default();
-
-        let status = sequence.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Running);
-
-        sequence.halt();
-        assert_eq!(sequence.status, None);
-
-        // * When `resuming` this current action needs to restart
-        // We call this resume since the Sequence node continues from where it was halted
-        let status = sequence.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Running);
-
-        let status = sequence.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Success);
+        println!("State: {:?}", sequence.state());
     }
 
     #[test]
     fn test_sequence_multiple_children() {
+        let mut shared = TestShared::default();
         let mut sequence = SequenceState::new(vec![
-            Behavior::Action(TestActions::Success),
-            Behavior::Action(TestActions::Success),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
         ]);
         assert_eq!(sequence.status, None);
+        println!("State: {:?}", sequence.state());
 
-        let mut shared = TestShared::default();
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
+        println!("State: {:?}", sequence.state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
+        println!("State: {:?}", sequence.state());
     }
 
     #[test]
     fn test_sequence_multiple_children_early_failure() {
-        let mut sequence = SequenceState::new(vec![
-            Behavior::Action(TestActions::Success),
-            Behavior::Action(TestActions::Failure),
-            Behavior::Action(TestActions::Success),
-        ]);
-        assert_eq!(sequence.status, None);
-
         let mut shared = TestShared::default();
+        let mut sequence = SequenceState::new(vec![
+            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
+            Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
+            Behavior::Action(TestActions::SuccessTimes { ticks: 0 }), // This never executes
+        ]);
+
+        assert_eq!(sequence.status, None);
+        println!("State: {:?}", sequence.state());
+
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
+        println!("State: {:?}", sequence.state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
+        println!("State: {:?}", sequence.state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
+        println!("State: {:?}", sequence.state());
     }
 }
