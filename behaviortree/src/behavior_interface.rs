@@ -1,5 +1,5 @@
 use crate::{
-    behavior_nodes::{SequenceState, WaitState},
+    behavior_nodes::{InvertState, SequenceState, WaitState},
     Behavior, ChildState, State, Status,
 };
 
@@ -58,9 +58,8 @@ where
             Behavior::Wait(target) => Box::new(WaitState::new(target)),
             Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
             Behavior::Select(_) => todo!(),
-            Behavior::Invert(_) => todo!(),
             // Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
-            // Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
+            Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
         }
     }
 }

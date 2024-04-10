@@ -1,12 +1,11 @@
-use crate::{Action, Behavior, ChildState, State, Status, ToAction};
+use crate::{Action, Behavior, Child, State, Status, ToAction};
 
 pub struct InvertState<S> {
+    //
+    child: Child<S>,
+
     // state
     status: Option<Status>,
-
-    // child state
-    current_action: Box<dyn Action<S>>,
-    current_action_status: Option<Status>,
 }
 
 impl<S> InvertState<S>
@@ -17,20 +16,15 @@ where
     where
         A: ToAction<S> + 'static,
     {
-        let current_action: Box<dyn Action<S>> = Box::from(behavior);
-        let current_action_status = None;
+        let action: Box<dyn Action<S>> = Box::from(behavior);
         Self {
+            child: Child::new(action, None),
             status: None,
-            current_action,
-            current_action_status,
         }
     }
 }
 
-impl<S> Action<S> for InvertState<S>
-where
-    S: 'static,
-{
+impl<S> Action<S> for InvertState<S> {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {
             if status != Status::Running {
@@ -38,8 +32,7 @@ where
             }
         }
 
-        let child_status = self.current_action.tick(dt, shared);
-        self.current_action_status = Some(child_status);
+        let child_status = self.child.tick(dt, shared);
         let status = match child_status {
             Status::Success => Status::Failure,
             Status::Failure => Status::Success,
@@ -49,27 +42,22 @@ where
         status
     }
 
-    fn halt(&mut self) {
-        if let Some(child_status) = self.current_action_status {
-            if child_status == Status::Running {
-                self.current_action.halt();
-                self.current_action_status = None;
-            }
-        }
+    fn reset(&mut self) {
+        self.child.reset();
         self.status = None;
     }
 
     fn state(&self) -> State {
-        State::SingleChild(Box::new(ChildState::new(
-            self.current_action.state(),
-            self.current_action_status,
-        )))
+        State::SingleChild(Box::new(self.child.child_state()))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::test_behavior_interface::{TestActions, TestShared};
+    use crate::{
+        test_behavior_interface::{TestActions, TestShared},
+        ChildState,
+    };
 
     use super::*;
 
@@ -77,7 +65,7 @@ mod tests {
     fn test_invert_success() {
         let mut shared = TestShared::default();
 
-        let mut invert = InvertState::new(Behavior::Action(TestActions::Success));
+        let mut invert = InvertState::new(Behavior::Action(TestActions::SuccessTimes { ticks: 1 }));
         assert_eq!(
             invert.state(),
             State::SingleChild(Box::new(ChildState::new(State::NoChild, None)))
@@ -108,7 +96,7 @@ mod tests {
     fn test_invert_failure() {
         let mut shared = TestShared::default();
 
-        let mut invert = InvertState::new(Behavior::Action(TestActions::Failure));
+        let mut invert = InvertState::new(Behavior::Action(TestActions::FailureTimes { ticks: 1 }));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
@@ -128,7 +116,10 @@ mod tests {
     fn test_invert_running_status() {
         let mut shared = TestShared::default();
 
-        let mut invert = InvertState::new(Behavior::Action(TestActions::Run(1, Status::Failure)));
+        let mut invert = InvertState::new(Behavior::Action(TestActions::Run {
+            times: 1,
+            output: Status::Failure,
+        }));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
@@ -158,37 +149,6 @@ mod tests {
                 State::NoChild,
                 Some(Status::Failure)
             )))
-        );
-    }
-
-    #[test]
-    fn test_invert_halt() {
-        let mut shared = TestShared::default();
-
-        let mut invert = InvertState::new(Behavior::Action(TestActions::Simulate(|mut mob| {
-            mob.expect_tick()
-                .once()
-                .returning(|_dt, _shared| Status::Running);
-            mob.expect_halt().return_once(|| {});
-            mob.expect_state().returning(|| State::NoChild);
-            mob
-        })));
-
-        let status = invert.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Running);
-        assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new(ChildState::new(
-                State::NoChild,
-                Some(Status::Running)
-            )))
-        );
-
-        invert.halt();
-        assert_eq!(invert.status, None);
-        assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new(ChildState::new(State::NoChild, None)))
         );
     }
 }
