@@ -39,6 +39,8 @@ impl Action<OperationShared> for AddState {
         self.2.write(&mut shared.blackboard, c);
         Status::Success
     }
+
+    fn reset(&mut self) {}
 }
 
 struct SubState(Input<usize>, Input<usize>, Output);
@@ -55,6 +57,8 @@ impl Action<OperationShared> for SubState {
         self.2.write(&mut shared.blackboard, c);
         Status::Success
     }
+
+    fn reset(&mut self) {}
 }
 
 fn main() {
