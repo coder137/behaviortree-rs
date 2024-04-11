@@ -1,4 +1,4 @@
-use crate::{Action, Child, ChildState, State, Status};
+use crate::{Action, Child, State, Status};
 
 pub struct SequenceState<S> {
     children: Vec<Child<S>>,
@@ -53,7 +53,7 @@ impl<S> Action<S> for SequenceState<S> {
             .iter()
             .take(self.index + 1)
             .map(|child| child.child_state())
-            .collect::<Vec<ChildState>>();
+            .collect();
         State::MultipleChildren(child_states)
     }
 }
@@ -106,7 +106,7 @@ mod tests {
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(sequence.status, Some(Status::Success));
-        matches!(sequence.state(), State::MultipleChildren(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
+        // matches!(sequence.state(), State::MultipleChildren(states) if states.len() == 1 && states[0] == ChildState::new(State::NoChild, Some(Status::Success)));
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);

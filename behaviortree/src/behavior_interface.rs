@@ -1,6 +1,6 @@
 use crate::{
     behavior_nodes::{InvertState, SequenceState, WaitState},
-    Behavior, ChildState, State, Status,
+    Behavior, State, Status,
 };
 
 #[cfg(test)]
@@ -20,9 +20,9 @@ pub trait Action<S> {
     /// NOTE: See `BehaviorTree` implementation. User is not expected to invoke this manually
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status;
 
-    /// Resets the current action
+    /// Resets the current action to its initial/newly created state
     ///
-    /// Functionally equal to calling `Self::new(..)`
+    /// Decorator and Control nodes need to also reset their ticked children
     fn reset(&mut self);
 
     /// Decorator and Control type nodes need to know the state of its child(ren)
@@ -76,35 +76,27 @@ where
 pub struct Child<S> {
     action: Box<dyn Action<S>>,
     status: Option<Status>,
-    state: ChildState,
 }
 
 impl<S> Child<S> {
     pub fn new(action: Box<dyn Action<S>>) -> Self {
         let status = None;
-        let state = ChildState::new(action.state(), status);
-        Self {
-            action,
-            status,
-            state,
-        }
+        Self { action, status }
     }
 
     pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         let status = self.action.tick(dt, shared);
         self.status = Some(status);
-        self.state.child_status = Some(status);
         status
     }
 
-    pub fn child_state(&self) -> ChildState {
-        self.state.clone()
+    pub fn child_state(&self) -> (State, Option<Status>) {
+        (self.action.state(), self.status)
     }
 
     pub fn reset(&mut self) {
         self.action.reset();
         self.status = None;
-        self.state.child_status = None;
     }
 }
 
