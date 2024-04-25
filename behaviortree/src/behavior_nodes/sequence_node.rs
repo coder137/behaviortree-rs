@@ -39,9 +39,12 @@ impl<S> Action<S> for SequenceState<S> {
 
     fn reset(&mut self) {
         // Reset all children
-        for i in 0..=self.index {
-            self.children[i].reset();
-        }
+        self.children
+            .iter_mut()
+            .take(self.index + 1)
+            .for_each(|child| {
+                child.reset();
+            });
 
         self.index = 0;
         self.status = None;

@@ -41,6 +41,7 @@ impl<A, S> Action<S> for BehaviorTree<A, S> {
 
     fn reset(&mut self) {
         self.action.reset();
+        self.status = None;
     }
 
     fn state(&self) -> State {
@@ -85,10 +86,50 @@ impl<A, S> BehaviorTree<A, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_behavior_interface::{TestActions, TestShared};
+    use crate::{
+        test_behavior_interface::{TestActions, TestShared},
+        MockAction,
+    };
 
     #[test]
-    fn behavior_tree() {
+    fn behavior_tree_with_reset() {
+        let behavior = Behavior::Sequence(vec![
+            Behavior::Action(TestActions::SuccessWithCb {
+                ticks: 2,
+                cb: |mut m: MockAction<TestShared>| {
+                    m.expect_reset().times(1).returning(|| {});
+                    m
+                },
+            }),
+            Behavior::Action(TestActions::SuccessWithCb {
+                ticks: 2,
+                cb: |mut m| {
+                    m.expect_reset().times(1).returning(|| {});
+                    m
+                },
+            }),
+        ]);
+        let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
+
+        let mut shared = TestShared::default();
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+
+        tree.reset();
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+
+    #[test]
+    fn behavior_tree_with_observer() {
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
@@ -102,12 +143,19 @@ mod tests {
             println!("Status: {:?}, State: {:#?}", status, state);
         };
 
-        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        assert_eq!(status, Status::Running);
 
-        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        assert_eq!(status, Status::Running);
 
-        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        assert_eq!(status, Status::Running);
 
-        tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        assert_eq!(status, Status::Success);
+
+        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
+        assert_eq!(status, Status::Success);
     }
 }
