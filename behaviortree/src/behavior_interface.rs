@@ -1,5 +1,5 @@
 use crate::{
-    behavior_nodes::{InvertState, SequenceState, WaitState},
+    behavior_nodes::{InvertState, SelectState, SequenceState, WaitState},
     Behavior, State, Status,
 };
 
@@ -36,6 +36,20 @@ pub trait ToAction<S> {
     fn to_action(self) -> Box<dyn Action<S>>;
 }
 
+pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
+where
+    A: ToAction<S> + 'static,
+    S: 'static,
+{
+    behaviors
+        .drain(..)
+        .map(|b| {
+            let action = Box::from(b);
+            Child::new(action)
+        })
+        .collect::<Vec<Child<S>>>()
+}
+
 impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
 where
     A: ToAction<S> + 'static,
@@ -45,18 +59,14 @@ where
         match behavior {
             Behavior::Action(action) => action.to_action(),
             Behavior::Wait(target) => Box::new(WaitState::new(target)),
-            Behavior::Sequence(mut behaviors) => {
-                let behaviors = behaviors
-                    .drain(..)
-                    .map(|b| {
-                        let action = Self::from(b);
-                        Child::new(action)
-                    })
-                    .collect::<Vec<Child<S>>>();
-                Box::new(SequenceState::new(behaviors))
+            Behavior::Sequence(behaviors) => {
+                let children = convert_behaviors(behaviors);
+                Box::new(SequenceState::new(children))
             }
-            Behavior::Select(_) => todo!(),
-            // Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
+            Behavior::Select(behaviors) => {
+                let children = convert_behaviors(behaviors);
+                Box::new(SelectState::new(children))
+            }
             Behavior::Invert(behavior) => {
                 let action = Self::from(*behavior);
                 Box::new(InvertState::new(Child::new(action)))
@@ -103,21 +113,6 @@ impl<S> Child<S> {
 #[cfg(test)]
 pub mod test_behavior_interface {
     use super::*;
-
-    pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
-    where
-        A: ToAction<S> + 'static,
-        S: 'static,
-    {
-        let behaviors = behaviors
-            .drain(..)
-            .map(|b| {
-                let action = Box::from(b);
-                Child::new(action)
-            })
-            .collect::<Vec<Child<S>>>();
-        behaviors
-    }
 
     #[derive(Default)]
     pub struct TestShared {}

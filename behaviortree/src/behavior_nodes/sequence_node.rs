@@ -76,7 +76,8 @@ impl<S> SequenceState<S> {
 mod tests {
     use super::*;
     use crate::{
-        test_behavior_interface::{convert_behaviors, TestActions, TestShared},
+        convert_behaviors,
+        test_behavior_interface::{TestActions, TestShared},
         Action, Behavior, Status,
     };
 
