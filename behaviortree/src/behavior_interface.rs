@@ -104,6 +104,21 @@ impl<S> Child<S> {
 pub mod test_behavior_interface {
     use super::*;
 
+    pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
+    where
+        A: ToAction<S> + 'static,
+        S: 'static,
+    {
+        let behaviors = behaviors
+            .drain(..)
+            .map(|b| {
+                let action = Box::from(b);
+                Child::new(action)
+            })
+            .collect::<Vec<Child<S>>>();
+        behaviors
+    }
+
     #[derive(Default)]
     pub struct TestShared {}
 
