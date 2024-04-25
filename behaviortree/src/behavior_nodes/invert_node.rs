@@ -45,7 +45,7 @@ impl<S> Action<S> for InvertState<S> {
 
     fn state(&self) -> State {
         let (state, status) = self.child.child_state();
-        State::SingleChild(Box::new(state), status)
+        State::SingleChild(Box::new((state, status)))
     }
 }
 

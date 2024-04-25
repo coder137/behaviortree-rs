@@ -65,11 +65,11 @@ impl<A, S> BehaviorTree<A, S> {
 
     pub fn tick_with_observer<O>(&mut self, dt: f64, shared: &mut S, observer: &mut O) -> Status
     where
-        O: FnMut(Status, State),
+        O: FnMut(State, Status),
     {
         let status = self.tick(dt, shared);
         let state = self.state();
-        observer(status, state);
+        observer(state, status);
         status
     }
 
@@ -98,7 +98,7 @@ mod tests {
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
         let mut shared = TestShared::default();
-        let mut observer = |status: Status, state: State| {
+        let mut observer = |state: State, status: Status| {
             println!("Status: {:?}, State: {:#?}", status, state);
         };
 
