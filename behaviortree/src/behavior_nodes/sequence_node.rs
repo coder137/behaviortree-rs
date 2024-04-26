@@ -17,7 +17,10 @@ impl<S> Action<S> for SequenceState<S> {
             }
         }
 
-        let child = &mut self.children[self.index];
+        let child = match self.children.get_mut(self.index) {
+            Some(child) => child,
+            None => unreachable!(),
+        };
         let new_child_status = child.tick(dt, shared);
         let new_status = match new_child_status {
             Status::Success => {
