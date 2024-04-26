@@ -111,6 +111,10 @@ mod tests {
         ]);
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
+        // For unit tests
+        let _ = tree.behavior();
+        assert_eq!(tree.status(), None);
+
         let mut shared = TestShared::default();
 
         let status = tree.tick(0.1, &mut shared);
@@ -120,6 +124,43 @@ mod tests {
         assert_eq!(status, Status::Success);
 
         tree.reset();
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+
+    #[test]
+    fn behavior_tree_with_auto_reset() {
+        let behavior = Behavior::Sequence(vec![
+            Behavior::Action(TestActions::SuccessWithCb {
+                ticks: 2,
+                cb: |mut m: MockAction<TestShared>| {
+                    m.expect_reset().times(1).returning(|| {});
+                    m
+                },
+            }),
+            Behavior::Action(TestActions::SuccessWithCb {
+                ticks: 2,
+                cb: |mut m| {
+                    m.expect_reset().times(1).returning(|| {});
+                    m
+                },
+            }),
+        ]);
+        let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::ReloadOnCompletion);
+
+        let mut shared = TestShared::default();
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = tree.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Success);
+
+        // Automatically resets after success (Reload on Completion)
 
         let status = tree.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
