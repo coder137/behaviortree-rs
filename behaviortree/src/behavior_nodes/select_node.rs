@@ -162,6 +162,34 @@ mod tests {
     }
 
     #[test]
+    fn test_select_multiple_children_early_reset() {
+        let mut select = SelectState::new(convert_behaviors(vec![
+            Behavior::Action(TestActions::FailureWithCb {
+                ticks: 2,
+                cb: |mut m| {
+                    m.expect_reset().times(1).returning(|| {});
+                    m
+                },
+            }),
+            Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
+        ]));
+        assert_eq!(select.status, None);
+
+        let mut shared = TestShared::default();
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        select.reset();
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = select.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+    }
+
+    #[test]
     fn test_select_multiple_children_early_success() {
         let mut select = SelectState::new(convert_behaviors(vec![
             Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
