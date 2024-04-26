@@ -20,12 +20,10 @@ pub trait Action<S> {
     /// NOTE: See `BehaviorTree` implementation. User is not expected to invoke this manually
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status;
 
-    /// Halts the current action and `status` will be reported as None
+    /// Resets the current action to its initial/newly created state
     ///
-    /// Function is only invoked when action is in `Status::Running` state
-    ///
-    /// Ticking after halting == `resume` operation
-    fn halt(&mut self) {}
+    /// Decorator and Control nodes need to also reset their ticked children
+    fn reset(&mut self);
 
     /// Decorator and Control type nodes need to know the state of its child(ren)
     /// User defined Action nodes do not need to override this function
@@ -38,6 +36,20 @@ pub trait ToAction<S> {
     fn to_action(self) -> Box<dyn Action<S>>;
 }
 
+pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
+where
+    A: ToAction<S> + 'static,
+    S: 'static,
+{
+    behaviors
+        .drain(..)
+        .map(|b| {
+            let action = Box::from(b);
+            Child::new(action)
+        })
+        .collect::<Vec<Child<S>>>()
+}
+
 impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
 where
     A: ToAction<S> + 'static,
@@ -47,10 +59,58 @@ where
         match behavior {
             Behavior::Action(action) => action.to_action(),
             Behavior::Wait(target) => Box::new(WaitState::new(target)),
-            Behavior::Sequence(behaviors) => Box::new(SequenceState::new(behaviors)),
-            Behavior::Select(behaviors) => Box::new(SelectState::new(behaviors)),
-            Behavior::Invert(behavior) => Box::new(InvertState::new(*behavior)),
+            Behavior::Sequence(behaviors) => {
+                let children = convert_behaviors(behaviors);
+                Box::new(SequenceState::new(children))
+            }
+            Behavior::Select(behaviors) => {
+                let children = convert_behaviors(behaviors);
+                Box::new(SelectState::new(children))
+            }
+            Behavior::Invert(behavior) => {
+                let action = Self::from(*behavior);
+                Box::new(InvertState::new(Child::new(action)))
+            }
         }
+    }
+}
+
+/// Tracking Child action, status and state
+///
+/// Decorator and Control nodes need to track 1 or more children
+/// This wrapper makes it easier to work with child nodes
+/// Bundles
+/// - Action: Boxed action trait (converted from Behavior)
+/// - Status: Running child status
+/// - Child State
+pub struct Child<S> {
+    action: Box<dyn Action<S>>,
+    status: Option<Status>,
+}
+
+impl<S> Child<S> {
+    pub fn new(action: Box<dyn Action<S>>) -> Self {
+        let status = None;
+        Self { action, status }
+    }
+
+    pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+        let status = self.action.tick(dt, shared);
+        self.status = Some(status);
+        status
+    }
+
+    pub fn child_state(&self) -> (State, Option<Status>) {
+        (self.action.state(), self.status)
+    }
+
+    pub fn reset(&mut self) {
+        self.action.reset();
+        self.status = None;
+    }
+
+    pub fn status(&self) -> &Option<Status> {
+        &self.status
     }
 }
 
@@ -64,45 +124,79 @@ pub mod test_behavior_interface {
     #[derive(Clone)]
     pub enum TestActions {
         /// Action returns success immediately
-        Success,
+        SuccessTimes { ticks: usize },
+        SuccessWithCb {
+            ticks: usize,
+            cb: fn(MockAction<TestShared>) -> MockAction<TestShared>,
+        },
         /// Action returns failure immediately
-        Failure,
-        /// Action runs for `usize` ticks and returns `status` in the next tick
+        FailureTimes { ticks: usize },
+        FailureWithCb {
+            ticks: usize,
+            cb: fn(MockAction<TestShared>) -> MockAction<TestShared>,
+        },
+        /// Action runs for `usize` ticks as Status::Running and returns `status` in the next tick
         ///
         /// Runs for a total of `usize + 1` ticks
-        Run(usize, Status),
+        Run { times: usize, output: Status },
+        RunWithCb {
+            times: usize,
+            output: Status,
+            cb: fn(MockAction<TestShared>) -> MockAction<TestShared>,
+        },
         /// Provides a user defined callback to simulate more complex scenarios
         Simulate(fn(MockAction<TestShared>) -> MockAction<TestShared>),
     }
 
     impl ToAction<TestShared> for TestActions {
         fn to_action(self) -> Box<dyn Action<TestShared>> {
-            let mut mock = MockAction::new();
             match self {
-                TestActions::Success => {
-                    mock.expect_tick()
-                        .once()
-                        .returning(|_dt, _shared| Status::Success);
-                    mock.expect_state().returning(|| State::NoChild);
+                TestActions::SuccessTimes { ticks } => {
+                    TestActions::SuccessWithCb { ticks, cb: |m| m }.to_action()
                 }
-                TestActions::Failure => {
+                TestActions::SuccessWithCb { ticks, cb } => {
+                    let mut mock = MockAction::new();
                     mock.expect_tick()
-                        .once()
+                        .times(ticks)
+                        .returning(|_, _| Status::Success);
+                    mock.expect_state().returning(|| State::NoChild);
+                    mock = cb(mock);
+                    Box::new(mock)
+                }
+                TestActions::FailureTimes { ticks } => {
+                    TestActions::FailureWithCb { ticks, cb: |m| m }.to_action()
+                }
+                TestActions::FailureWithCb { ticks, cb } => {
+                    let mut mock = MockAction::new();
+                    mock.expect_tick()
+                        .times(ticks)
                         .returning(|_dt, _shared| Status::Failure);
                     mock.expect_state().returning(|| State::NoChild);
+                    mock = cb(mock);
+                    Box::new(mock)
                 }
-                TestActions::Run(times, status) => {
+                TestActions::Run { times, output } => TestActions::RunWithCb {
+                    times,
+                    output,
+                    cb: |m| m,
+                }
+                .to_action(),
+                TestActions::RunWithCb { times, output, cb } => {
+                    let mut mock = MockAction::new();
                     mock.expect_tick()
                         .times(times)
                         .returning(|_dt, _shared| Status::Running);
-                    mock.expect_tick().return_once(move |_dt, _shared| status);
+                    mock.expect_tick().return_once(move |_dt, _shared| output);
                     mock.expect_state().returning(|| State::NoChild);
+                    mock = cb(mock);
+                    Box::new(mock)
                 }
                 TestActions::Simulate(cb) => {
+                    let mut mock = MockAction::new();
                     mock = cb(mock);
+                    Box::new(mock)
                 }
             }
-            Box::new(mock)
         }
     }
 }
