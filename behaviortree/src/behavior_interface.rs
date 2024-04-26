@@ -108,6 +108,10 @@ impl<S> Child<S> {
         self.action.reset();
         self.status = None;
     }
+
+    pub fn status(&self) -> &Option<Status> {
+        &self.status
+    }
 }
 
 #[cfg(test)]

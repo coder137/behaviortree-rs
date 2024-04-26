@@ -38,10 +38,10 @@ impl<S> Action<S> for SequenceState<S> {
     }
 
     fn reset(&mut self) {
-        // Reset all children
+        // Reset all ticked children
         self.children
             .iter_mut()
-            .take(self.index + 1)
+            .filter(|child| child.status().is_some())
             .for_each(|child| {
                 child.reset();
             });
