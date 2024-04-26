@@ -64,30 +64,24 @@ mod tests {
 
         let behavior = Behavior::Action(TestActions::SuccessTimes { ticks: 1 });
         let mut invert = InvertState::new(Child::new(Box::from(behavior)));
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(State::NoChild, None)))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, None)))
+        );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(
-        //         State::NoChild,
-        //         Some(Status::Success)
-        //     )))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, Some(Status::Success))))
+        );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(
-        //         State::NoChild,
-        //         Some(Status::Success)
-        //     )))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, Some(Status::Success))))
+        );
     }
 
     #[test]
@@ -99,13 +93,10 @@ mod tests {
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(
-        //         State::NoChild,
-        //         Some(Status::Failure)
-        //     )))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, Some(Status::Failure))))
+        );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
@@ -123,32 +114,49 @@ mod tests {
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(
-        //         State::NoChild,
-        //         Some(Status::Running)
-        //     )))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, Some(Status::Running))))
+        );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(
-        //         State::NoChild,
-        //         Some(Status::Failure)
-        //     )))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, Some(Status::Failure))))
+        );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        // assert_eq!(
-        //     invert.state(),
-        //     State::SingleChild(Box::new(ChildState::new(
-        //         State::NoChild,
-        //         Some(Status::Failure)
-        //     )))
-        // );
+        assert_eq!(
+            invert.state(),
+            State::SingleChild(Box::new((State::NoChild, Some(Status::Failure))))
+        );
+    }
+
+    #[test]
+    fn test_invert_reset() {
+        let mut shared = TestShared::default();
+
+        let behavior = Behavior::Action(TestActions::SuccessWithCb {
+            ticks: 2,
+            cb: |mut m| {
+                //
+                m.expect_reset().times(1).returning(|| {});
+                m
+            },
+        });
+        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
+
+        let status = invert.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+
+        let status = invert.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
+
+        invert.reset();
+
+        let status = invert.tick(0.1, &mut shared);
+        assert_eq!(status, Status::Failure);
     }
 }
