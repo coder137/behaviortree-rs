@@ -1,4 +1,6 @@
-use crate::{Action, Child, State, Status};
+use std::rc::Rc;
+
+use crate::{Action, Child, ChildState, ChildStateInfo, State, Status};
 
 pub struct SelectState<S> {
     children: Vec<Child<S>>,
@@ -6,6 +8,23 @@ pub struct SelectState<S> {
 
     // state
     status: Option<Status>,
+    state: Rc<[ChildStateInfo]>,
+}
+
+impl<S> SelectState<S> {
+    pub fn new(children: Vec<Child<S>>) -> Self
+    where
+        S: 'static,
+    {
+        assert!(!children.is_empty());
+        let state = Rc::from_iter(children.iter().map(|child| child.child_state_info()));
+        Self {
+            children,
+            index: 0,
+            status: None,
+            state,
+        }
+    }
 }
 
 impl<S> Action<S> for SelectState<S>
@@ -64,22 +83,9 @@ where
             .collect();
         State::MultipleChildren(child_states)
     }
-}
 
-impl<S> SelectState<S>
-where
-    S: 'static,
-{
-    pub fn new(children: Vec<Child<S>>) -> Self
-    where
-        S: 'static,
-    {
-        assert!(!children.is_empty());
-        Self {
-            children,
-            index: 0,
-            status: None,
-        }
+    fn child_state(&self) -> ChildState {
+        ChildState::MultipleChildren(self.state.clone())
     }
 }
 

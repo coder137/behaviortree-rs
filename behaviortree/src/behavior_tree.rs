@@ -1,4 +1,4 @@
-use crate::{Action, Behavior, State, Status, ToAction};
+use crate::{Action, Behavior, ChildState, State, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -47,6 +47,10 @@ impl<A, S> Action<S> for BehaviorTree<A, S> {
     fn state(&self) -> State {
         self.action.state()
     }
+
+    fn child_state(&self) -> ChildState {
+        self.action.child_state()
+    }
 }
 
 impl<A, S> BehaviorTree<A, S> {
@@ -66,11 +70,11 @@ impl<A, S> BehaviorTree<A, S> {
 
     pub fn tick_with_observer<O>(&mut self, dt: f64, shared: &mut S, observer: &mut O) -> Status
     where
-        O: FnMut(State, Status),
+        O: FnMut(ChildState, Status),
     {
         let status = self.tick(dt, shared);
-        let state = self.state();
-        observer(state, status);
+        let child_state = self.child_state();
+        observer(child_state, status);
         status
     }
 
@@ -180,8 +184,8 @@ mod tests {
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
         let mut shared = TestShared::default();
-        let mut observer = |state: State, status: Status| {
-            println!("Status: {:?}, State: {:#?}", status, state);
+        let mut observer = |state, status| {
+            println!("Status: {:?}, State: {:?}", status, state);
         };
 
         let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);

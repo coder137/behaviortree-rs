@@ -1,15 +1,26 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::Status;
 
-pub type ChildState = (State, Option<Status>);
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+pub type StateInfo = (State, Option<Status>);
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum State {
-    // Leaf nodes
+    /// Leaf nodes
     NoChild,
+    /// Decorator nodes
+    SingleChild(Box<StateInfo>),
+    /// Control nodes
+    MultipleChildren(Vec<StateInfo>),
+}
 
-    // Decorator nodes
-    SingleChild(Box<ChildState>),
+pub type ChildStateInfo = Rc<RefCell<(ChildState, Option<Status>)>>;
 
-    // Control nodes
-    MultipleChildren(Vec<ChildState>),
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ChildState {
+    /// Leaf nodes
+    NoChild,
+    /// Decorator nodes
+    SingleChild(ChildStateInfo),
+    /// Control nodes
+    MultipleChildren(Rc<[ChildStateInfo]>),
 }

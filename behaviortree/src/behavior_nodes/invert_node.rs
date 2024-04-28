@@ -1,4 +1,4 @@
-use crate::{Action, Child, State, Status};
+use crate::{Action, Child, ChildState, State, Status};
 
 pub struct InvertState<S> {
     //
@@ -46,6 +46,10 @@ impl<S> Action<S> for InvertState<S> {
     fn state(&self) -> State {
         let (state, status) = self.child.child_state();
         State::SingleChild(Box::new((state, status)))
+    }
+
+    fn child_state(&self) -> ChildState {
+        ChildState::SingleChild(self.child.child_state_info())
     }
 }
 

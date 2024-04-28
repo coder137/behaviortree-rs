@@ -1,6 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     behavior_nodes::{InvertState, SelectState, SequenceState, WaitState},
-    Behavior, State, Status,
+    Behavior, ChildState, ChildStateInfo, State, StateInfo, Status,
 };
 
 #[cfg(test)]
@@ -29,6 +31,10 @@ pub trait Action<S> {
     /// User defined Action nodes do not need to override this function
     fn state(&self) -> State {
         State::NoChild
+    }
+
+    fn child_state(&self) -> ChildState {
+        ChildState::NoChild
     }
 }
 
@@ -86,27 +92,47 @@ where
 pub struct Child<S> {
     action: Box<dyn Action<S>>,
     status: Option<Status>,
+    state: ChildStateInfo,
 }
 
 impl<S> Child<S> {
     pub fn new(action: Box<dyn Action<S>>) -> Self {
         let status = None;
-        Self { action, status }
+        let state = Rc::new(RefCell::new((action.child_state(), None)));
+        Self {
+            action,
+            status,
+            state,
+        }
     }
 
     pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         let status = self.action.tick(dt, shared);
         self.status = Some(status);
+        {
+            let mut b = self.state.borrow_mut();
+            b.0 = self.action.child_state();
+            b.1 = Some(status);
+        }
         status
-    }
-
-    pub fn child_state(&self) -> (State, Option<Status>) {
-        (self.action.state(), self.status)
     }
 
     pub fn reset(&mut self) {
         self.action.reset();
         self.status = None;
+        {
+            let mut b = self.state.borrow_mut();
+            b.0 = self.action.child_state();
+            b.1 = None;
+        }
+    }
+
+    pub fn child_state(&self) -> StateInfo {
+        (self.action.state(), self.status)
+    }
+
+    pub fn child_state_info(&self) -> ChildStateInfo {
+        self.state.clone()
     }
 
     pub fn status(&self) -> &Option<Status> {
@@ -159,6 +185,7 @@ pub mod test_behavior_interface {
                     mock.expect_tick()
                         .times(ticks)
                         .returning(|_, _| Status::Success);
+                    mock.expect_child_state().returning(|| ChildState::NoChild);
                     mock.expect_state().returning(|| State::NoChild);
                     mock = cb(mock);
                     Box::new(mock)
@@ -171,6 +198,7 @@ pub mod test_behavior_interface {
                     mock.expect_tick()
                         .times(ticks)
                         .returning(|_dt, _shared| Status::Failure);
+                    mock.expect_child_state().returning(|| ChildState::NoChild);
                     mock.expect_state().returning(|| State::NoChild);
                     mock = cb(mock);
                     Box::new(mock)
@@ -188,6 +216,7 @@ pub mod test_behavior_interface {
                         .returning(|_dt, _shared| Status::Running);
                     mock.expect_tick().return_once(move |_dt, _shared| output);
                     mock.expect_state().returning(|| State::NoChild);
+                    mock.expect_child_state().returning(|| ChildState::NoChild);
                     mock = cb(mock);
                     Box::new(mock)
                 }
