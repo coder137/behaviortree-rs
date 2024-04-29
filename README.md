@@ -5,6 +5,9 @@ classDiagram
 
 class Behavior~A~ {
     <<enum>>
+    Leaf
+    Decorator
+    Control
 }
 
 class Action~S~ {
