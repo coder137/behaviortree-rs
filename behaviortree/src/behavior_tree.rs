@@ -48,7 +48,7 @@ impl<A, S> Action<S> for BehaviorTree<A, S> {
 impl<A, S> BehaviorTree<A, S> {
     pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
     where
-        A: ToAction<S> + Clone + 'static,
+        A: ToAction<S> + Clone,
         S: 'static,
     {
         let action: Box<dyn Action<S>> = Box::from(behavior.clone());

@@ -40,7 +40,7 @@ pub trait ToAction<S> {
 
 pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
 where
-    A: ToAction<S> + 'static,
+    A: ToAction<S>,
     S: 'static,
 {
     behaviors
@@ -54,7 +54,7 @@ where
 
 impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
 where
-    A: ToAction<S> + 'static,
+    A: ToAction<S>,
     S: 'static,
 {
     fn from(behavior: Behavior<A>) -> Self {
