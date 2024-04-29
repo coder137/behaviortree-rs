@@ -75,8 +75,6 @@ impl<S> Action<S> for SequenceState<S> {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-
     use super::*;
     use crate::{
         convert_behaviors,
@@ -95,7 +93,7 @@ mod tests {
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(sequence.status, Some(Status::Success));
-        matches!(sequence.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == Rc::new(RefCell::new((ChildState::NoChild, Some(Status::Success)))));
+        matches!(sequence.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == ChildStateInfo::from((ChildState::NoChild, Some(Status::Success))));
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);

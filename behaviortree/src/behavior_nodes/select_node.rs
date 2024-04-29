@@ -75,8 +75,6 @@ impl<S> Action<S> for SelectState<S> {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-
     use crate::{
         convert_behaviors,
         test_behavior_interface::{TestActions, TestShared},
@@ -95,7 +93,7 @@ mod tests {
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        matches!(select.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == Rc::new(RefCell::new((ChildState::NoChild, Some(Status::Success)))));
+        matches!(select.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == ChildStateInfo::from((ChildState::NoChild, Some(Status::Success))));
 
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);

@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     behavior_nodes::{InvertState, SelectState, SequenceState, WaitState},
-    Behavior, ChildState, ChildStateInfo, Status,
+    Behavior, ChildState, ChildStateInfo, ChildStateInfoInner, Status,
 };
 
 #[cfg(test)]
@@ -86,7 +86,7 @@ where
 /// - Child State
 pub struct Child<S> {
     action: Box<dyn Action<S>>,
-    state: ChildStateInfo,
+    state: ChildStateInfoInner,
 }
 
 impl<S> Child<S> {
@@ -115,7 +115,7 @@ impl<S> Child<S> {
     }
 
     pub fn child_state_info(&self) -> ChildStateInfo {
-        self.state.clone()
+        ChildStateInfo::from(self.state.clone())
     }
 
     pub fn child_state(&self) -> ChildState {

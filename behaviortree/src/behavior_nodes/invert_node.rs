@@ -45,11 +45,9 @@ impl<S> Action<S> for InvertState<S> {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
-
     use crate::{
         test_behavior_interface::{TestActions, TestShared},
-        Behavior,
+        Behavior, ChildStateInfo,
     };
 
     use super::*;
@@ -62,27 +60,27 @@ mod tests {
         let mut invert = InvertState::new(Child::new(Box::from(behavior)));
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((ChildState::NoChild, None))))
+            ChildState::SingleChild(ChildStateInfo::from((ChildState::NoChild, None)))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((
+            ChildState::SingleChild(ChildStateInfo::from((
                 ChildState::NoChild,
                 Some(Status::Success)
-            ))))
+            )))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((
+            ChildState::SingleChild(ChildStateInfo::from((
                 ChildState::NoChild,
                 Some(Status::Success)
-            ))))
+            )))
         );
     }
 
@@ -97,10 +95,10 @@ mod tests {
         assert_eq!(status, Status::Success);
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((
+            ChildState::SingleChild(ChildStateInfo::from((
                 ChildState::NoChild,
                 Some(Status::Failure)
-            ))))
+            )))
         );
 
         let status = invert.tick(0.1, &mut shared);
@@ -121,30 +119,30 @@ mod tests {
         assert_eq!(status, Status::Running);
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((
+            ChildState::SingleChild(ChildStateInfo::from((
                 ChildState::NoChild,
                 Some(Status::Running)
-            ))))
+            )))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((
+            ChildState::SingleChild(ChildStateInfo::from((
                 ChildState::NoChild,
                 Some(Status::Failure)
-            ))))
+            )))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(
             invert.child_state(),
-            ChildState::SingleChild(Rc::new(RefCell::new((
+            ChildState::SingleChild(ChildStateInfo::from((
                 ChildState::NoChild,
                 Some(Status::Failure)
-            ))))
+            )))
         );
     }
 
