@@ -1,4 +1,4 @@
-use crate::{Action, Behavior, ChildState, State, Status, ToAction};
+use crate::{Action, Behavior, Child, ChildState, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -11,15 +11,14 @@ pub struct BehaviorTree<A, S> {
     behavior: Behavior<A>,
     behavior_policy: BehaviorTreePolicy,
 
-    // State
-    status: Option<Status>,
-    action: Box<dyn Action<S>>,
+    //
+    child: Child<S>,
 }
 
 impl<A, S> Action<S> for BehaviorTree<A, S> {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
-        if let Some(status) = self.status {
-            if status == Status::Success || status == Status::Failure {
+        if let Some(status) = self.child.status() {
+            if status != Status::Running {
                 match self.behavior_policy {
                     BehaviorTreePolicy::ReloadOnCompletion => {
                         self.reset();
@@ -34,22 +33,15 @@ impl<A, S> Action<S> for BehaviorTree<A, S> {
             }
         }
 
-        let status = self.action.tick(dt, shared);
-        self.status = Some(status);
-        status
+        self.child.tick(dt, shared)
     }
 
     fn reset(&mut self) {
-        self.action.reset();
-        self.status = None;
-    }
-
-    fn state(&self) -> State {
-        self.action.state()
+        self.child.reset();
     }
 
     fn child_state(&self) -> ChildState {
-        self.action.child_state()
+        self.child.child_state()
     }
 }
 
@@ -60,11 +52,11 @@ impl<A, S> BehaviorTree<A, S> {
         S: 'static,
     {
         let action: Box<dyn Action<S>> = Box::from(behavior.clone());
+        let child = Child::new(action);
         Self {
             behavior,
             behavior_policy,
-            status: None,
-            action,
+            child,
         }
     }
 
@@ -83,7 +75,7 @@ impl<A, S> BehaviorTree<A, S> {
     }
 
     pub fn status(&self) -> Option<Status> {
-        self.status
+        self.child.status()
     }
 }
 

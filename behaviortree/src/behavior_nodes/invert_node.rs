@@ -1,18 +1,13 @@
-use crate::{Action, Child, ChildState, State, Status};
+use crate::{Action, Child, ChildState, Status};
 
 pub struct InvertState<S> {
     //
     child: Child<S>,
-
-    // state
     status: Option<Status>,
 }
 
 impl<S> InvertState<S> {
-    pub fn new(child: Child<S>) -> Self
-    where
-        S: 'static,
-    {
+    pub fn new(child: Child<S>) -> Self {
         Self {
             child,
             status: None,
@@ -43,11 +38,6 @@ impl<S> Action<S> for InvertState<S> {
         self.status = None;
     }
 
-    fn state(&self) -> State {
-        let (state, status) = self.child.child_state();
-        State::SingleChild(Box::new((state, status)))
-    }
-
     fn child_state(&self) -> ChildState {
         ChildState::SingleChild(self.child.child_state_info())
     }
@@ -55,6 +45,8 @@ impl<S> Action<S> for InvertState<S> {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, rc::Rc};
+
     use crate::{
         test_behavior_interface::{TestActions, TestShared},
         Behavior,
@@ -69,22 +61,28 @@ mod tests {
         let behavior = Behavior::Action(TestActions::SuccessTimes { ticks: 1 });
         let mut invert = InvertState::new(Child::new(Box::from(behavior)));
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, None)))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((ChildState::NoChild, None))))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, Some(Status::Success))))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((
+                ChildState::NoChild,
+                Some(Status::Success)
+            ))))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, Some(Status::Success))))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((
+                ChildState::NoChild,
+                Some(Status::Success)
+            ))))
         );
     }
 
@@ -98,8 +96,11 @@ mod tests {
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, Some(Status::Failure))))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((
+                ChildState::NoChild,
+                Some(Status::Failure)
+            ))))
         );
 
         let status = invert.tick(0.1, &mut shared);
@@ -119,22 +120,31 @@ mod tests {
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, Some(Status::Running))))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((
+                ChildState::NoChild,
+                Some(Status::Running)
+            ))))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, Some(Status::Failure))))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((
+                ChildState::NoChild,
+                Some(Status::Failure)
+            ))))
         );
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(
-            invert.state(),
-            State::SingleChild(Box::new((State::NoChild, Some(Status::Failure))))
+            invert.child_state(),
+            ChildState::SingleChild(Rc::new(RefCell::new((
+                ChildState::NoChild,
+                Some(Status::Failure)
+            ))))
         );
     }
 
