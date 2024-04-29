@@ -57,7 +57,7 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestActions::SuccessTimes { ticks: 1 });
-        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
+        let mut invert = InvertState::new(Child::from(behavior));
         assert_eq!(
             invert.child_state(),
             ChildState::SingleChild(ChildStateInfo::from((ChildState::NoChild, None)))
@@ -89,7 +89,7 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestActions::FailureTimes { ticks: 1 });
-        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
+        let mut invert = InvertState::new(Child::from(behavior));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
@@ -113,7 +113,7 @@ mod tests {
             times: 1,
             output: Status::Failure,
         });
-        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
+        let mut invert = InvertState::new(Child::from(behavior));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
@@ -158,7 +158,7 @@ mod tests {
                 m
             },
         });
-        let mut invert = InvertState::new(Child::new(Box::from(behavior)));
+        let mut invert = InvertState::new(Child::from(behavior));
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);

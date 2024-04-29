@@ -51,8 +51,7 @@ impl<A, S> BehaviorTree<A, S> {
         A: ToAction<S> + Clone,
         S: 'static,
     {
-        let action: Box<dyn Action<S>> = Box::from(behavior.clone());
-        let child = Child::new(action);
+        let child = Child::from(behavior.clone());
         Self {
             behavior,
             behavior_policy,

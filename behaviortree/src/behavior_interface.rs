@@ -45,36 +45,8 @@ where
 {
     behaviors
         .drain(..)
-        .map(|b| {
-            let action = Box::from(b);
-            Child::new(action)
-        })
+        .map(Child::from)
         .collect::<Vec<Child<S>>>()
-}
-
-impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
-where
-    A: ToAction<S>,
-    S: 'static,
-{
-    fn from(behavior: Behavior<A>) -> Self {
-        match behavior {
-            Behavior::Action(action) => action.to_action(),
-            Behavior::Wait(target) => Box::new(WaitState::new(target)),
-            Behavior::Sequence(behaviors) => {
-                let children = convert_behaviors(behaviors);
-                Box::new(SequenceState::new(children))
-            }
-            Behavior::Select(behaviors) => {
-                let children = convert_behaviors(behaviors);
-                Box::new(SelectState::new(children))
-            }
-            Behavior::Invert(behavior) => {
-                let action = Self::from(*behavior);
-                Box::new(InvertState::new(Child::new(action)))
-            }
-        }
-    }
 }
 
 /// Tracking Child action, status and state
@@ -124,6 +96,32 @@ impl<S> Child<S> {
 
     pub fn status(&self) -> Option<Status> {
         self.state.borrow().1
+    }
+}
+
+impl<A, S> From<Behavior<A>> for Child<S>
+where
+    A: ToAction<S>,
+    S: 'static,
+{
+    fn from(behavior: Behavior<A>) -> Self {
+        let action = match behavior {
+            Behavior::Action(action) => action.to_action(),
+            Behavior::Wait(target) => Box::new(WaitState::new(target)),
+            Behavior::Sequence(behaviors) => {
+                let children = convert_behaviors(behaviors);
+                Box::new(SequenceState::new(children))
+            }
+            Behavior::Select(behaviors) => {
+                let children = convert_behaviors(behaviors);
+                Box::new(SelectState::new(children))
+            }
+            Behavior::Invert(behavior) => {
+                //
+                Box::new(InvertState::new(Self::from(*behavior)))
+            }
+        };
+        Self::new(action)
     }
 }
 
