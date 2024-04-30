@@ -62,11 +62,6 @@ pub struct Child<S> {
 }
 
 impl<S> Child<S> {
-    pub fn new(action: Box<dyn Action<S>>) -> Self {
-        let state = Rc::new(RefCell::new((action.child_state(), None)));
-        Self { action, state }
-    }
-
     pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         let status = self.action.tick(dt, shared);
         {
@@ -99,6 +94,13 @@ impl<S> Child<S> {
     }
 }
 
+impl<S> From<Box<dyn Action<S>>> for Child<S> {
+    fn from(action: Box<dyn Action<S>>) -> Self {
+        let state = Rc::new(RefCell::new((action.child_state(), None)));
+        Self { action, state }
+    }
+}
+
 impl<A, S> From<Behavior<A>> for Child<S>
 where
     A: ToAction<S>,
@@ -121,7 +123,7 @@ where
                 Box::new(InvertState::new(Self::from(*behavior)))
             }
         };
-        Self::new(action)
+        Self::from(action)
     }
 }
 
