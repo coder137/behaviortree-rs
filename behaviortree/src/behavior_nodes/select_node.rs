@@ -1,4 +1,6 @@
-use crate::{Action, Child, State, Status};
+use std::rc::Rc;
+
+use crate::{Action, Child, ChildState, ChildStateInfo, Status};
 
 pub struct SelectState<S> {
     children: Vec<Child<S>>,
@@ -6,12 +8,23 @@ pub struct SelectState<S> {
 
     // state
     status: Option<Status>,
+    state: Rc<[ChildStateInfo]>,
 }
 
-impl<S> Action<S> for SelectState<S>
-where
-    S: 'static,
-{
+impl<S> SelectState<S> {
+    pub fn new(children: Vec<Child<S>>) -> Self {
+        assert!(!children.is_empty());
+        let state = Rc::from_iter(children.iter().map(|child| child.child_state_info()));
+        Self {
+            children,
+            index: 0,
+            status: None,
+            state,
+        }
+    }
+}
+
+impl<S> Action<S> for SelectState<S> {
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.status {
             if status != Status::Running {
@@ -55,31 +68,8 @@ where
         self.status = None;
     }
 
-    fn state(&self) -> State {
-        let child_states = self
-            .children
-            .iter()
-            .take(self.index + 1)
-            .map(|child| child.child_state())
-            .collect();
-        State::MultipleChildren(child_states)
-    }
-}
-
-impl<S> SelectState<S>
-where
-    S: 'static,
-{
-    pub fn new(children: Vec<Child<S>>) -> Self
-    where
-        S: 'static,
-    {
-        assert!(!children.is_empty());
-        Self {
-            children,
-            index: 0,
-            status: None,
-        }
+    fn child_state(&self) -> ChildState {
+        ChildState::MultipleChildren(self.state.clone())
     }
 }
 
@@ -103,7 +93,7 @@ mod tests {
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        matches!(select.state(), State::MultipleChildren(states) if states.len() == 1 && states[0] == (State::NoChild, Some(Status::Success)));
+        matches!(select.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == ChildStateInfo::from((ChildState::NoChild, Some(Status::Success))));
 
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);

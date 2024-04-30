@@ -1,6 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     behavior_nodes::{InvertState, SelectState, SequenceState, WaitState},
-    Behavior, State, Status,
+    Behavior, ChildState, ChildStateInfo, ChildStateInfoInner, Status,
 };
 
 #[cfg(test)]
@@ -27,8 +29,8 @@ pub trait Action<S> {
 
     /// Decorator and Control type nodes need to know the state of its child(ren)
     /// User defined Action nodes do not need to override this function
-    fn state(&self) -> State {
-        State::NoChild
+    fn child_state(&self) -> ChildState {
+        ChildState::NoChild
     }
 }
 
@@ -38,25 +40,74 @@ pub trait ToAction<S> {
 
 pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
 where
-    A: ToAction<S> + 'static,
+    A: ToAction<S>,
     S: 'static,
 {
     behaviors
         .drain(..)
-        .map(|b| {
-            let action = Box::from(b);
-            Child::new(action)
-        })
+        .map(Child::from)
         .collect::<Vec<Child<S>>>()
 }
 
-impl<A, S> From<Behavior<A>> for Box<dyn Action<S>>
+/// Tracking Child action, status and state
+///
+/// Decorator and Control nodes need to track 1 or more children
+/// This wrapper makes it easier to work with child nodes
+/// Bundles
+/// - Action: Boxed action trait (converted from Behavior)
+/// - Child State
+pub struct Child<S> {
+    action: Box<dyn Action<S>>,
+    state: ChildStateInfoInner,
+}
+
+impl<S> Child<S> {
+    pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+        let status = self.action.tick(dt, shared);
+        {
+            let mut b = self.state.borrow_mut();
+            b.0 = self.action.child_state();
+            b.1 = Some(status);
+        }
+        status
+    }
+
+    pub fn reset(&mut self) {
+        self.action.reset();
+        {
+            let mut b = self.state.borrow_mut();
+            b.0 = self.action.child_state();
+            b.1 = None;
+        }
+    }
+
+    pub fn child_state_info(&self) -> ChildStateInfo {
+        ChildStateInfo::from(self.state.clone())
+    }
+
+    pub fn child_state(&self) -> ChildState {
+        self.state.borrow().0.clone()
+    }
+
+    pub fn status(&self) -> Option<Status> {
+        self.state.borrow().1
+    }
+}
+
+impl<S> From<Box<dyn Action<S>>> for Child<S> {
+    fn from(action: Box<dyn Action<S>>) -> Self {
+        let state = Rc::new(RefCell::new((action.child_state(), None)));
+        Self { action, state }
+    }
+}
+
+impl<A, S> From<Behavior<A>> for Child<S>
 where
-    A: ToAction<S> + 'static,
+    A: ToAction<S>,
     S: 'static,
 {
     fn from(behavior: Behavior<A>) -> Self {
-        match behavior {
+        let action = match behavior {
             Behavior::Action(action) => action.to_action(),
             Behavior::Wait(target) => Box::new(WaitState::new(target)),
             Behavior::Sequence(behaviors) => {
@@ -68,49 +119,11 @@ where
                 Box::new(SelectState::new(children))
             }
             Behavior::Invert(behavior) => {
-                let action = Self::from(*behavior);
-                Box::new(InvertState::new(Child::new(action)))
+                //
+                Box::new(InvertState::new(Self::from(*behavior)))
             }
-        }
-    }
-}
-
-/// Tracking Child action, status and state
-///
-/// Decorator and Control nodes need to track 1 or more children
-/// This wrapper makes it easier to work with child nodes
-/// Bundles
-/// - Action: Boxed action trait (converted from Behavior)
-/// - Status: Running child status
-/// - Child State
-pub struct Child<S> {
-    action: Box<dyn Action<S>>,
-    status: Option<Status>,
-}
-
-impl<S> Child<S> {
-    pub fn new(action: Box<dyn Action<S>>) -> Self {
-        let status = None;
-        Self { action, status }
-    }
-
-    pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
-        let status = self.action.tick(dt, shared);
-        self.status = Some(status);
-        status
-    }
-
-    pub fn child_state(&self) -> (State, Option<Status>) {
-        (self.action.state(), self.status)
-    }
-
-    pub fn reset(&mut self) {
-        self.action.reset();
-        self.status = None;
-    }
-
-    pub fn status(&self) -> &Option<Status> {
-        &self.status
+        };
+        Self::from(action)
     }
 }
 
@@ -159,7 +172,7 @@ pub mod test_behavior_interface {
                     mock.expect_tick()
                         .times(ticks)
                         .returning(|_, _| Status::Success);
-                    mock.expect_state().returning(|| State::NoChild);
+                    mock.expect_child_state().returning(|| ChildState::NoChild);
                     mock = cb(mock);
                     Box::new(mock)
                 }
@@ -171,7 +184,7 @@ pub mod test_behavior_interface {
                     mock.expect_tick()
                         .times(ticks)
                         .returning(|_dt, _shared| Status::Failure);
-                    mock.expect_state().returning(|| State::NoChild);
+                    mock.expect_child_state().returning(|| ChildState::NoChild);
                     mock = cb(mock);
                     Box::new(mock)
                 }
@@ -187,7 +200,7 @@ pub mod test_behavior_interface {
                         .times(times)
                         .returning(|_dt, _shared| Status::Running);
                     mock.expect_tick().return_once(move |_dt, _shared| output);
-                    mock.expect_state().returning(|| State::NoChild);
+                    mock.expect_child_state().returning(|| ChildState::NoChild);
                     mock = cb(mock);
                     Box::new(mock)
                 }

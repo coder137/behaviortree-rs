@@ -1,15 +1,39 @@
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
+
 use crate::Status;
 
-pub type ChildState = (State, Option<Status>);
+pub type ChildStateInfoInner = Rc<RefCell<(ChildState, Option<Status>)>>;
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
-pub enum State {
-    // Leaf nodes
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ChildStateInfo(ChildStateInfoInner);
+
+impl From<ChildStateInfoInner> for ChildStateInfo {
+    fn from(inner: ChildStateInfoInner) -> Self {
+        Self(inner)
+    }
+}
+
+impl From<(ChildState, Option<Status>)> for ChildStateInfo {
+    fn from(inner: (ChildState, Option<Status>)) -> Self {
+        Self(Rc::new(RefCell::new(inner)))
+    }
+}
+
+impl ChildStateInfo {
+    pub fn get(&self) -> Ref<'_, (ChildState, Option<Status>)> {
+        self.0.borrow()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ChildState {
+    /// Leaf nodes
     NoChild,
-
-    // Decorator nodes
-    SingleChild(Box<ChildState>),
-
-    // Control nodes
-    MultipleChildren(Vec<ChildState>),
+    /// Decorator nodes
+    SingleChild(ChildStateInfo),
+    /// Control nodes
+    MultipleChildren(Rc<[ChildStateInfo]>),
 }

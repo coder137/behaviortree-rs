@@ -1,11 +1,26 @@
-use crate::{Action, Child, State, Status};
+use std::rc::Rc;
+
+use crate::{Action, Child, ChildState, ChildStateInfo, Status};
 
 pub struct SequenceState<S> {
     children: Vec<Child<S>>,
     index: usize,
 
-    // state
     status: Option<Status>,
+    state: Rc<[ChildStateInfo]>,
+}
+
+impl<S> SequenceState<S> {
+    pub fn new(children: Vec<Child<S>>) -> Self {
+        assert!(!children.is_empty());
+        let state = Rc::from_iter(children.iter().map(|child| child.child_state_info()));
+        Self {
+            children,
+            index: 0,
+            status: None,
+            state,
+        }
+    }
 }
 
 impl<S> Action<S> for SequenceState<S> {
@@ -53,28 +68,8 @@ impl<S> Action<S> for SequenceState<S> {
         self.status = None;
     }
 
-    fn state(&self) -> State {
-        let child_states = self
-            .children
-            .iter()
-            .take(self.index + 1)
-            .map(|child| child.child_state())
-            .collect();
-        State::MultipleChildren(child_states)
-    }
-}
-
-impl<S> SequenceState<S> {
-    pub fn new(children: Vec<Child<S>>) -> Self
-    where
-        S: 'static,
-    {
-        assert!(!children.is_empty());
-        Self {
-            children,
-            index: 0,
-            status: None,
-        }
+    fn child_state(&self) -> ChildState {
+        ChildState::MultipleChildren(self.state.clone())
     }
 }
 
@@ -98,7 +93,7 @@ mod tests {
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
         assert_eq!(sequence.status, Some(Status::Success));
-        matches!(sequence.state(), State::MultipleChildren(states) if states.len() == 1 && states[0] == (State::NoChild, Some(Status::Success)));
+        matches!(sequence.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == ChildStateInfo::from((ChildState::NoChild, Some(Status::Success))));
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
@@ -133,15 +128,15 @@ mod tests {
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
     }
 
     #[test]
@@ -152,15 +147,15 @@ mod tests {
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
         ]));
         assert_eq!(sequence.status, None);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
     }
 
     #[test]
@@ -173,18 +168,18 @@ mod tests {
         ]));
 
         assert_eq!(sequence.status, None);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
 
         let status = sequence.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-        println!("State: {:?}", sequence.state());
+        println!("State: {:?}", sequence.child_state());
     }
 }

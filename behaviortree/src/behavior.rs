@@ -2,7 +2,7 @@
 ///
 /// This is used for more complex event logic.
 /// Can also be used for game AI.
-#[derive(Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Behavior<A> {
     /// A high level description of an action.
     Action(A),
