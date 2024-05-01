@@ -1,24 +1,17 @@
-use std::rc::Rc;
-
-use crate::{Action, Child, ChildState, ChildStateInfo, Status};
+use crate::{Action, Child, ChildState, Children, Status};
 
 pub struct SequenceState<S> {
-    children: Vec<Child<S>>,
-    index: usize,
-
+    children: Children<S>,
     status: Option<Status>,
-    state: Rc<[ChildStateInfo]>,
 }
 
 impl<S> SequenceState<S> {
     pub fn new(children: Vec<Child<S>>) -> Self {
         assert!(!children.is_empty());
-        let state = Rc::from_iter(children.iter().map(|child| child.child_state_info()));
+        let children = Children::from(children);
         Self {
             children,
-            index: 0,
             status: None,
-            state,
         }
     }
 }
@@ -32,21 +25,21 @@ impl<S> Action<S> for SequenceState<S> {
             }
         }
 
-        let child = match self.children.get_mut(self.index) {
+        let child = match self.children.current_child() {
             Some(child) => child,
             None => unreachable!(),
         };
         let new_child_status = child.tick(dt, shared);
         let new_status = match new_child_status {
             Status::Success => {
-                self.index += 1;
-                match self.children.get(self.index) {
+                self.children.next();
+                match self.children.current_child() {
                     Some(_) => Status::Running,
                     None => Status::Success,
                 }
             }
             Status::Failure => {
-                self.index += 1;
+                self.children.next();
                 Status::Failure
             }
             Status::Running => Status::Running,
@@ -56,20 +49,12 @@ impl<S> Action<S> for SequenceState<S> {
     }
 
     fn reset(&mut self) {
-        // Reset all ticked children
-        self.children
-            .iter_mut()
-            .filter(|child| child.status().is_some())
-            .for_each(|child| {
-                child.reset();
-            });
-
-        self.index = 0;
+        self.children.reset();
         self.status = None;
     }
 
     fn child_state(&self) -> ChildState {
-        ChildState::MultipleChildren(self.state.clone())
+        ChildState::MultipleChildren(self.children.inner_state())
     }
 }
 
@@ -79,7 +64,7 @@ mod tests {
     use crate::{
         convert_behaviors,
         test_behavior_interface::{TestActions, TestShared},
-        Action, Behavior, Status,
+        Action, Behavior, ChildStateInfo, Status,
     };
 
     #[test]
