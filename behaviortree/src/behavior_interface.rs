@@ -45,17 +45,6 @@ pub trait ToAction<S> {
     fn to_action(self) -> Box<dyn Action<S>>;
 }
 
-pub fn convert_behaviors<A, S>(mut behaviors: Vec<Behavior<A>>) -> Vec<Child<S>>
-where
-    A: ToAction<S>,
-    S: 'static,
-{
-    behaviors
-        .drain(..)
-        .map(Child::from)
-        .collect::<Vec<Child<S>>>()
-}
-
 #[derive(Debug)]
 enum ChildStateMachine {
     PreStart,
@@ -148,17 +137,14 @@ where
             Behavior::Action(action) => action.to_action(),
             Behavior::Wait(target) => Box::new(WaitState::new(target)),
             Behavior::Sequence(behaviors) => {
-                let children = convert_behaviors(behaviors);
+                let children = Children::from(behaviors);
                 Box::new(SequenceState::new(children))
             }
             Behavior::Select(behaviors) => {
-                let children = convert_behaviors(behaviors);
+                let children = Children::from(behaviors);
                 Box::new(SelectState::new(children))
             }
-            Behavior::Invert(behavior) => {
-                //
-                Box::new(InvertState::new(Self::from(*behavior)))
-            }
+            Behavior::Invert(behavior) => Box::new(InvertState::new(Self::from(*behavior))),
         };
         Self::from(action)
     }
@@ -196,8 +182,13 @@ impl<S> Children<S> {
     }
 }
 
-impl<S> From<Vec<Child<S>>> for Children<S> {
-    fn from(children: Vec<Child<S>>) -> Self {
+impl<A, S> From<Vec<Behavior<A>>> for Children<S>
+where
+    A: ToAction<S>,
+    S: 'static,
+{
+    fn from(mut behaviors: Vec<Behavior<A>>) -> Self {
+        let children = behaviors.drain(..).map(Child::from).collect::<Vec<_>>();
         let state = Rc::from_iter(children.iter().map(|child| child.inner_state()));
         Self {
             children,

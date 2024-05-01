@@ -1,4 +1,4 @@
-use crate::{Action, Child, ChildState, Children, Status};
+use crate::{Action, ChildState, Children, Status};
 
 pub struct SelectState<S> {
     children: Children<S>,
@@ -6,9 +6,7 @@ pub struct SelectState<S> {
 }
 
 impl<S> SelectState<S> {
-    pub fn new(children: Vec<Child<S>>) -> Self {
-        assert!(!children.is_empty());
-        let children = Children::from(children);
+    pub fn new(children: Children<S>) -> Self {
         Self {
             children,
             status: None,
@@ -61,7 +59,6 @@ impl<S> Action<S> for SelectState<S> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        convert_behaviors,
         test_behavior_interface::{TestActions, TestShared},
         Behavior, ChildStateInfo,
     };
@@ -70,7 +67,7 @@ mod tests {
 
     #[test]
     fn test_select_success() {
-        let mut select = SelectState::new(convert_behaviors(vec![Behavior::Action(
+        let mut select = SelectState::new(Children::from(vec![Behavior::Action(
             TestActions::SuccessTimes { ticks: 1 },
         )]));
         assert_eq!(select.status, None);
@@ -86,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_select_failure() {
-        let mut select = SelectState::new(convert_behaviors(vec![Behavior::Action(
+        let mut select = SelectState::new(Children::from(vec![Behavior::Action(
             TestActions::FailureTimes { ticks: 1 },
         )]));
         assert_eq!(select.status, None);
@@ -101,12 +98,11 @@ mod tests {
 
     #[test]
     fn test_select_run_then_status() {
-        let mut select = SelectState::new(convert_behaviors(vec![Behavior::Action(
-            TestActions::Run {
+        let mut select =
+            SelectState::new(Children::from(vec![Behavior::Action(TestActions::Run {
                 times: 2,
                 output: Status::Failure,
-            },
-        )]));
+            })]));
         assert_eq!(select.status, None);
 
         let mut shared = TestShared::default();
@@ -122,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_select_multiple_children() {
-        let mut select = SelectState::new(convert_behaviors(vec![
+        let mut select = SelectState::new(Children::from(vec![
             Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
             Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
         ]));
@@ -138,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_select_multiple_children_early_reset() {
-        let mut select = SelectState::new(convert_behaviors(vec![
+        let mut select = SelectState::new(Children::from(vec![
             Behavior::Action(TestActions::FailureWithCb {
                 ticks: 2,
                 cb: |mut m| {
@@ -166,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_select_multiple_children_early_success() {
-        let mut select = SelectState::new(convert_behaviors(vec![
+        let mut select = SelectState::new(Children::from(vec![
             Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
             Behavior::Action(TestActions::FailureTimes { ticks: 0 }),

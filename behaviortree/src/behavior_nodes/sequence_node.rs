@@ -1,4 +1,4 @@
-use crate::{Action, Child, ChildState, Children, Status};
+use crate::{Action, ChildState, Children, Status};
 
 pub struct SequenceState<S> {
     children: Children<S>,
@@ -6,9 +6,7 @@ pub struct SequenceState<S> {
 }
 
 impl<S> SequenceState<S> {
-    pub fn new(children: Vec<Child<S>>) -> Self {
-        assert!(!children.is_empty());
-        let children = Children::from(children);
+    pub fn new(children: Children<S>) -> Self {
         Self {
             children,
             status: None,
@@ -62,7 +60,6 @@ impl<S> Action<S> for SequenceState<S> {
 mod tests {
     use super::*;
     use crate::{
-        convert_behaviors,
         test_behavior_interface::{TestActions, TestShared},
         Action, Behavior, ChildStateInfo, Status,
     };
@@ -70,7 +67,7 @@ mod tests {
     #[test]
     fn test_sequence_success() {
         let mut shared = TestShared::default();
-        let mut sequence = SequenceState::new(convert_behaviors(vec![Behavior::Action(
+        let mut sequence = SequenceState::new(Children::from(vec![Behavior::Action(
             TestActions::SuccessTimes { ticks: 1 },
         )]));
         assert_eq!(sequence.status, None);
@@ -87,7 +84,7 @@ mod tests {
     #[test]
     fn test_sequence_failure() {
         let mut shared = TestShared::default();
-        let mut sequence = SequenceState::new(convert_behaviors(vec![Behavior::Action(
+        let mut sequence = SequenceState::new(Children::from(vec![Behavior::Action(
             TestActions::FailureTimes { ticks: 1 },
         )]));
         assert_eq!(sequence.status, None);
@@ -103,12 +100,11 @@ mod tests {
     #[test]
     fn test_sequence_run_then_status() {
         let mut shared = TestShared::default();
-        let mut sequence = SequenceState::new(convert_behaviors(vec![Behavior::Action(
-            TestActions::Run {
+        let mut sequence =
+            SequenceState::new(Children::from(vec![Behavior::Action(TestActions::Run {
                 times: 2,
                 output: Status::Failure,
-            },
-        )]));
+            })]));
         assert_eq!(sequence.status, None);
 
         let status = sequence.tick(0.1, &mut shared);
@@ -127,7 +123,7 @@ mod tests {
     #[test]
     fn test_sequence_multiple_children() {
         let mut shared = TestShared::default();
-        let mut sequence = SequenceState::new(convert_behaviors(vec![
+        let mut sequence = SequenceState::new(Children::from(vec![
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
         ]));
@@ -146,7 +142,7 @@ mod tests {
     #[test]
     fn test_sequence_multiple_children_early_failure() {
         let mut shared = TestShared::default();
-        let mut sequence = SequenceState::new(convert_behaviors(vec![
+        let mut sequence = SequenceState::new(Children::from(vec![
             Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
             Behavior::Action(TestActions::FailureTimes { ticks: 1 }),
             Behavior::Action(TestActions::SuccessTimes { ticks: 0 }), // This never executes
