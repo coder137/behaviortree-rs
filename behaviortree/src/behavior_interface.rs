@@ -10,6 +10,13 @@ use mockall::automock;
 
 #[cfg_attr(test, automock)]
 pub trait Action<S> {
+    /// Callback invoked when the action is ticked for the first time
+    fn on_start(&mut self, _shared: &mut S) {}
+
+    /// Callback invoked when the action moves to its completed state
+    /// i.e it returns a Status::Success or Status::Failure
+    fn on_end(&mut self, _status: Status, _shared: &mut S) {}
+
     /// Ticks the action
     ///
     /// "Work" is done as long as `Status::Running` is returned by the action.
@@ -49,6 +56,13 @@ where
         .collect::<Vec<Child<S>>>()
 }
 
+#[derive(Debug)]
+enum ChildStateMachine {
+    PreStart,
+    Running,
+    PostEnd(Status),
+}
+
 /// Tracking Child action, status and state
 ///
 /// Decorator and Control nodes need to track 1 or more children
@@ -59,26 +73,33 @@ where
 pub struct Child<S> {
     action: Box<dyn Action<S>>,
     state: ChildStateInfoInner,
+    stm: ChildStateMachine,
 }
 
 impl<S> Child<S> {
     pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
-        let status = self.action.tick(dt, shared);
-        {
-            let mut b = self.state.borrow_mut();
-            b.0 = self.action.child_state();
-            b.1 = Some(status);
+        match self.stm {
+            ChildStateMachine::PreStart => {
+                self.action.on_start(shared);
+                self.stm = ChildStateMachine::Running;
+                self.inner_tick(dt, shared)
+            }
+            ChildStateMachine::Running => {
+                let status = self.inner_tick(dt, shared);
+                if status != Status::Running {
+                    self.action.on_end(status, shared);
+                    self.stm = ChildStateMachine::PostEnd(status);
+                }
+                status
+            }
+            ChildStateMachine::PostEnd(status) => status,
         }
-        status
     }
 
     pub fn reset(&mut self) {
+        self.stm = ChildStateMachine::PreStart;
         self.action.reset();
-        {
-            let mut b = self.state.borrow_mut();
-            b.0 = self.action.child_state();
-            b.1 = None;
-        }
+        self.set_status(None);
     }
 
     pub fn inner_state(&self) -> ChildStateInfo {
@@ -92,12 +113,28 @@ impl<S> Child<S> {
     pub fn status(&self) -> Option<Status> {
         self.state.borrow().1
     }
+
+    //
+
+    fn set_status(&self, status: Option<Status>) {
+        self.state.borrow_mut().1 = status;
+    }
+
+    fn inner_tick(&mut self, dt: f64, shared: &mut S) -> Status {
+        let status = self.action.tick(dt, shared);
+        self.set_status(Some(status));
+        status
+    }
 }
 
 impl<S> From<Box<dyn Action<S>>> for Child<S> {
     fn from(action: Box<dyn Action<S>>) -> Self {
         let state = Rc::new(RefCell::new((action.child_state(), None)));
-        Self { action, state }
+        Self {
+            action,
+            state,
+            stm: ChildStateMachine::PreStart,
+        }
     }
 }
 
@@ -216,6 +253,10 @@ pub mod test_behavior_interface {
                         .times(ticks)
                         .returning(|_, _| Status::Success);
                     mock.expect_child_state().returning(|| ChildState::NoChild);
+                    mock.expect_on_start().returning(|_shared| {});
+                    mock.expect_on_end().returning(|status, _shared| {
+                        assert_eq!(status, Status::Success);
+                    });
                     mock = cb(mock);
                     Box::new(mock)
                 }
@@ -228,6 +269,10 @@ pub mod test_behavior_interface {
                         .times(ticks)
                         .returning(|_dt, _shared| Status::Failure);
                     mock.expect_child_state().returning(|| ChildState::NoChild);
+                    mock.expect_on_start().returning(|_shared| {});
+                    mock.expect_on_end().returning(|status, _shared| {
+                        assert_eq!(status, Status::Failure);
+                    });
                     mock = cb(mock);
                     Box::new(mock)
                 }
@@ -244,6 +289,10 @@ pub mod test_behavior_interface {
                         .returning(|_dt, _shared| Status::Running);
                     mock.expect_tick().return_once(move |_dt, _shared| output);
                     mock.expect_child_state().returning(|| ChildState::NoChild);
+                    mock.expect_on_start().returning(|_shared| {});
+                    mock.expect_on_end().returning(move |status, _shared| {
+                        assert_eq!(status, output);
+                    });
                     mock = cb(mock);
                     Box::new(mock)
                 }
