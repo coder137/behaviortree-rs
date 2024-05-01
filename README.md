@@ -33,8 +33,8 @@ class BehaviorTree {
 
 Behavior --> Action: Implements
 
-Child --> Action: Contains
+Child <-- Action: Contains
 
 BehaviorTree --> Action: Implements
-BehaviorTree --> Child: Contains
+BehaviorTree <-- Child: Contains
 ```
