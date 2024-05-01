@@ -81,7 +81,7 @@ impl<S> Child<S> {
         }
     }
 
-    pub fn child_state_info(&self) -> ChildStateInfo {
+    pub fn inner_state(&self) -> ChildStateInfo {
         ChildStateInfo::from(self.state.clone())
     }
 
@@ -124,6 +124,49 @@ where
             }
         };
         Self::from(action)
+    }
+}
+
+pub struct Children<S> {
+    children: Vec<Child<S>>,
+    index: usize,
+
+    //
+    state: Rc<[ChildStateInfo]>,
+}
+
+impl<S> Children<S> {
+    pub fn current_child(&mut self) -> Option<&mut Child<S>> {
+        self.children.get_mut(self.index)
+    }
+
+    pub fn next(&mut self) {
+        self.index += 1;
+    }
+
+    pub fn reset(&mut self) {
+        self.children
+            .iter_mut()
+            .take_while(|child| child.status().is_some())
+            .for_each(|child| {
+                child.reset();
+            });
+        self.index = 0;
+    }
+
+    pub fn inner_state(&self) -> Rc<[ChildStateInfo]> {
+        self.state.clone()
+    }
+}
+
+impl<S> From<Vec<Child<S>>> for Children<S> {
+    fn from(children: Vec<Child<S>>) -> Self {
+        let state = Rc::from_iter(children.iter().map(|child| child.inner_state()));
+        Self {
+            children,
+            index: 0,
+            state,
+        }
     }
 }
 

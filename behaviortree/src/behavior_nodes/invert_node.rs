@@ -39,7 +39,7 @@ impl<S> Action<S> for InvertState<S> {
     }
 
     fn child_state(&self) -> ChildState {
-        ChildState::SingleChild(self.child.child_state_info())
+        ChildState::SingleChild(self.child.inner_state())
     }
 }
 
