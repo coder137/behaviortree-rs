@@ -9,25 +9,21 @@ use crate::{
 use mockall::automock;
 
 #[cfg_attr(test, automock)]
+/// Modelled after the `std::future::Future` trait
 pub trait Action<S> {
-    /// Ticks the action
+    /// Ticks the action once
     ///
-    /// "Work" is done as long as `Status::Running` is returned by the action.
+    /// User implementation must ensure that calls to `tick` are non-blocking. Should return `Status::Running`
+    /// if action has not completed.
     ///
-    /// `Status::Success` or `Status::Failure` indicates whether the work was a success/failure
-    ///
-    /// Invoking `tick` after action has return ed`Status::Success` or `Status::Failure` should
-    /// return the same value without actually doing any "work"
-    ///
-    /// NOTE: See `BehaviorTree` implementation. User is not expected to invoke this manually
+    /// Once an action has finished, clients should not `tick` it again
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status;
 
     /// Resets the current action to its initial/newly created state
-    ///
-    /// Decorator and Control nodes need to also reset their ticked children
     fn reset(&mut self);
 
     /// Decorator and Control type nodes need to know the state of its child(ren)
+    ///
     /// User defined Action nodes do not need to override this function
     fn child_state(&self) -> ChildState {
         ChildState::NoChild
