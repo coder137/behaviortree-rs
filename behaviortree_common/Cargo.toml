@@ -1,0 +1,9 @@
+[package]
+name = "behaviortree_common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
