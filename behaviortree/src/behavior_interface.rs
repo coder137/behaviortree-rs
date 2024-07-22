@@ -172,7 +172,7 @@ pub mod test_behavior_interface {
     use super::*;
 
     #[derive(Default)]
-    pub struct TestShared {}
+    pub struct TestShared;
 
     struct GenericTestAction {
         status: bool,
