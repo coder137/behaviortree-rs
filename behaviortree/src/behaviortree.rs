@@ -81,28 +81,13 @@ impl<A, S> BehaviorTree<A, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        test_behavior_interface::{TestActions, TestShared},
-        MockAction,
-    };
+    use crate::test_behavior_interface::{TestAction, TestShared};
 
     #[test]
     fn behavior_tree_with_reset() {
         let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestActions::SuccessWithCb {
-                ticks: 2,
-                cb: |mut m: MockAction<TestShared>| {
-                    m.expect_reset().times(1).returning(|| {});
-                    m
-                },
-            }),
-            Behavior::Action(TestActions::SuccessWithCb {
-                ticks: 2,
-                cb: |mut m| {
-                    m.expect_reset().times(1).returning(|| {});
-                    m
-                },
-            }),
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Success),
         ]);
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
@@ -130,20 +115,8 @@ mod tests {
     #[test]
     fn behavior_tree_with_auto_reset() {
         let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestActions::SuccessWithCb {
-                ticks: 2,
-                cb: |mut m: MockAction<TestShared>| {
-                    m.expect_reset().times(1).returning(|| {});
-                    m
-                },
-            }),
-            Behavior::Action(TestActions::SuccessWithCb {
-                ticks: 2,
-                cb: |mut m| {
-                    m.expect_reset().times(1).returning(|| {});
-                    m
-                },
-            }),
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Success),
         ]);
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::ReloadOnCompletion);
 
@@ -167,10 +140,10 @@ mod tests {
     #[test]
     fn behavior_tree_with_observer() {
         let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
-            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
-            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
-            Behavior::Action(TestActions::SuccessTimes { ticks: 1 }),
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Success),
         ]);
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
