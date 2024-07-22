@@ -44,18 +44,12 @@ impl<S> AsyncChild<S> {
                 let child = Self::from_behavior(*behavior);
                 Box::new(AsyncInvertState { child })
             }
-            Behavior::Sequence(mut behaviors) => {
-                let children = behaviors
-                    .drain(..)
-                    .map(|behavior| Self::from_behavior(behavior))
-                    .collect::<Vec<_>>();
+            Behavior::Sequence(behaviors) => {
+                let children = Self::from_behaviors(behaviors);
                 Box::new(AsyncSequenceState { children })
             }
-            Behavior::Select(mut behaviors) => {
-                let children = behaviors
-                    .drain(..)
-                    .map(|behavior| Self::from_behavior(behavior))
-                    .collect::<Vec<_>>();
+            Behavior::Select(behaviors) => {
+                let children = Self::from_behaviors(behaviors);
                 Box::new(AsyncSelectState { children })
             }
         };

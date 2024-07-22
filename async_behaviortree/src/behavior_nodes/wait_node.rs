@@ -46,12 +46,14 @@ impl<S> AsyncAction<S> for AsyncWaitState {
 
 #[cfg(test)]
 mod tests {
+    use ticked_async_executor::TickedAsyncExecutor;
+
     use super::*;
     use crate::test_async_behavior_interface::{TestShared, DELTA};
 
     #[test]
     fn test_wait_success() {
-        let executor = ticked_async_executor::TickedAsyncExecutor::default();
+        let executor = TickedAsyncExecutor::default();
 
         let mut wait = AsyncWaitState::new(0.0);
 
@@ -71,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_wait_running() {
-        let executor = ticked_async_executor::TickedAsyncExecutor::default();
+        let executor = TickedAsyncExecutor::default();
 
         let mut wait: Box<dyn AsyncAction<TestShared>> = Box::new(AsyncWaitState::new(49.0));
 
@@ -100,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_executor_drop() {
-        let executor = ticked_async_executor::TickedAsyncExecutor::default();
+        let executor = TickedAsyncExecutor::default();
 
         let mut wait = AsyncWaitState::new(50.0);
 

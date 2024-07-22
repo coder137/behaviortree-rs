@@ -25,6 +25,7 @@ mod tests {
         AsyncChild,
     };
     use behaviortree_common::Behavior;
+    use ticked_async_executor::TickedAsyncExecutor;
 
     #[test]
     fn test_invert_success() {
@@ -33,7 +34,7 @@ mod tests {
             child: AsyncChild::from_behavior(behavior),
         };
 
-        let executor = ticked_async_executor::TickedAsyncExecutor::default();
+        let executor = TickedAsyncExecutor::default();
 
         let mut delta = executor.tick_channel();
         let mut shared = TestShared;
@@ -57,7 +58,7 @@ mod tests {
             child: AsyncChild::from_behavior(behavior),
         };
 
-        let executor = ticked_async_executor::TickedAsyncExecutor::default();
+        let executor = TickedAsyncExecutor::default();
 
         let mut delta = executor.tick_channel();
         let mut shared = TestShared;
@@ -81,7 +82,7 @@ mod tests {
             child: AsyncChild::from_behavior(behavior),
         };
 
-        let executor = ticked_async_executor::TickedAsyncExecutor::default();
+        let executor = TickedAsyncExecutor::default();
 
         let mut delta = executor.tick_channel();
         let mut shared = TestShared;
