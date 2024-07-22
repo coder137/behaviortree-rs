@@ -1,5 +1,5 @@
 use crate::{
-    behavior_nodes::{AsyncInvertState, AsyncSequenceState, AsyncWaitState},
+    behavior_nodes::{AsyncInvertState, AsyncSelectState, AsyncSequenceState, AsyncWaitState},
     Behavior, Status,
 };
 
@@ -44,16 +44,33 @@ impl<S> AsyncChild<S> {
                 let child = Self::from_behavior(*behavior);
                 Box::new(AsyncInvertState { child })
             }
-            Behavior::Sequence(behaviors) => {
+            Behavior::Sequence(mut behaviors) => {
                 let children = behaviors
-                    .into_iter()
+                    .drain(..)
                     .map(|behavior| Self::from_behavior(behavior))
                     .collect::<Vec<_>>();
                 Box::new(AsyncSequenceState { children })
             }
-            Behavior::Select(_) => todo!(),
+            Behavior::Select(mut behaviors) => {
+                let children = behaviors
+                    .drain(..)
+                    .map(|behavior| Self::from_behavior(behavior))
+                    .collect::<Vec<_>>();
+                Box::new(AsyncSelectState { children })
+            }
         };
         Self::from_action(action)
+    }
+
+    pub fn from_behaviors<A>(mut behaviors: Vec<Behavior<A>>) -> Vec<Self>
+    where
+        A: ToAsyncAction<S>,
+        S: 'static,
+    {
+        behaviors
+            .drain(..)
+            .map(|behavior| Self::from_behavior(behavior))
+            .collect()
     }
 
     pub async fn run(
@@ -91,6 +108,8 @@ impl<S> AsyncChild<S> {
 #[cfg(test)]
 pub mod test_async_behavior_interface {
     use super::*;
+
+    pub const DELTA: f64 = 1000.0 / 60.0;
 
     #[derive(Default)]
     pub struct TestShared;
