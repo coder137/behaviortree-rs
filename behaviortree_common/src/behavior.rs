@@ -8,8 +8,11 @@ pub enum Behavior<A> {
     Action(A),
     /// Waits an amount of time before continuing.
     ///
-    /// f64: Time in seconds
+    /// f64: Time in milliseconds
     Wait(f64),
+
+    /// Converts `Success` into `Failure` and vice versa.
+    Invert(Box<Behavior<A>>),
 
     /// Runs behaviors one by one until all succeeded.
     ///
@@ -23,7 +26,4 @@ pub enum Behavior<A> {
     /// Fails if the last behavior fails.
     /// Can be thought of as a short-circuited logical OR gate.
     Select(Vec<Behavior<A>>),
-
-    /// Converts `Success` into `Failure` and vice versa.
-    Invert(Box<Behavior<A>>),
 }

@@ -7,8 +7,9 @@ pub struct WaitState {
 
 impl<S> Action<S> for WaitState {
     fn tick(&mut self, dt: f64, _shared: &mut S) -> Status {
-        if self.elapsed >= self.target {
-            return Status::Success;
+        match self.elapsed >= self.target {
+            true => unreachable!(),
+            false => {}
         }
 
         self.elapsed += dt;
@@ -47,9 +48,6 @@ mod tests {
 
         let status = wait_ref_mut.tick(1.0, &mut shared);
         assert_eq!(status, Status::Running);
-
-        let status = wait_ref_mut.tick(1.0, &mut shared);
-        assert_eq!(status, Status::Success);
 
         let status = wait_ref_mut.tick(1.0, &mut shared);
         assert_eq!(status, Status::Success);

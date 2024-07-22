@@ -1,12 +1,9 @@
 [package]
-name = "behaviortree"
+name = "behaviortree_common"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
 
-behaviortree_common = { path = "../behaviortree_common" }
-
 [dev-dependencies]
-serde_json = "1.0"
