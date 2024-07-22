@@ -1,4 +1,4 @@
-use crate::{Action, Behavior, Child, ChildState, Status, ToAction};
+use crate::{Behavior, Child, ChildState, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -10,13 +10,24 @@ pub enum BehaviorTreePolicy {
 pub struct BehaviorTree<A, S> {
     behavior: Behavior<A>,
     behavior_policy: BehaviorTreePolicy,
-
-    //
     child: Child<S>,
 }
 
-impl<A, S> Action<S> for BehaviorTree<A, S> {
-    fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+impl<A, S> BehaviorTree<A, S> {
+    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
+    where
+        A: ToAction<S> + Clone,
+        S: 'static,
+    {
+        let child = Child::from(behavior.clone());
+        Self {
+            behavior,
+            behavior_policy,
+            child,
+        }
+    }
+
+    pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         if let Some(status) = self.child.status() {
             if status != Status::Running {
                 match self.behavior_policy {
@@ -36,29 +47,6 @@ impl<A, S> Action<S> for BehaviorTree<A, S> {
         self.child.tick(dt, shared)
     }
 
-    fn reset(&mut self) {
-        self.child.reset();
-    }
-
-    fn child_state(&self) -> ChildState {
-        self.child.child_state()
-    }
-}
-
-impl<A, S> BehaviorTree<A, S> {
-    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
-    where
-        A: ToAction<S> + Clone,
-        S: 'static,
-    {
-        let child = Child::from(behavior.clone());
-        Self {
-            behavior,
-            behavior_policy,
-            child,
-        }
-    }
-
     pub fn tick_with_observer<O>(&mut self, dt: f64, shared: &mut S, observer: &mut O) -> Status
     where
         O: FnMut(ChildState, Status),
@@ -67,6 +55,14 @@ impl<A, S> BehaviorTree<A, S> {
         let child_state = self.child_state();
         observer(child_state, status);
         status
+    }
+
+    pub fn reset(&mut self) {
+        self.child.reset();
+    }
+
+    pub fn child_state(&self) -> ChildState {
+        self.child.child_state()
     }
 
     pub fn behavior(&self) -> &Behavior<A> {
