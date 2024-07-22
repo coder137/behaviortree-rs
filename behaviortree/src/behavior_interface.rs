@@ -7,12 +7,14 @@ use crate::{
 
 /// Modelled after the `std::future::Future` trait
 pub trait Action<S> {
-    /// Ticks the action once
+    /// Ticks the action once.
     ///
-    /// User implementation must ensure that calls to `tick` are non-blocking. Should return `Status::Running`
-    /// if action has not completed.
+    /// User implementation must ensure that calls to `tick` are non-blocking.
+    /// Should return `Status::Running` if action has not completed.
     ///
-    /// Once an action has finished, clients should not `tick` it again
+    /// Can be called multiple times.
+    /// Once `tick` has completed i.e returns `Status::Success`/`Status::Failure`,
+    /// clients should `reset` before `tick`ing.
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status;
 
     /// Resets the current action to its initial/newly created state
@@ -170,7 +172,7 @@ pub mod test_behavior_interface {
     use super::*;
 
     #[derive(Default)]
-    pub struct TestShared {}
+    pub struct TestShared;
 
     struct GenericTestAction {
         status: bool,

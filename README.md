@@ -29,12 +29,14 @@ class BehaviorTree {
     Child~S~ child
 
     new(Behavior~A~ behavior) BehaviorTree
+    tick(&mut self) Status
+    tick_with_observer(&mut self, O) Status
+    reset(&mut self)
 }
 
 Behavior --> Action: Implements
 
 Child <-- Action: Contains
 
-BehaviorTree --> Action: Implements
 BehaviorTree <-- Child: Contains
 ```
