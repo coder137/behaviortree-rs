@@ -87,3 +87,75 @@ impl<S> AsyncChild<S> {
         }
     }
 }
+
+#[cfg(test)]
+pub mod test_async_behavior_interface {
+    use super::*;
+
+    #[derive(Default)]
+    pub struct TestShared;
+
+    struct GenericTestAction {
+        status: bool,
+        times: usize,
+        elapsed: usize,
+    }
+
+    impl GenericTestAction {
+        fn new(status: bool, times: usize) -> Self {
+            Self {
+                status,
+                times,
+                elapsed: 0,
+            }
+        }
+    }
+
+    #[async_trait::async_trait(?Send)]
+    impl<S> AsyncAction<S> for GenericTestAction {
+        async fn run(
+            &mut self,
+            delta: &mut tokio::sync::watch::Receiver<f64>,
+            _shared: &mut S,
+        ) -> bool {
+            loop {
+                let _r = delta.changed().await.unwrap();
+                let _dt = *delta.borrow_and_update();
+                self.elapsed += 1;
+                if self.elapsed < self.times {
+                    async_std::task::yield_now().await;
+                } else {
+                    break;
+                }
+            }
+            self.status
+        }
+
+        fn reset(&mut self) {
+            self.elapsed = 0;
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub enum TestAction {
+        Success,
+        Failure,
+        SuccessAfter { times: usize },
+        FailureAfter { times: usize },
+    }
+
+    impl<S> ToAsyncAction<S> for TestAction {
+        fn to_async_action(self) -> Box<dyn AsyncAction<S>> {
+            match self {
+                TestAction::Success => Box::new(GenericTestAction::new(true, 1)),
+                TestAction::Failure => Box::new(GenericTestAction::new(false, 1)),
+                TestAction::SuccessAfter { times } => {
+                    Box::new(GenericTestAction::new(true, times + 1))
+                }
+                TestAction::FailureAfter { times } => {
+                    Box::new(GenericTestAction::new(false, times + 1))
+                }
+            }
+        }
+    }
+}

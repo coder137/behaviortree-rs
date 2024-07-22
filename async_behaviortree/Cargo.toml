@@ -14,4 +14,4 @@ async-std = "1.12.0"
 tokio = { version = "1.38.0", default-features = false, features = ["sync"] }
 
 [dev-dependencies]
-ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "54b5a7df41dbc663c05fb3f0caa38fb93d2791f1" }
+ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "e7179511f1c6c834fbe81ab16b31d5dbf4e50218" }
