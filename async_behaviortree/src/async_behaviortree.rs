@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use crate::AsyncChild;
+use crate::AsyncChildObserver;
 use crate::Behavior;
 
 use crate::ToAsyncAction;
@@ -13,8 +14,9 @@ pub enum AsyncBehaviorTreePolicy {
 }
 
 pub struct AsyncBehaviorController {
-    pub reset_tx: tokio::sync::mpsc::Sender<()>,
-    pub shutdown_tx: tokio::sync::mpsc::Sender<()>,
+    observer: AsyncChildObserver,
+    reset_tx: tokio::sync::mpsc::Sender<()>,
+    shutdown_tx: tokio::sync::mpsc::Sender<()>,
 }
 
 pub struct AsyncBehaviorTree;
@@ -31,6 +33,7 @@ impl AsyncBehaviorTree {
         S: 'static,
     {
         let mut child = AsyncChild::from_behavior(behavior);
+        let observer = child.observer();
         let (reset_tx, mut reset_rx) = tokio::sync::mpsc::channel::<()>(1);
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
 
@@ -61,6 +64,7 @@ impl AsyncBehaviorTree {
         (
             behavior_fut,
             AsyncBehaviorController {
+                observer,
                 reset_tx,
                 shutdown_tx,
             },
@@ -70,9 +74,13 @@ impl AsyncBehaviorTree {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
     use super::*;
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
+    use tokio::select;
+    use tokio_stream::StreamExt;
 
     use crate::test_async_behavior_interface::{TestAction, TestShared, DELTA};
 
@@ -93,12 +101,77 @@ mod tests {
             shared,
         );
 
+        let observer = _controller.observer.clone();
+        let (shut_tx, mut shut_rx) = tokio::sync::mpsc::channel::<()>(1);
+        executor
+            .spawn_local("AsyncObserver", async move {
+                let mut streams = tokio_stream::StreamMap::new();
+                let mut counter = 0;
+
+                let mut pending_queue = VecDeque::from_iter([&observer]);
+                loop {
+                    let tobs = pending_queue.pop_front();
+                    let tobs = match tobs {
+                        Some(tobs) => tobs,
+                        None => {
+                            break;
+                        }
+                    };
+                    let rx = match tobs {
+                        AsyncChildObserver::NoChild(rx) => rx,
+                        AsyncChildObserver::SingleChild(rx, child) => {
+                            pending_queue.push_back(&*child);
+                            rx
+                        }
+                        AsyncChildObserver::MultipleChildren(rx, children) => {
+                            for child in children.iter() {
+                                pending_queue.push_back(child);
+                            }
+                            rx
+                        }
+                    };
+                    // let data = (counter, *rx.borrow());
+                    // println!("Data: {:?}", data);
+                    streams.insert(
+                        counter,
+                        tokio_stream::wrappers::WatchStream::new(rx.clone()),
+                    );
+                    counter += 1;
+                }
+
+                let fut = async move {
+                    loop {
+                        let data = streams.next().await;
+                        let data = match data {
+                            Some(data) => data,
+                            None => {
+                                break;
+                            }
+                        };
+                        println!("Data: {:?}", data);
+                    }
+                };
+
+                select! {
+                    _ = fut => {}
+                    _ = shut_rx.recv() => {}
+                }
+            })
+            .detach();
+        executor.tick(DELTA);
+
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        for i in 0..100 {
+            println!("C: {i}");
+            executor.tick(DELTA);
+        }
+        let _r = shut_tx.try_send(());
+        for _ in 0..100 {
+            executor.tick(DELTA);
+        }
         assert_eq!(executor.num_tasks(), 0);
     }
 
