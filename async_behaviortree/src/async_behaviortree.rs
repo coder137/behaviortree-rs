@@ -1,8 +1,9 @@
 use std::future::Future;
 
+use behaviortree_common::Behavior;
+
 use crate::AsyncChild;
 use crate::AsyncChildObserver;
-use crate::Behavior;
 
 use crate::ToAsyncAction;
 
@@ -13,10 +14,30 @@ pub enum AsyncBehaviorTreePolicy {
     RetainOnCompletion,
 }
 
+enum BehaviorControllerMessage {
+    Reset,
+    Shutdown,
+}
+
 pub struct AsyncBehaviorController {
     observer: AsyncChildObserver,
-    reset_tx: tokio::sync::mpsc::Sender<()>,
-    shutdown_tx: tokio::sync::mpsc::Sender<()>,
+    message_tx: tokio::sync::mpsc::Sender<BehaviorControllerMessage>,
+}
+
+impl AsyncBehaviorController {
+    pub fn observer(&self) -> AsyncChildObserver {
+        self.observer.clone()
+    }
+
+    pub fn reset(&self) {
+        let _r = self.message_tx.try_send(BehaviorControllerMessage::Reset);
+    }
+
+    pub fn shutdown(&self) {
+        let _r = self
+            .message_tx
+            .try_send(BehaviorControllerMessage::Shutdown);
+    }
 }
 
 pub struct AsyncBehaviorTree;
@@ -34,10 +55,10 @@ impl AsyncBehaviorTree {
     {
         let mut child = AsyncChild::from_behavior(behavior);
         let observer = child.observer();
-        let (reset_tx, mut reset_rx) = tokio::sync::mpsc::channel::<()>(1);
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
+        let (message_tx, mut message_rx) =
+            tokio::sync::mpsc::channel::<BehaviorControllerMessage>(2);
 
-        let behavior_fut = async move {
+        let behavior_future = async move {
             loop {
                 tokio::select! {
                     _ = child.run(&mut delta, &mut shared) => {
@@ -46,27 +67,34 @@ impl AsyncBehaviorTree {
                             AsyncBehaviorTreePolicy::RetainOnCompletion => {break;},
                         }
                     }
-                    _ = reset_rx.recv() => {
-                        child.reset();
-                        match behavior_policy {
-                            AsyncBehaviorTreePolicy::ReloadOnCompletion => {},
-                            AsyncBehaviorTreePolicy::RetainOnCompletion => {break;},
+                    message = message_rx.recv() => {
+                        let message = match message {
+                            Some(message) => message,
+                            None => break,
+                        };
+                        match message {
+                            BehaviorControllerMessage::Reset => {
+                                child.reset();
+                                match behavior_policy {
+                                    AsyncBehaviorTreePolicy::ReloadOnCompletion => {},
+                                    AsyncBehaviorTreePolicy::RetainOnCompletion => {break;},
+                                }
+                            },
+                            BehaviorControllerMessage::Shutdown => {
+                                child.reset();
+                                break;
+                            },
                         }
-                    }
-                    _ = shutdown_rx.recv() => {
-                        child.reset();
-                        break;
                     }
                 }
             }
         };
 
         (
-            behavior_fut,
+            behavior_future,
             AsyncBehaviorController {
                 observer,
-                reset_tx,
-                shutdown_tx,
+                message_tx,
             },
         )
     }
@@ -164,14 +192,11 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        for i in 0..100 {
-            println!("C: {i}");
-            executor.tick(DELTA);
-        }
+        executor.tick(DELTA);
+        executor.tick(DELTA);
+        executor.tick(DELTA);
         let _r = shut_tx.try_send(());
-        for _ in 0..100 {
-            executor.tick(DELTA);
-        }
+        executor.tick(DELTA);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -197,7 +222,7 @@ mod tests {
             .detach();
 
         executor.tick(DELTA);
-        controller.reset_tx.try_send(()).unwrap();
+        controller.reset();
 
         executor.tick(DELTA);
         executor.tick(DELTA);
@@ -228,8 +253,8 @@ mod tests {
         for _ in 0..10 {
             executor.tick(DELTA);
         }
+        controller.shutdown();
 
-        controller.shutdown_tx.try_send(()).unwrap();
         executor.tick(DELTA);
         assert_eq!(executor.num_tasks(), 0);
     }
