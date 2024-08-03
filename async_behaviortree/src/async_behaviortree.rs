@@ -63,8 +63,13 @@ impl AsyncBehaviorTree {
                 tokio::select! {
                     _ = child.run(&mut delta, &mut shared) => {
                         match behavior_policy {
-                            AsyncBehaviorTreePolicy::ReloadOnCompletion => {child.reset();},
-                            AsyncBehaviorTreePolicy::RetainOnCompletion => {break;},
+                            AsyncBehaviorTreePolicy::ReloadOnCompletion => {
+                                async_std::task::yield_now().await;
+                                child.reset();
+                            },
+                            AsyncBehaviorTreePolicy::RetainOnCompletion => {
+                                break;
+                            },
                         }
                     }
                     message = message_rx.recv() => {
@@ -74,10 +79,13 @@ impl AsyncBehaviorTree {
                         };
                         match message {
                             BehaviorControllerMessage::Reset => {
+                                async_std::task::yield_now().await;
                                 child.reset();
                                 match behavior_policy {
                                     AsyncBehaviorTreePolicy::ReloadOnCompletion => {},
-                                    AsyncBehaviorTreePolicy::RetainOnCompletion => {break;},
+                                    AsyncBehaviorTreePolicy::RetainOnCompletion => {
+                                        break;
+                                    },
                                 }
                             },
                             BehaviorControllerMessage::Shutdown => {
