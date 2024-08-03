@@ -39,7 +39,7 @@ impl<S> AsyncAction<S> for AsyncWaitState {
         true
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, _shared: &mut S) {
         self.elapsed = 0.0;
     }
 }
@@ -83,7 +83,7 @@ mod tests {
         executor
             .spawn_local("WaitFuture", async move {
                 wait.run(&mut delta, &mut shared).await;
-                wait.reset();
+                wait.reset(&mut shared);
                 wait.run(&mut delta, &mut shared).await;
             })
             .detach();

@@ -92,21 +92,21 @@ impl<S> AsyncChild<S> {
         success
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, shared: &mut S) {
         if self.state.borrow().is_none() {
             return;
         }
         match &mut self.action {
             AsyncBehaviorType::Leaf(action) => {
-                action.reset();
+                action.reset(shared);
             }
             AsyncBehaviorType::Decorator(decorator, child) => {
-                child.reset();
+                child.reset(shared);
                 decorator.reset();
             }
             AsyncBehaviorType::Control(control, children) => {
                 children.iter_mut().for_each(|child| {
-                    child.reset();
+                    child.reset(shared);
                 });
                 control.reset();
             }

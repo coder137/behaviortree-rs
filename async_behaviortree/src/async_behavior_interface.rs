@@ -16,7 +16,7 @@ pub trait AsyncAction<S> {
     /// Resets the current action to its initial/newly created state
     ///
     /// Decorator and Control nodes need to also reset their ticked children
-    fn reset(&mut self);
+    fn reset(&mut self, shared: &mut S);
 }
 
 pub trait ToAsyncAction<S> {
@@ -92,7 +92,7 @@ pub mod test_async_behavior_interface {
             self.status
         }
 
-        fn reset(&mut self) {
+        fn reset(&mut self, _shared: &mut S) {
             self.elapsed = 0;
         }
     }

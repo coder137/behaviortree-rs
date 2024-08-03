@@ -65,7 +65,7 @@ impl AsyncBehaviorTree {
                         match behavior_policy {
                             AsyncBehaviorTreePolicy::ReloadOnCompletion => {
                                 async_std::task::yield_now().await;
-                                child.reset();
+                                child.reset(&mut shared);
                             },
                             AsyncBehaviorTreePolicy::RetainOnCompletion => {
                                 break;
@@ -80,7 +80,7 @@ impl AsyncBehaviorTree {
                         match message {
                             BehaviorControllerMessage::Reset => {
                                 async_std::task::yield_now().await;
-                                child.reset();
+                                child.reset(&mut shared);
                                 match behavior_policy {
                                     AsyncBehaviorTreePolicy::ReloadOnCompletion => {},
                                     AsyncBehaviorTreePolicy::RetainOnCompletion => {
@@ -89,7 +89,7 @@ impl AsyncBehaviorTree {
                                 }
                             },
                             BehaviorControllerMessage::Shutdown => {
-                                child.reset();
+                                child.reset(&mut shared);
                                 break;
                             },
                         }
