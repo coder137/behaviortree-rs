@@ -1,7 +1,4 @@
-use crate::{
-    behavior_nodes::{AsyncInvertState, AsyncSelectState, AsyncSequenceState, AsyncWaitState},
-    Behavior, Status,
-};
+use crate::AsyncChild;
 
 #[async_trait::async_trait(?Send)]
 pub trait AsyncAction<S> {
@@ -19,84 +16,35 @@ pub trait AsyncAction<S> {
     /// Resets the current action to its initial/newly created state
     ///
     /// Decorator and Control nodes need to also reset their ticked children
-    fn reset(&mut self);
+    fn reset(&mut self, shared: &mut S);
 }
 
 pub trait ToAsyncAction<S> {
     fn to_async_action(self) -> Box<dyn AsyncAction<S>>;
 }
 
-pub struct AsyncChild<S> {
-    action: Box<dyn AsyncAction<S>>,
-    status: Option<Status>,
-}
-
-impl<S> AsyncChild<S> {
-    pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
-    where
-        A: ToAsyncAction<S>,
-        S: 'static,
-    {
-        let action = match behavior {
-            Behavior::Action(action) => action.to_async_action(),
-            Behavior::Wait(target) => Box::new(AsyncWaitState::new(target)),
-            Behavior::Invert(behavior) => {
-                let child = Self::from_behavior(*behavior);
-                Box::new(AsyncInvertState { child })
-            }
-            Behavior::Sequence(behaviors) => {
-                let children = Self::from_behaviors(behaviors);
-                Box::new(AsyncSequenceState { children })
-            }
-            Behavior::Select(behaviors) => {
-                let children = Self::from_behaviors(behaviors);
-                Box::new(AsyncSelectState { children })
-            }
-        };
-        Self::from_action(action)
-    }
-
-    pub fn from_behaviors<A>(mut behaviors: Vec<Behavior<A>>) -> Vec<Self>
-    where
-        A: ToAsyncAction<S>,
-        S: 'static,
-    {
-        behaviors
-            .drain(..)
-            .map(|behavior| Self::from_behavior(behavior))
-            .collect()
-    }
-
-    pub async fn run(
+#[async_trait::async_trait(?Send)]
+pub trait AsyncDecorator<S> {
+    async fn run(
         &mut self,
+        child: &mut AsyncChild<S>,
         delta: &mut tokio::sync::watch::Receiver<f64>,
         shared: &mut S,
-    ) -> bool {
-        self.status = Some(Status::Running);
-        let success = self.action.run(delta, shared).await;
-        let status = if success {
-            Status::Success
-        } else {
-            Status::Failure
-        };
-        self.status = Some(status);
-        success
-    }
+    ) -> bool;
 
-    pub fn reset(&mut self) {
-        if self.status.is_none() {
-            return;
-        }
-        self.action.reset();
-        self.status = None;
-    }
+    fn reset(&mut self);
+}
 
-    fn from_action(action: Box<dyn AsyncAction<S>>) -> Self {
-        Self {
-            action,
-            status: None,
-        }
-    }
+#[async_trait::async_trait(?Send)]
+pub trait AsyncControl<S> {
+    async fn run(
+        &mut self,
+        children: &mut [AsyncChild<S>],
+        delta: &mut tokio::sync::watch::Receiver<f64>,
+        shared: &mut S,
+    ) -> bool;
+
+    fn reset(&mut self);
 }
 
 #[cfg(test)]
@@ -105,7 +53,7 @@ pub mod test_async_behavior_interface {
 
     pub const DELTA: f64 = 1000.0 / 60.0;
 
-    #[derive(Default)]
+    #[derive(Debug, Default)]
     pub struct TestShared;
 
     struct GenericTestAction {
@@ -144,7 +92,7 @@ pub mod test_async_behavior_interface {
             self.status
         }
 
-        fn reset(&mut self) {
+        fn reset(&mut self, _shared: &mut S) {
             self.elapsed = 0;
         }
     }

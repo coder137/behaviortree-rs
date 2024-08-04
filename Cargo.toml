@@ -1,5 +1,5 @@
 [workspace]
-members = ["behaviortree", "async_behaviortree"]
+members = ["behaviortree_common", "behaviortree", "async_behaviortree"]
 resolver = "2"
 
 [workspace.dependencies]

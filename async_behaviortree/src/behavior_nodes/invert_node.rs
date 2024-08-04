@@ -1,19 +1,38 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, AsyncChild};
+use crate::{AsyncChild, AsyncDecorator};
 
-pub struct AsyncInvertState<S> {
-    pub child: AsyncChild<S>,
+pub struct AsyncInvertState {
+    completed: bool,
+}
+
+impl AsyncInvertState {
+    pub fn new() -> Self {
+        Self { completed: false }
+    }
 }
 
 #[async_trait(?Send)]
-impl<S> AsyncAction<S> for AsyncInvertState<S> {
-    async fn run(&mut self, delta: &mut tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
-        !self.child.run(delta, shared).await
+impl<S> AsyncDecorator<S> for AsyncInvertState {
+    async fn run(
+        &mut self,
+        child: &mut AsyncChild<S>,
+        delta: &mut tokio::sync::watch::Receiver<f64>,
+        shared: &mut S,
+    ) -> bool {
+        match self.completed {
+            true => {
+                unreachable!()
+            }
+            false => {}
+        }
+        let status = !child.run(delta, shared).await;
+        self.completed = true;
+        status
     }
 
     fn reset(&mut self) {
-        self.child.reset();
+        self.completed = false;
     }
 }
 
@@ -30,9 +49,9 @@ mod tests {
     #[test]
     fn test_invert_success() {
         let behavior = Behavior::Action(TestAction::Success);
-        let mut invert = AsyncInvertState::<TestShared> {
-            child: AsyncChild::from_behavior(behavior),
-        };
+        let mut child = AsyncChild::from_behavior(behavior);
+
+        let mut invert = AsyncInvertState::new();
 
         let executor = TickedAsyncExecutor::default();
 
@@ -41,7 +60,7 @@ mod tests {
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(&mut delta, &mut shared).await;
+                let status = invert.run(&mut child, &mut delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
@@ -54,9 +73,9 @@ mod tests {
     #[test]
     fn test_invert_failure() {
         let behavior = Behavior::Action(TestAction::Failure);
-        let mut invert = AsyncInvertState::<TestShared> {
-            child: AsyncChild::from_behavior(behavior),
-        };
+        let mut child = AsyncChild::from_behavior(behavior);
+
+        let mut invert = AsyncInvertState::new();
 
         let executor = TickedAsyncExecutor::default();
 
@@ -65,7 +84,7 @@ mod tests {
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(&mut delta, &mut shared).await;
+                let status = invert.run(&mut child, &mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -78,9 +97,9 @@ mod tests {
     #[test]
     fn test_invert_running_with_reset() {
         let behavior = Behavior::Action(TestAction::SuccessAfter { times: 2 });
-        let mut invert = AsyncInvertState::<TestShared> {
-            child: AsyncChild::from_behavior(behavior),
-        };
+        let mut child = AsyncChild::from_behavior(behavior);
+
+        let mut invert: Box<dyn AsyncDecorator<TestShared>> = Box::new(AsyncInvertState::new());
 
         let executor = TickedAsyncExecutor::default();
 
@@ -89,10 +108,10 @@ mod tests {
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(&mut delta, &mut shared).await;
+                let status = invert.run(&mut child, &mut delta, &mut shared).await;
                 assert!(!status);
                 invert.reset();
-                let status = invert.run(&mut delta, &mut shared).await;
+                let status = invert.run(&mut child, &mut delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();

@@ -18,3 +18,5 @@ tokio = { version = "1.38.0", default-features = false, features = [
 
 [dev-dependencies]
 ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "45c76da3730e0f77f08c9f6af86f00832c89fe1e" }
+
+tokio-stream = { version = "0.1.15", features = ["full"] }

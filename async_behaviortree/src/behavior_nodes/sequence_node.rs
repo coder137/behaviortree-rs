@@ -1,19 +1,38 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, AsyncChild};
+use crate::{AsyncChild, AsyncControl};
 
-pub struct AsyncSequenceState<S> {
-    pub children: Vec<AsyncChild<S>>,
+pub struct AsyncSequenceState {
+    completed: bool,
+}
+
+impl AsyncSequenceState {
+    pub fn new() -> Self {
+        Self { completed: false }
+    }
 }
 
 #[async_trait(?Send)]
-impl<S> AsyncAction<S> for AsyncSequenceState<S> {
-    async fn run(&mut self, delta: &mut tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
-        let last = self.children.len() - 1;
-        for (index, child) in self.children.iter_mut().enumerate() {
+impl<S> AsyncControl<S> for AsyncSequenceState {
+    async fn run(
+        &mut self,
+        children: &mut [AsyncChild<S>],
+        delta: &mut tokio::sync::watch::Receiver<f64>,
+        shared: &mut S,
+    ) -> bool {
+        match self.completed {
+            true => {
+                unreachable!()
+            }
+            false => {}
+        }
+        let mut status = true;
+        let last = children.len() - 1;
+        for (index, child) in children.iter_mut().enumerate() {
             let child_status = child.run(delta, shared).await;
             if !child_status {
-                return false;
+                status = false;
+                break;
             }
             // Only one child should be run per tick
             // This means that if they are more children after the current child,
@@ -22,13 +41,12 @@ impl<S> AsyncAction<S> for AsyncSequenceState<S> {
                 async_std::task::yield_now().await;
             }
         }
-        true
+        self.completed = true;
+        status
     }
 
     fn reset(&mut self) {
-        self.children.iter_mut().for_each(|child| {
-            child.reset();
-        });
+        self.completed = false;
     }
 }
 
@@ -43,9 +61,8 @@ mod tests {
 
     #[test]
     fn test_sequence_success() {
-        let mut sequence = AsyncSequenceState {
-            children: AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::Success)]),
-        };
+        let mut children = AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::Success)]);
+        let mut sequence = AsyncSequenceState::new();
 
         let executor = TickedAsyncExecutor::default();
 
@@ -54,7 +71,7 @@ mod tests {
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(&mut children, &mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -66,9 +83,8 @@ mod tests {
 
     #[test]
     fn test_sequence_failure() {
-        let mut sequence = AsyncSequenceState {
-            children: AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::Failure)]),
-        };
+        let mut children = AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::Failure)]);
+        let mut sequence = AsyncSequenceState::new();
 
         let executor = TickedAsyncExecutor::default();
 
@@ -77,7 +93,7 @@ mod tests {
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(&mut children, &mut delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
@@ -89,11 +105,11 @@ mod tests {
 
     #[test]
     fn test_sequence_running() {
-        let mut sequence = AsyncSequenceState {
-            children: AsyncChild::from_behaviors(vec![Behavior::Action(
-                TestAction::SuccessAfter { times: 1 },
-            )]),
-        };
+        let mut children =
+            AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::SuccessAfter {
+                times: 1,
+            })]);
+        let mut sequence = AsyncSequenceState::new();
 
         let executor = TickedAsyncExecutor::default();
 
@@ -102,7 +118,7 @@ mod tests {
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(&mut children, &mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -115,12 +131,11 @@ mod tests {
 
     #[test]
     fn test_sequence_multiple_children() {
-        let mut sequence = AsyncSequenceState {
-            children: AsyncChild::from_behaviors(vec![
-                Behavior::Action(TestAction::Success),
-                Behavior::Action(TestAction::Success),
-            ]),
-        };
+        let mut children = AsyncChild::from_behaviors(vec![
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Success),
+        ]);
+        let mut sequence = AsyncSequenceState::new();
 
         let executor = TickedAsyncExecutor::default();
 
@@ -129,7 +144,7 @@ mod tests {
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(&mut children, &mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -143,13 +158,12 @@ mod tests {
 
     #[test]
     fn test_sequence_multiple_children_early_failure() {
-        let mut sequence = AsyncSequenceState {
-            children: AsyncChild::from_behaviors(vec![
-                Behavior::Action(TestAction::Success),
-                Behavior::Action(TestAction::Failure),
-                Behavior::Action(TestAction::Success),
-            ]),
-        };
+        let mut children = AsyncChild::from_behaviors(vec![
+            Behavior::Action(TestAction::Success),
+            Behavior::Action(TestAction::Failure),
+            Behavior::Action(TestAction::Success),
+        ]);
+        let mut sequence: Box<dyn AsyncControl<TestShared>> = Box::new(AsyncSequenceState::new());
 
         let executor = TickedAsyncExecutor::default();
 
@@ -158,10 +172,10 @@ mod tests {
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(&mut children, &mut delta, &mut shared).await;
                 assert!(!status);
                 sequence.reset();
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(&mut children, &mut delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
