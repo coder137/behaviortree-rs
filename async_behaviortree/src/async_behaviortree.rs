@@ -29,7 +29,7 @@ impl AsyncBehaviorController {
         let _ignore = self.reset_tx.send(());
     }
 
-    pub fn shutdown(self) {
+    pub fn shutdown(&self) {
         let _ignore = self.shutdown_tx.send(());
     }
 }
@@ -94,7 +94,6 @@ impl AsyncBehaviorTree {
                     }
                     State::ShutdownNotification => {
                         shutdown_rx.mark_unchanged();
-                        async_std::task::yield_now().await;
                         child.reset(&mut shared);
                         break;
                     }
@@ -245,6 +244,7 @@ mod tests {
     #[test]
     fn test_async_behaviortree_shutdown() {
         let behavior = Behavior::Sequence(vec![
+            Behavior::Invert(Box::new(Behavior::Action(TestAction::Failure))),
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
