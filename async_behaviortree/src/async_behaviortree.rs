@@ -14,14 +14,10 @@ pub enum AsyncBehaviorTreePolicy {
     RetainOnCompletion,
 }
 
-enum BehaviorControllerMessage {
-    Reset,
-    Shutdown,
-}
-
 pub struct AsyncBehaviorController {
     observer: AsyncChildObserver,
-    message_tx: tokio::sync::mpsc::Sender<BehaviorControllerMessage>,
+    reset_tx: tokio::sync::watch::Sender<()>,
+    shutdown_tx: tokio::sync::watch::Sender<()>,
 }
 
 impl AsyncBehaviorController {
@@ -30,13 +26,11 @@ impl AsyncBehaviorController {
     }
 
     pub fn reset(&self) {
-        let _r = self.message_tx.try_send(BehaviorControllerMessage::Reset);
+        let _ignore = self.reset_tx.send(());
     }
 
     pub fn shutdown(&self) {
-        let _r = self
-            .message_tx
-            .try_send(BehaviorControllerMessage::Shutdown);
+        let _ignore = self.shutdown_tx.send(());
     }
 }
 
@@ -55,44 +49,53 @@ impl AsyncBehaviorTree {
     {
         let mut child = AsyncChild::from_behavior(behavior);
         let observer = child.observer();
-        let (message_tx, mut message_rx) =
-            tokio::sync::mpsc::channel::<BehaviorControllerMessage>(2);
 
+        let (reset_tx, mut reset_rx) = tokio::sync::watch::channel(());
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(());
         let behavior_future = async move {
+            enum State {
+                ChildCompleted,
+                ResetNotification,
+                ShutdownNotification,
+            }
             loop {
-                tokio::select! {
+                let state = tokio::select! {
                     _ = child.run(&mut delta, &mut shared) => {
+                        State::ChildCompleted
+                    }
+                    _ = reset_rx.changed() => {
+                        State::ResetNotification
+                    }
+                    _ = shutdown_rx.changed() => {
+                        State::ShutdownNotification
+                    }
+                };
+
+                match state {
+                    State::ChildCompleted => match behavior_policy {
+                        AsyncBehaviorTreePolicy::ReloadOnCompletion => {
+                            async_std::task::yield_now().await;
+                            child.reset(&mut shared);
+                        }
+                        AsyncBehaviorTreePolicy::RetainOnCompletion => {
+                            break;
+                        }
+                    },
+                    State::ResetNotification => {
+                        reset_rx.mark_unchanged();
+                        async_std::task::yield_now().await;
+                        child.reset(&mut shared);
                         match behavior_policy {
-                            AsyncBehaviorTreePolicy::ReloadOnCompletion => {
-                                async_std::task::yield_now().await;
-                                child.reset(&mut shared);
-                            },
+                            AsyncBehaviorTreePolicy::ReloadOnCompletion => {}
                             AsyncBehaviorTreePolicy::RetainOnCompletion => {
                                 break;
-                            },
+                            }
                         }
                     }
-                    message = message_rx.recv() => {
-                        let message = match message {
-                            Some(message) => message,
-                            None => break,
-                        };
-                        match message {
-                            BehaviorControllerMessage::Reset => {
-                                async_std::task::yield_now().await;
-                                child.reset(&mut shared);
-                                match behavior_policy {
-                                    AsyncBehaviorTreePolicy::ReloadOnCompletion => {},
-                                    AsyncBehaviorTreePolicy::RetainOnCompletion => {
-                                        break;
-                                    },
-                                }
-                            },
-                            BehaviorControllerMessage::Shutdown => {
-                                child.reset(&mut shared);
-                                break;
-                            },
-                        }
+                    State::ShutdownNotification => {
+                        shutdown_rx.mark_unchanged();
+                        child.reset(&mut shared);
+                        break;
                     }
                 }
             }
@@ -102,7 +105,8 @@ impl AsyncBehaviorTree {
             behavior_future,
             AsyncBehaviorController {
                 observer,
-                message_tx,
+                reset_tx,
+                shutdown_tx,
             },
         )
     }
@@ -240,6 +244,7 @@ mod tests {
     #[test]
     fn test_async_behaviortree_shutdown() {
         let behavior = Behavior::Sequence(vec![
+            Behavior::Invert(Box::new(Behavior::Action(TestAction::Failure))),
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
@@ -258,12 +263,31 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
+        let observer = controller.observer();
         for _ in 0..10 {
             executor.tick(DELTA);
+            println!("Observer: {observer:?}");
         }
         controller.shutdown();
 
-        executor.tick(DELTA);
+        while executor.num_tasks() != 0 {
+            executor.tick(DELTA);
+        }
         assert_eq!(executor.num_tasks(), 0);
+    }
+
+    #[test]
+    fn test_watch_channel() {
+        let (tx, mut rx) = tokio::sync::watch::channel(());
+        let changed = rx.has_changed().unwrap();
+        assert!(!changed);
+
+        let _r = tx.send(());
+        let changed = rx.has_changed().unwrap();
+        assert!(changed);
+        rx.mark_unchanged();
+
+        let changed = rx.has_changed().unwrap();
+        assert!(!changed);
     }
 }
