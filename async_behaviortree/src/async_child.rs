@@ -22,6 +22,24 @@ pub enum AsyncChildObserver {
     MultipleChildren(AsyncChildObserverChannel, Rc<[AsyncChildObserver]>),
 }
 
+impl std::fmt::Debug for AsyncChildObserver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoChild(arg0) => f.debug_tuple("NoChild").field(&*arg0.borrow()).finish(),
+            Self::SingleChild(arg0, arg1) => f
+                .debug_tuple("SingleChild")
+                .field(&*arg0.borrow())
+                .field(arg1)
+                .finish(),
+            Self::MultipleChildren(arg0, arg1) => f
+                .debug_tuple("MultipleChildren")
+                .field(&*arg0.borrow())
+                .field(arg1)
+                .finish(),
+        }
+    }
+}
+
 pub struct AsyncChild<S> {
     action: AsyncBehaviorType<S>,
     state: tokio::sync::watch::Sender<Option<Status>>,
