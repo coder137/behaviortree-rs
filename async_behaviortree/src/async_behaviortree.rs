@@ -26,11 +26,11 @@ impl AsyncBehaviorController {
     }
 
     pub fn reset(&self) {
-        let _r = self.reset_tx.send(());
+        let _ignore = self.reset_tx.send(());
     }
 
     pub fn shutdown(self) {
-        let _r = self.shutdown_tx.send(());
+        let _ignore = self.shutdown_tx.send(());
     }
 }
 
@@ -263,8 +263,10 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
+        let observer = controller.observer();
         for _ in 0..10 {
             executor.tick(DELTA);
+            println!("Observer: {observer:?}");
         }
         controller.shutdown();
 
