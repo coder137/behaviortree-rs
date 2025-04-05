@@ -1,4 +1,4 @@
-use crate::{Behavior, Child, ChildState, Status, ToAction};
+use crate::{Behavior, Child, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -19,7 +19,7 @@ impl<A, S> BehaviorTree<A, S> {
         A: ToAction<S> + Clone,
         S: 'static,
     {
-        let child = Child::from(behavior.clone());
+        let child = Child::from_behavior(behavior.clone());
         Self {
             behavior,
             behavior_policy,
@@ -47,22 +47,8 @@ impl<A, S> BehaviorTree<A, S> {
         self.child.tick(dt, shared)
     }
 
-    pub fn tick_with_observer<O>(&mut self, dt: f64, shared: &mut S, observer: &mut O) -> Status
-    where
-        O: FnMut(ChildState, Status),
-    {
-        let status = self.tick(dt, shared);
-        let child_state = self.child_state();
-        observer(child_state, status);
-        status
-    }
-
     pub fn reset(&mut self) {
         self.child.reset();
-    }
-
-    pub fn child_state(&self) -> ChildState {
-        self.child.child_state()
     }
 
     pub fn behavior(&self) -> &Behavior<A> {
@@ -130,37 +116,6 @@ mod tests {
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1, &mut shared);
-        assert_eq!(status, Status::Success);
-    }
-
-    #[test]
-    fn behavior_tree_with_observer() {
-        let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestAction::Success),
-            Behavior::Action(TestAction::Success),
-            Behavior::Action(TestAction::Success),
-            Behavior::Action(TestAction::Success),
-        ]);
-        let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
-
-        let mut shared = TestShared::default();
-        let mut observer = |state, status| {
-            println!("Status: {:?}, State: {:?}", status, state);
-        };
-
-        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
-        assert_eq!(status, Status::Running);
-
-        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
-        assert_eq!(status, Status::Running);
-
-        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
-        assert_eq!(status, Status::Running);
-
-        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
-        assert_eq!(status, Status::Success);
-
-        let status = tree.tick_with_observer(0.1, &mut shared, &mut observer);
         assert_eq!(status, Status::Success);
     }
 }
