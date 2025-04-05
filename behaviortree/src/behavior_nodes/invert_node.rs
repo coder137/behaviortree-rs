@@ -1,27 +1,23 @@
-use crate::{Action, Child, ChildState, Status};
+use crate::{Child, Decorator, Status};
 
-pub struct InvertState<S> {
-    child: Child<S>,
+pub struct InvertState {
     completed: bool,
 }
 
-impl<S> InvertState<S> {
-    pub fn new(child: Child<S>) -> Self {
-        Self {
-            child,
-            completed: false,
-        }
+impl InvertState {
+    pub fn new() -> Self {
+        Self { completed: false }
     }
 }
 
-impl<S> Action<S> for InvertState<S> {
-    fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+impl<S> Decorator<S> for InvertState {
+    fn tick(&mut self, child: &mut Child<S>, dt: f64, shared: &mut S) -> Status {
         match self.completed {
             true => unreachable!(),
             false => {}
         }
 
-        match self.child.tick(dt, shared) {
+        match child.tick(dt, shared) {
             Status::Success => {
                 self.completed = true;
                 Status::Failure
@@ -35,12 +31,7 @@ impl<S> Action<S> for InvertState<S> {
     }
 
     fn reset(&mut self) {
-        self.child.reset();
         self.completed = false;
-    }
-
-    fn child_state(&self) -> ChildState {
-        ChildState::SingleChild(self.child.inner_state())
     }
 }
 
@@ -48,7 +39,7 @@ impl<S> Action<S> for InvertState<S> {
 mod tests {
     use crate::{
         test_behavior_interface::{TestAction, TestShared},
-        Behavior, ChildStateInfo,
+        Behavior,
     };
 
     use super::*;
@@ -58,21 +49,11 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::Success);
-        let mut invert = InvertState::new(Child::from(behavior));
-        assert_eq!(
-            invert.child_state(),
-            ChildState::SingleChild(ChildStateInfo::from((ChildState::NoChild, None)))
-        );
+        let mut child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new();
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = invert.tick(&mut child, 0.1, &mut shared);
         assert_eq!(status, Status::Failure);
-        assert_eq!(
-            invert.child_state(),
-            ChildState::SingleChild(ChildStateInfo::from((
-                ChildState::NoChild,
-                Some(Status::Success)
-            )))
-        );
     }
 
     #[test]
@@ -80,17 +61,11 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::Failure);
-        let mut invert = InvertState::new(Child::from(behavior));
+        let mut child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new();
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = invert.tick(&mut child, 0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        assert_eq!(
-            invert.child_state(),
-            ChildState::SingleChild(ChildStateInfo::from((
-                ChildState::NoChild,
-                Some(Status::Failure)
-            )))
-        );
     }
 
     #[test]
@@ -98,27 +73,14 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::FailureAfter { times: 1 });
-        let mut invert = InvertState::new(Child::from(behavior));
+        let mut child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new();
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = invert.tick(&mut child, 0.1, &mut shared);
         assert_eq!(status, Status::Running);
-        assert_eq!(
-            invert.child_state(),
-            ChildState::SingleChild(ChildStateInfo::from((
-                ChildState::NoChild,
-                Some(Status::Running)
-            )))
-        );
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = invert.tick(&mut child, 0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        assert_eq!(
-            invert.child_state(),
-            ChildState::SingleChild(ChildStateInfo::from((
-                ChildState::NoChild,
-                Some(Status::Failure)
-            )))
-        );
     }
 
     #[test]
@@ -126,14 +88,15 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::Success);
-        let mut invert = InvertState::new(Child::from(behavior));
+        let mut child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new();
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = invert.tick(&mut child, 0.1, &mut shared);
         assert_eq!(status, Status::Failure);
 
-        invert.reset();
+        Decorator::<TestShared>::reset(&mut invert);
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = invert.tick(&mut child, 0.1, &mut shared);
         assert_eq!(status, Status::Failure);
     }
 }

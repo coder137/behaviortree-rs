@@ -1,4 +1,7 @@
-use crate::{behavior_nodes::InvertState, Behavior, Status};
+use crate::{
+    behavior_nodes::{InvertState, WaitState},
+    Behavior, Status,
+};
 
 /// Modelled after the `std::future::Future` trait
 pub trait Action<S> {
@@ -50,7 +53,10 @@ impl<S> Child<S> {
                 let action = action.to_action();
                 Self::Action(action, None)
             }
-            Behavior::Wait(_) => todo!(),
+            Behavior::Wait(target) => {
+                let action = WaitState::new(target);
+                Self::Action(Box::new(action), None)
+            }
             Behavior::Invert(child) => {
                 let child = Child::from_behavior(*child);
                 Self::Decorator(Box::new(InvertState::new()), Box::new(child), None)
