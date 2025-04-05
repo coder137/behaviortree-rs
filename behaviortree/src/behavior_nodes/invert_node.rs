@@ -1,23 +1,27 @@
-use crate::{Child, Decorator, Status};
+use crate::{Action, Child, Status};
 
-pub struct InvertState {
+pub struct InvertState<S> {
+    child: Child<S>,
     completed: bool,
 }
 
-impl InvertState {
-    pub fn new() -> Self {
-        Self { completed: false }
+impl<S> InvertState<S> {
+    pub fn new(child: Child<S>) -> Self {
+        Self {
+            child,
+            completed: false,
+        }
     }
 }
 
-impl<S> Decorator<S> for InvertState {
-    fn tick(&mut self, child: &mut Child<S>, dt: f64, shared: &mut S) -> Status {
+impl<S> Action<S> for InvertState<S> {
+    fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         match self.completed {
             true => unreachable!(),
             false => {}
         }
 
-        match child.tick(dt, shared) {
+        match self.child.tick(delta, shared) {
             Status::Success => {
                 self.completed = true;
                 Status::Failure
@@ -31,6 +35,7 @@ impl<S> Decorator<S> for InvertState {
     }
 
     fn reset(&mut self) {
+        self.child.reset();
         self.completed = false;
     }
 }
@@ -49,10 +54,10 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::Success);
-        let mut child = Child::from_behavior(behavior);
-        let mut invert = InvertState::new();
+        let child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new(child);
 
-        let status = invert.tick(&mut child, 0.1, &mut shared);
+        let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
     }
 
@@ -61,10 +66,10 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::Failure);
-        let mut child = Child::from_behavior(behavior);
-        let mut invert = InvertState::new();
+        let child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new(child);
 
-        let status = invert.tick(&mut child, 0.1, &mut shared);
+        let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
     }
 
@@ -73,13 +78,13 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::FailureAfter { times: 1 });
-        let mut child = Child::from_behavior(behavior);
-        let mut invert = InvertState::new();
+        let child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new(child);
 
-        let status = invert.tick(&mut child, 0.1, &mut shared);
+        let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        let status = invert.tick(&mut child, 0.1, &mut shared);
+        let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
     }
 
@@ -88,15 +93,15 @@ mod tests {
         let mut shared = TestShared::default();
 
         let behavior = Behavior::Action(TestAction::Success);
-        let mut child = Child::from_behavior(behavior);
-        let mut invert = InvertState::new();
+        let child = Child::from_behavior(behavior);
+        let mut invert = InvertState::new(child);
 
-        let status = invert.tick(&mut child, 0.1, &mut shared);
+        let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
 
-        Decorator::<TestShared>::reset(&mut invert);
+        invert.reset();
 
-        let status = invert.tick(&mut child, 0.1, &mut shared);
+        let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
     }
 }

@@ -1,7 +1,4 @@
-use crate::{
-    behavior_nodes::{InvertState, WaitState},
-    Behavior, Status,
-};
+use crate::{behavior_nodes::*, Behavior, Status};
 
 /// Modelled after the `std::future::Future` trait
 pub trait Action<S> {
@@ -23,93 +20,72 @@ pub trait ToAction<S> {
     fn to_action(self) -> Box<dyn Action<S>>;
 }
 
-pub trait Decorator<S> {
-    fn tick(&mut self, child: &mut Child<S>, delta: f64, shared: &mut S) -> Status;
-
-    /// Resets the current action to its initial/newly created state
-    fn reset(&mut self);
-}
-
-pub trait Control<S> {
-    fn tick(&mut self, children: &mut [Child<S>], delta: f64, shared: &mut S) -> Status;
-
-    /// Resets the current action to its initial/newly created state
-    fn reset(&mut self);
-}
-
-pub enum Child<S> {
-    Action(Box<dyn Action<S>>, Option<Status>),
-    Decorator(Box<dyn Decorator<S>>, Box<Child<S>>, Option<Status>),
-    Control(Box<dyn Control<S>>, Vec<Child<S>>, Option<Status>),
+pub struct Child<S> {
+    action: Box<dyn Action<S>>,
+    status: Option<Status>,
 }
 
 impl<S> Child<S> {
+    pub fn new(action: Box<dyn Action<S>>) -> Self {
+        Self {
+            action,
+            status: None,
+        }
+    }
+
     pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
     where
         A: ToAction<S>,
+        S: 'static,
     {
         match behavior {
             Behavior::Action(action) => {
                 let action = action.to_action();
-                Self::Action(action, None)
+                // Self::Action(action, None)
+                Self::new(action)
             }
             Behavior::Wait(target) => {
                 let action = WaitState::new(target);
-                Self::Action(Box::new(action), None)
+                // Self::Action(Box::new(action), None)
+                Self::new(Box::new(action))
             }
             Behavior::Invert(child) => {
                 let child = Child::from_behavior(*child);
-                Self::Decorator(Box::new(InvertState::new()), Box::new(child), None)
+                let action = InvertState::new(child);
+                Self::new(Box::new(action))
             }
-            Behavior::Sequence(_children) => todo!(),
-            Behavior::Select(_children) => todo!(),
+            Behavior::Sequence(children) => {
+                let children = children
+                    .into_iter()
+                    .map(|child| Child::from_behavior(child))
+                    .collect::<Vec<_>>();
+                let action = SequenceState::new(children);
+                Self::new(Box::new(action))
+            }
+            Behavior::Select(children) => {
+                let children = children
+                    .into_iter()
+                    .map(|child| Child::from_behavior(child))
+                    .collect::<Vec<_>>();
+                let action = SelectState::new(children);
+                Self::new(Box::new(action))
+            }
         }
     }
 
     pub fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
-        match self {
-            Child::Action(action, status) => {
-                let current_status = action.tick(delta, shared);
-                *status = Some(current_status);
-                current_status
-            }
-            Child::Decorator(decorator, child, status) => {
-                //
-                let current_status = decorator.tick(child, delta, shared);
-                *status = Some(current_status);
-                current_status
-            }
-            Child::Control(control, child, status) => todo!(),
-        }
+        let status = self.action.tick(delta, shared);
+        self.status = Some(status);
+        status
     }
 
     pub fn reset(&mut self) {
-        match self {
-            Child::Action(action, status) => {
-                action.reset();
-                *status = None;
-            }
-            Child::Decorator(decorator, child, status) => {
-                child.reset();
-                decorator.reset();
-                *status = None;
-            }
-            Child::Control(control, children, status) => {
-                children.iter_mut().for_each(|child| {
-                    child.reset();
-                });
-                control.reset();
-                *status = None;
-            }
-        }
+        self.action.reset();
+        self.status = None;
     }
 
     pub fn status(&self) -> Option<Status> {
-        match self {
-            Child::Action(_, status) => *status,
-            Child::Decorator(_, _, status) => *status,
-            Child::Control(_, _, status) => *status,
-        }
+        self.status
     }
 }
 
