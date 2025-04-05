@@ -1,14 +1,17 @@
-use crate::{Action, ChildState, Children, Status};
+use crate::{Action, Child, Status};
 
 pub struct SelectState<S> {
-    children: Children<S>,
+    children: Vec<Child<S>>,
+    index: usize,
     completed: bool,
 }
 
 impl<S> SelectState<S> {
-    pub fn new(children: Children<S>) -> Self {
+    pub fn new(children: Vec<Child<S>>) -> Self {
+        assert!(!children.is_empty());
         Self {
             children,
+            index: 0,
             completed: false,
         }
     }
@@ -21,14 +24,11 @@ impl<S> Action<S> for SelectState<S> {
             false => {}
         }
 
-        let child = match self.children.current_child() {
-            Some(child) => child,
-            None => unreachable!(),
-        };
+        let child = &mut self.children[self.index];
         match child.tick(dt, shared) {
             Status::Failure => {
-                self.children.next();
-                match self.children.current_child() {
+                self.index += 1;
+                match self.children.get(self.index) {
                     Some(_) => Status::Running,
                     None => {
                         self.completed = true;
@@ -45,12 +45,9 @@ impl<S> Action<S> for SelectState<S> {
     }
 
     fn reset(&mut self) {
-        self.children.reset();
+        self.children.iter_mut().for_each(|child| child.reset());
+        self.index = 0;
         self.completed = false;
-    }
-
-    fn child_state(&self) -> ChildState {
-        ChildState::MultipleChildren(self.children.inner_state())
     }
 }
 
@@ -58,27 +55,26 @@ impl<S> Action<S> for SelectState<S> {
 mod tests {
     use crate::{
         test_behavior_interface::{TestAction, TestShared},
-        Behavior, ChildStateInfo,
+        Behavior,
     };
 
     use super::*;
 
     #[test]
     fn test_select_success() {
-        let mut select =
-            SelectState::new(Children::from(vec![Behavior::Action(TestAction::Success)]));
+        let select = Behavior::Select(vec![Behavior::Action(TestAction::Success)]);
+        let mut select = Child::from_behavior(select);
 
         let mut shared = TestShared::default();
 
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Success);
-        matches!(select.child_state(), ChildState::MultipleChildren(states) if states.len() == 1 && states[0] == ChildStateInfo::from((ChildState::NoChild, Some(Status::Success))));
     }
 
     #[test]
     fn test_select_failure() {
-        let mut select =
-            SelectState::new(Children::from(vec![Behavior::Action(TestAction::Failure)]));
+        let select = Behavior::Select(vec![Behavior::Action(TestAction::Failure)]);
+        let mut select = Child::from_behavior(select);
 
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
@@ -87,9 +83,10 @@ mod tests {
 
     #[test]
     fn test_select_run_then_status() {
-        let mut select = SelectState::new(Children::from(vec![Behavior::Action(
-            TestAction::FailureAfter { times: 2 },
-        )]));
+        let select = Behavior::Select(vec![Behavior::Action(TestAction::FailureAfter {
+            times: 2,
+        })]);
+        let mut select = Child::from_behavior(select);
 
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
@@ -104,10 +101,11 @@ mod tests {
 
     #[test]
     fn test_select_multiple_children() {
-        let mut select = SelectState::new(Children::from(vec![
+        let select = Behavior::Select(vec![
             Behavior::Action(TestAction::Failure),
             Behavior::Action(TestAction::Failure),
-        ]));
+        ]);
+        let mut select = Child::from_behavior(select);
 
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
@@ -119,10 +117,11 @@ mod tests {
 
     #[test]
     fn test_select_multiple_children_early_reset() {
-        let mut select = SelectState::new(Children::from(vec![
+        let select = Behavior::Select(vec![
             Behavior::Action(TestAction::Failure),
             Behavior::Action(TestAction::Failure),
-        ]));
+        ]);
+        let mut select = Child::from_behavior(select);
 
         let mut shared = TestShared::default();
 
@@ -140,11 +139,12 @@ mod tests {
 
     #[test]
     fn test_select_multiple_children_early_success() {
-        let mut select = SelectState::new(Children::from(vec![
+        let select = Behavior::Select(vec![
             Behavior::Action(TestAction::Failure),
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Failure),
-        ]));
+        ]);
+        let mut select = Child::from_behavior(select);
 
         let mut shared = TestShared::default();
         let status = select.tick(0.1, &mut shared);
