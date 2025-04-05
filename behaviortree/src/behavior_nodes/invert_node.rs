@@ -53,11 +53,10 @@ mod tests {
     fn test_invert_success() {
         let mut shared = TestShared::default();
 
-        let behavior = Behavior::Action(TestAction::Success);
-        let child = Child::from_behavior(behavior);
-        let mut invert = InvertState::new(child);
+        let behavior = Behavior::Invert(Box::new(Behavior::Action(TestAction::Success)));
+        let mut child = Child::from_behavior(behavior);
 
-        let status = invert.tick(0.1, &mut shared);
+        let status = child.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
     }
 

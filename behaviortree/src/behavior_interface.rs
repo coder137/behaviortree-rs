@@ -41,12 +41,10 @@ impl<S> Child<S> {
         match behavior {
             Behavior::Action(action) => {
                 let action = action.to_action();
-                // Self::Action(action, None)
                 Self::new(action)
             }
             Behavior::Wait(target) => {
                 let action = WaitState::new(target);
-                // Self::Action(Box::new(action), None)
                 Self::new(Box::new(action))
             }
             Behavior::Invert(child) => {
