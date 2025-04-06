@@ -36,11 +36,16 @@ impl WaitState {
 
 #[cfg(test)]
 mod tests {
+    use behaviortree_common::Behavior;
+
     use super::*;
-    use crate::test_behavior_interface::TestShared;
+    use crate::{
+        test_behavior_interface::{TestAction, TestShared},
+        Child,
+    };
 
     #[test]
-    fn test_tick_simple() {
+    fn test_wait() {
         let mut shared = TestShared::default();
 
         let mut wait = WaitState::new(2.0);
@@ -59,6 +64,28 @@ mod tests {
         assert_eq!(status, Status::Running);
 
         let status = wait_ref_mut.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Success);
+    }
+
+    #[test]
+    fn test_wait_from_behavior() {
+        let mut shared = TestShared::default();
+
+        let mut wait = Child::from_behavior::<TestAction>(Behavior::Wait(2.0));
+
+        let status = wait.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = wait.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Success);
+
+        // Reset
+        wait.reset();
+
+        let status = wait.tick(1.0, &mut shared);
+        assert_eq!(status, Status::Running);
+
+        let status = wait.tick(1.0, &mut shared);
         assert_eq!(status, Status::Success);
     }
 }
