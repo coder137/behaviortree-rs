@@ -50,6 +50,10 @@ impl<S> Action<S> for SequenceState<S> {
         self.index = 0;
         self.completed = false;
     }
+
+    fn name(&self) -> &'static str {
+        "Sequence"
+    }
 }
 
 #[cfg(test)]

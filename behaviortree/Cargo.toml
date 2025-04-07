@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }
 
 behaviortree_common = { path = "../behaviortree_common" }

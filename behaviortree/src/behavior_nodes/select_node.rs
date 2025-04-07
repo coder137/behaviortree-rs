@@ -50,6 +50,10 @@ impl<S> Action<S> for SelectState<S> {
         self.index = 0;
         self.completed = false;
     }
+
+    fn name(&self) -> &'static str {
+        "Select"
+    }
 }
 
 #[cfg(test)]

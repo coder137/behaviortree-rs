@@ -24,6 +24,10 @@ impl<S> Action<S> for WaitState {
     fn reset(&mut self) {
         self.elapsed = 0.0;
     }
+
+    fn name(&self) -> &'static str {
+        "Wait"
+    }
 }
 
 impl WaitState {

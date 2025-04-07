@@ -41,6 +41,10 @@ impl Action<OperationShared> for AddState {
     }
 
     fn reset(&mut self) {}
+
+    fn name(&self) -> &'static str {
+        "Add"
+    }
 }
 
 struct SubState(Input<usize>, Input<usize>, Output);
@@ -59,6 +63,10 @@ impl Action<OperationShared> for SubState {
     }
 
     fn reset(&mut self) {}
+
+    fn name(&self) -> &'static str {
+        "Sub"
+    }
 }
 
 fn main() {

@@ -39,6 +39,10 @@ impl<S> Action<S> for InvertState<S> {
         self.child.reset();
         self.completed = false;
     }
+
+    fn name(&self) -> &'static str {
+        "Invert"
+    }
 }
 
 #[cfg(test)]
