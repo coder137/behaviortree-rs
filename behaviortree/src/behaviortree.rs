@@ -1,4 +1,4 @@
-use crate::{Behavior, Child, Status, ToAction};
+use crate::{Behavior, Child, State, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -43,6 +43,10 @@ impl<S> BehaviorTree<S> {
         }
 
         self.child.tick(dt, shared)
+    }
+
+    pub fn state(&self) -> State {
+        self.child.state()
     }
 
     pub fn reset(&mut self) {

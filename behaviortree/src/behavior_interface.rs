@@ -117,6 +117,10 @@ impl<S> Child<S> {
     pub fn status(&self) -> Option<Status> {
         *self.status.borrow()
     }
+
+    pub fn state(&self) -> State {
+        self.state.clone()
+    }
 }
 
 #[cfg(test)]
