@@ -7,21 +7,19 @@ pub enum BehaviorTreePolicy {
     RetainOnCompletion,
 }
 
-pub struct BehaviorTree<A, S> {
-    behavior: Behavior<A>,
+pub struct BehaviorTree<S> {
     behavior_policy: BehaviorTreePolicy,
     child: Child<S>,
 }
 
-impl<A, S> BehaviorTree<A, S> {
-    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
+impl<S> BehaviorTree<S> {
+    pub fn new<A>(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
     where
-        A: ToAction<S> + Clone,
+        A: ToAction<S>,
         S: 'static,
     {
-        let child = Child::from_behavior(behavior.clone());
+        let child = Child::from_behavior(behavior);
         Self {
-            behavior,
             behavior_policy,
             child,
         }
@@ -51,10 +49,6 @@ impl<A, S> BehaviorTree<A, S> {
         self.child.reset();
     }
 
-    pub fn behavior(&self) -> &Behavior<A> {
-        &self.behavior
-    }
-
     pub fn status(&self) -> Option<Status> {
         self.child.status()
     }
@@ -74,7 +68,6 @@ mod tests {
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
         // For unit tests
-        let _ = tree.behavior();
         assert_eq!(tree.status(), None);
 
         let mut shared = TestShared::default();
