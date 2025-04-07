@@ -15,6 +15,7 @@ impl<S> InvertState<S> {
 }
 
 impl<S> Action<S> for InvertState<S> {
+    #[tracing::instrument(level = "trace", name = "Invert", skip_all, ret)]
     fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         match self.completed {
             true => unreachable!(),

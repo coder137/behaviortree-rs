@@ -6,6 +6,7 @@ pub struct WaitState {
 }
 
 impl<S> Action<S> for WaitState {
+    #[tracing::instrument(level = "trace", name = "Wait", skip_all, ret)]
     fn tick(&mut self, dt: f64, _shared: &mut S) -> Status {
         match self.elapsed >= self.target {
             true => unreachable!(),

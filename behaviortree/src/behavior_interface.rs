@@ -90,6 +90,7 @@ impl<S> Child<S> {
 #[cfg(test)]
 pub mod test_behavior_interface {
     use super::*;
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     #[derive(Default)]
     pub struct TestShared;
@@ -111,6 +112,7 @@ pub mod test_behavior_interface {
     }
 
     impl<S> Action<S> for GenericTestAction {
+        #[tracing::instrument(level = "trace", name = "GenericTestAction", skip_all, ret)]
         fn tick(&mut self, _dt: f64, _shared: &mut S) -> Status {
             let mut status = if self.status {
                 Status::Success
@@ -150,6 +152,31 @@ pub mod test_behavior_interface {
                     assert!(times >= 1);
                     Box::new(GenericTestAction::new(false, times + 1))
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_basic_behavior() {
+        let _ignore = tracing_subscriber::Registry::default()
+            .with(tracing_forest::ForestLayer::default())
+            .try_init();
+
+        let behavior = Behavior::Sequence(vec![
+            Behavior::Action(TestAction::Success),
+            Behavior::Wait(10.0),
+            Behavior::Action(TestAction::Success),
+            Behavior::Invert(Behavior::Action(TestAction::Failure).into()),
+            Behavior::Action(TestAction::Success),
+        ]);
+
+        let mut child = Child::from_behavior(behavior);
+        let mut shared = TestShared;
+
+        loop {
+            let status = child.tick(1.0, &mut shared);
+            if status != Status::Running {
+                break;
             }
         }
     }
