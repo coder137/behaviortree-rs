@@ -1,4 +1,4 @@
-use crate::{Behavior, Child, Status, ToAction};
+use crate::{Behavior, Child, State, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -7,21 +7,19 @@ pub enum BehaviorTreePolicy {
     RetainOnCompletion,
 }
 
-pub struct BehaviorTree<A, S> {
-    behavior: Behavior<A>,
+pub struct BehaviorTree<S> {
     behavior_policy: BehaviorTreePolicy,
     child: Child<S>,
 }
 
-impl<A, S> BehaviorTree<A, S> {
-    pub fn new(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
+impl<S> BehaviorTree<S> {
+    pub fn new<A>(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
     where
-        A: ToAction<S> + Clone,
+        A: ToAction<S>,
         S: 'static,
     {
-        let child = Child::from_behavior(behavior.clone());
+        let child = Child::from_behavior(behavior);
         Self {
-            behavior,
             behavior_policy,
             child,
         }
@@ -47,12 +45,12 @@ impl<A, S> BehaviorTree<A, S> {
         self.child.tick(dt, shared)
     }
 
-    pub fn reset(&mut self) {
-        self.child.reset();
+    pub fn state(&self) -> State {
+        self.child.state()
     }
 
-    pub fn behavior(&self) -> &Behavior<A> {
-        &self.behavior
+    pub fn reset(&mut self) {
+        self.child.reset();
     }
 
     pub fn status(&self) -> Option<Status> {
@@ -74,7 +72,7 @@ mod tests {
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
         // For unit tests
-        let _ = tree.behavior();
+        let _state = tree.state();
         assert_eq!(tree.status(), None);
 
         let mut shared = TestShared::default();

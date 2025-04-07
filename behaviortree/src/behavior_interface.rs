@@ -1,4 +1,4 @@
-use crate::{behavior_nodes::*, Behavior, Status};
+use crate::{behavior_nodes::*, Behavior, State, Status};
 
 /// Modelled after the `std::future::Future` trait
 pub trait Action<S> {
@@ -14,6 +14,9 @@ pub trait Action<S> {
 
     /// Resets the current action to its initial/newly created state
     fn reset(&mut self);
+
+    /// Identify your action
+    fn name(&self) -> &'static str;
 }
 
 pub trait ToAction<S> {
@@ -22,14 +25,20 @@ pub trait ToAction<S> {
 
 pub struct Child<S> {
     action: Box<dyn Action<S>>,
-    status: Option<Status>,
+    status: tokio::sync::watch::Sender<Option<Status>>,
+    state: State,
 }
 
 impl<S> Child<S> {
-    pub fn new(action: Box<dyn Action<S>>) -> Self {
+    pub fn new(
+        action: Box<dyn Action<S>>,
+        status: tokio::sync::watch::Sender<Option<Status>>,
+        state: State,
+    ) -> Self {
         Self {
             action,
-            status: None,
+            status,
+            state,
         }
     }
 
@@ -41,55 +50,83 @@ impl<S> Child<S> {
         match behavior {
             Behavior::Action(action) => {
                 let action = action.to_action();
-                Self::new(action)
+                let (tx, rx) = tokio::sync::watch::channel(None);
+                let state = State::NoChild(action.name(), rx);
+
+                Self::new(action, tx, state)
             }
             Behavior::Wait(target) => {
                 let action = WaitState::new(target);
-                Self::new(Box::new(action))
+                let (tx, rx) = tokio::sync::watch::channel(None);
+                let state = State::NoChild(<WaitState as Action<S>>::name(&action), rx);
+
+                Self::new(Box::new(action), tx, state)
             }
             Behavior::Invert(child) => {
                 let child = Child::from_behavior(*child);
+                let child_state = child.state.clone();
+
                 let action = InvertState::new(child);
-                Self::new(Box::new(action))
+                let (tx, rx) = tokio::sync::watch::channel(None);
+                let state = State::SingleChild(action.name(), rx, child_state.into());
+
+                Self::new(Box::new(action), tx, state)
             }
             Behavior::Sequence(children) => {
                 let children = children
                     .into_iter()
                     .map(|child| Child::from_behavior(child))
                     .collect::<Vec<_>>();
+                let children_states = children.iter().map(|child| child.state.clone());
+                let children_states = std::rc::Rc::from_iter(children_states);
+
                 let action = SequenceState::new(children);
-                Self::new(Box::new(action))
+                let (tx, rx) = tokio::sync::watch::channel(None);
+                let state = State::MultipleChildren(action.name(), rx, children_states);
+
+                Self::new(Box::new(action), tx, state)
             }
             Behavior::Select(children) => {
                 let children = children
                     .into_iter()
                     .map(|child| Child::from_behavior(child))
                     .collect::<Vec<_>>();
+                let children_states = children.iter().map(|child| child.state.clone());
+                let children_states = std::rc::Rc::from_iter(children_states);
+
                 let action = SelectState::new(children);
-                Self::new(Box::new(action))
+                let (tx, rx) = tokio::sync::watch::channel(None);
+                let state = State::MultipleChildren(action.name(), rx, children_states);
+
+                Self::new(Box::new(action), tx, state)
             }
         }
     }
 
     pub fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         let status = self.action.tick(delta, shared);
-        self.status = Some(status);
+        let _ignore = self.status.send(Some(status));
         status
     }
 
     pub fn reset(&mut self) {
         self.action.reset();
-        self.status = None;
+        let _ignore = self.status.send(None);
     }
 
     pub fn status(&self) -> Option<Status> {
-        self.status
+        *self.status.borrow()
+    }
+
+    pub fn state(&self) -> State {
+        self.state.clone()
     }
 }
 
 #[cfg(test)]
 pub mod test_behavior_interface {
     use super::*;
+    use tracing::info;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     #[derive(Default)]
@@ -128,6 +165,10 @@ pub mod test_behavior_interface {
 
         fn reset(&mut self) {
             self.elapsed = 0;
+        }
+
+        fn name(&self) -> &'static str {
+            "GenericTestAction"
         }
     }
 
@@ -171,10 +212,13 @@ pub mod test_behavior_interface {
         ]);
 
         let mut child = Child::from_behavior(behavior);
+        let state = child.state.clone();
+
         let mut shared = TestShared;
 
         loop {
             let status = child.tick(1.0, &mut shared);
+            info!("State:\n{:#?}", state);
             if status != Status::Running {
                 break;
             }

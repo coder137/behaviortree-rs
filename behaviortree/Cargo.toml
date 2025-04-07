@@ -1,10 +1,11 @@
 [package]
 name = "behaviortree"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }
 
 behaviortree_common = { path = "../behaviortree_common" }
