@@ -72,6 +72,7 @@ mod tests {
         let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
 
         // For unit tests
+        let _state = tree.state();
         assert_eq!(tree.status(), None);
 
         let mut shared = TestShared::default();
