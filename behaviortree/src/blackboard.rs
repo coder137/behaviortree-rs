@@ -53,7 +53,7 @@ impl<T> Input<T>
 where
     T: 'static,
 {
-    pub fn read_ref<'a>(&'a self, blackboard: &'a Blackboard) -> Option<&T> {
+    pub fn read_ref<'a>(&'a self, blackboard: &'a Blackboard) -> Option<&'a T> {
         match self {
             Input::Literal(data) => Some(data),
             Input::Blackboard(key) => blackboard.read_ref(key),
