@@ -3,6 +3,12 @@
 ```mermaid
 classDiagram
 
+class Action~S~ {
+    <<trait>>
+    fn tick(&mut self, delta: f64, shared: &mut S)
+    fn reset(&mut self)
+}
+
 class Behavior~A~ {
     <<enum>>
     Leaf
@@ -10,18 +16,17 @@ class Behavior~A~ {
     Control
 }
 
-class Action~S~ {
+class ToAction~S~ {
     <<trait>>
-    tick(&mut self, delta: f64, shared: &mut S)
-    reset(&mut self)
-    child_state(&mut self) ChildState
+    fn to_action(self) Box~dyn Action~S~~
 }
 
-
-
-class Child {
+class Child~S~ {
     <<struct>>
     Box~dyn Action~S~~ action
+    tokio::sync::watch::Sender~Option~Status~~ status
+
+    fn from_behavior~A~(Behavior~A~ behavior) Self where A: ToAction~S~, S: 'static
 }
 
 class BehaviorTree {
@@ -30,13 +35,11 @@ class BehaviorTree {
 
     new(Behavior~A~ behavior) BehaviorTree
     tick(&mut self) Status
-    tick_with_observer(&mut self, O) Status
     reset(&mut self)
 }
 
-Behavior --> Action: Implements
-
-Child <-- Action: Contains
-
-BehaviorTree <-- Child: Contains
+Behavior --> Child
+Action <-- ToAction
+ToAction --> Child
+Child --> BehaviorTree
 ```

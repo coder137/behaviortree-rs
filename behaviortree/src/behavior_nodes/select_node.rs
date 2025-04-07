@@ -18,6 +18,7 @@ impl<S> SelectState<S> {
 }
 
 impl<S> Action<S> for SelectState<S> {
+    #[tracing::instrument(level = "trace", name = "Select", skip_all, ret)]
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         match self.completed {
             true => unreachable!(),
