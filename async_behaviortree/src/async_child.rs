@@ -115,3 +115,39 @@ impl<S> AsyncChild<S> {
         self.state.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ticked_async_executor::TickedAsyncExecutor;
+
+    use crate::test_async_behavior_interface::{TestAction, TestShared, DELTA};
+
+    use super::*;
+
+    #[test]
+    fn test_basic_behavior() {
+        let behavior = Behavior::Sequence(vec![
+            Behavior::Action(TestAction::Success),
+            Behavior::Wait(10.0),
+            Behavior::Action(TestAction::Success),
+            Behavior::Invert(Behavior::Action(TestAction::Failure).into()),
+            Behavior::Action(TestAction::Success),
+        ]);
+
+        let mut child = AsyncChild::from_behavior(behavior);
+        let _state = child.state();
+
+        let executor = TickedAsyncExecutor::default();
+
+        let mut shared = TestShared;
+        let mut delta = executor.tick_channel();
+        executor
+            .spawn_local("WaitFuture", async move {
+                child.run(&mut delta, &mut shared).await;
+            })
+            .detach();
+
+        executor.wait_till_completed(DELTA);
+        assert_eq!(executor.num_tasks(), 0);
+    }
+}
