@@ -1,4 +1,4 @@
-use behaviortree_common::Status;
+use crate::Status;
 
 #[derive(Clone)]
 pub enum State {
