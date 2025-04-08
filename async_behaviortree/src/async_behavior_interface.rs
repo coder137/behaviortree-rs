@@ -63,7 +63,7 @@ pub mod test_async_behavior_interface {
                 let _dt = *delta.borrow_and_update();
                 self.elapsed += 1;
                 if self.elapsed < self.times {
-                    async_std::task::yield_now().await;
+                    tokio::task::yield_now().await;
                 } else {
                     break;
                 }

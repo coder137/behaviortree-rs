@@ -10,7 +10,6 @@ tokio = { workspace = true }
 behaviortree_common = { path = "../behaviortree_common" }
 
 async-trait = "0.1.80"
-async-std = "1.12.0"
 
 [dev-dependencies]
 ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "45c76da3730e0f77f08c9f6af86f00832c89fe1e" }

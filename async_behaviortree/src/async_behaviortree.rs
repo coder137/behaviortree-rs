@@ -74,7 +74,7 @@ impl AsyncBehaviorTree {
                 match state {
                     State::ChildCompleted => match behavior_policy {
                         AsyncBehaviorTreePolicy::ReloadOnCompletion => {
-                            async_std::task::yield_now().await;
+                            tokio::task::yield_now().await;
                             child.reset(&mut shared);
                         }
                         AsyncBehaviorTreePolicy::RetainOnCompletion => {
@@ -83,7 +83,7 @@ impl AsyncBehaviorTree {
                     },
                     State::ResetNotification => {
                         reset_rx.mark_unchanged();
-                        async_std::task::yield_now().await;
+                        tokio::task::yield_now().await;
                         child.reset(&mut shared);
                         match behavior_policy {
                             AsyncBehaviorTreePolicy::ReloadOnCompletion => {}

@@ -34,7 +34,7 @@ impl<S> AsyncAction<S> for AsyncWaitState {
             if self.elapsed >= self.target {
                 break;
             }
-            async_std::task::yield_now().await;
+            tokio::task::yield_now().await;
         }
         true
     }
