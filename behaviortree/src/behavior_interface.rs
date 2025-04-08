@@ -56,15 +56,15 @@ impl<S> Child<S> {
                 Self::new(action, tx, state)
             }
             Behavior::Wait(target) => {
-                let action = WaitState::new(target);
+                let action: Box<dyn Action<S>> = Box::new(WaitState::new(target));
                 let (tx, rx) = tokio::sync::watch::channel(None);
-                let state = State::NoChild(<WaitState as Action<S>>::name(&action), rx);
+                let state = State::NoChild(action.name(), rx);
 
-                Self::new(Box::new(action), tx, state)
+                Self::new(action, tx, state)
             }
             Behavior::Invert(child) => {
                 let child = Child::from_behavior(*child);
-                let child_state = child.state.clone();
+                let child_state = child.state();
 
                 let action = InvertState::new(child);
                 let (tx, rx) = tokio::sync::watch::channel(None);
@@ -77,7 +77,7 @@ impl<S> Child<S> {
                     .into_iter()
                     .map(|child| Child::from_behavior(child))
                     .collect::<Vec<_>>();
-                let children_states = children.iter().map(|child| child.state.clone());
+                let children_states = children.iter().map(|child| child.state());
                 let children_states = std::rc::Rc::from_iter(children_states);
 
                 let action = SequenceState::new(children);
@@ -91,7 +91,7 @@ impl<S> Child<S> {
                     .into_iter()
                     .map(|child| Child::from_behavior(child))
                     .collect::<Vec<_>>();
-                let children_states = children.iter().map(|child| child.state.clone());
+                let children_states = children.iter().map(|child| child.state());
                 let children_states = std::rc::Rc::from_iter(children_states);
 
                 let action = SelectState::new(children);
@@ -133,14 +133,16 @@ pub mod test_behavior_interface {
     pub struct TestShared;
 
     struct GenericTestAction {
+        name: &'static str,
         status: bool,
         times: usize,
         elapsed: usize,
     }
 
     impl GenericTestAction {
-        fn new(status: bool, times: usize) -> Self {
+        fn new(name: String, status: bool, times: usize) -> Self {
             Self {
+                name: Box::new(name).leak(),
                 status,
                 times,
                 elapsed: 0,
@@ -168,7 +170,7 @@ pub mod test_behavior_interface {
         }
 
         fn name(&self) -> &'static str {
-            "GenericTestAction"
+            self.name
         }
     }
 
@@ -183,15 +185,23 @@ pub mod test_behavior_interface {
     impl ToAction<TestShared> for TestAction {
         fn to_action(self) -> Box<dyn Action<TestShared>> {
             match self {
-                TestAction::Success => Box::new(GenericTestAction::new(true, 1)),
-                TestAction::Failure => Box::new(GenericTestAction::new(false, 1)),
+                TestAction::Success => Box::new(GenericTestAction::new("Success".into(), true, 1)),
+                TestAction::Failure => Box::new(GenericTestAction::new("Failure".into(), false, 1)),
                 TestAction::SuccessAfter { times } => {
                     assert!(times >= 1);
-                    Box::new(GenericTestAction::new(true, times + 1))
+                    Box::new(GenericTestAction::new(
+                        format!("SuccessAfter{}", times),
+                        true,
+                        times + 1,
+                    ))
                 }
                 TestAction::FailureAfter { times } => {
                     assert!(times >= 1);
-                    Box::new(GenericTestAction::new(false, times + 1))
+                    Box::new(GenericTestAction::new(
+                        format!("FailureAfter{}", times),
+                        false,
+                        times + 1,
+                    ))
                 }
             }
         }
@@ -212,7 +222,7 @@ pub mod test_behavior_interface {
         ]);
 
         let mut child = Child::from_behavior(behavior);
-        let state = child.state.clone();
+        let state = child.state();
 
         let mut shared = TestShared;
 

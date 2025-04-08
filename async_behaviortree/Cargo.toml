@@ -5,18 +5,13 @@ edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
+tokio = { workspace = true }
 
 behaviortree_common = { path = "../behaviortree_common" }
 
 async-trait = "0.1.80"
-async-std = "1.12.0"
-
-tokio = { version = "1.38.0", default-features = false, features = [
-    "macros",
-    "sync",
-] }
 
 [dev-dependencies]
-ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "45c76da3730e0f77f08c9f6af86f00832c89fe1e" }
+ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "a792d18fa778613138b91b493e95768d448613a1" }
 
 tokio-stream = { version = "0.1.15", features = ["full"] }

@@ -34,13 +34,17 @@ impl<S> AsyncAction<S> for AsyncWaitState {
             if self.elapsed >= self.target {
                 break;
             }
-            async_std::task::yield_now().await;
+            tokio::task::yield_now().await;
         }
         true
     }
 
     fn reset(&mut self, _shared: &mut S) {
         self.elapsed = 0.0;
+    }
+
+    fn name(&self) -> &'static str {
+        "Wait"
     }
 }
 
@@ -67,7 +71,7 @@ mod tests {
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -88,15 +92,15 @@ mod tests {
             })
             .detach();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
 
         // reset
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -115,7 +119,7 @@ mod tests {
             })
             .detach();
 
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         drop(executor);
     }
 }

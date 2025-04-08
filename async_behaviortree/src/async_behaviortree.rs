@@ -1,9 +1,9 @@
 use std::future::Future;
 
 use behaviortree_common::Behavior;
+use behaviortree_common::State;
 
 use crate::AsyncChild;
-use crate::AsyncChildObserver;
 
 use crate::ToAsyncAction;
 
@@ -15,13 +15,13 @@ pub enum AsyncBehaviorTreePolicy {
 }
 
 pub struct AsyncBehaviorController {
-    observer: AsyncChildObserver,
+    observer: State,
     reset_tx: tokio::sync::watch::Sender<()>,
     shutdown_tx: tokio::sync::watch::Sender<()>,
 }
 
 impl AsyncBehaviorController {
-    pub fn observer(&self) -> AsyncChildObserver {
+    pub fn observer(&self) -> State {
         self.observer.clone()
     }
 
@@ -48,7 +48,7 @@ impl AsyncBehaviorTree {
         S: 'static,
     {
         let mut child = AsyncChild::from_behavior(behavior);
-        let observer = child.observer();
+        let observer = child.state();
 
         let (reset_tx, mut reset_rx) = tokio::sync::watch::channel(());
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(());
@@ -74,7 +74,7 @@ impl AsyncBehaviorTree {
                 match state {
                     State::ChildCompleted => match behavior_policy {
                         AsyncBehaviorTreePolicy::ReloadOnCompletion => {
-                            async_std::task::yield_now().await;
+                            tokio::task::yield_now().await;
                             child.reset(&mut shared);
                         }
                         AsyncBehaviorTreePolicy::RetainOnCompletion => {
@@ -83,7 +83,7 @@ impl AsyncBehaviorTree {
                     },
                     State::ResetNotification => {
                         reset_rx.mark_unchanged();
-                        async_std::task::yield_now().await;
+                        tokio::task::yield_now().await;
                         child.reset(&mut shared);
                         match behavior_policy {
                             AsyncBehaviorTreePolicy::ReloadOnCompletion => {}
@@ -158,12 +158,12 @@ mod tests {
                         }
                     };
                     let rx = match tobs {
-                        AsyncChildObserver::NoChild(rx) => rx,
-                        AsyncChildObserver::SingleChild(rx, child) => {
+                        State::NoChild(_name, rx) => rx,
+                        State::SingleChild(_name, rx, child) => {
                             pending_queue.push_back(&*child);
                             rx
                         }
-                        AsyncChildObserver::MultipleChildren(rx, children) => {
+                        State::MultipleChildren(_name, rx, children) => {
                             for child in children.iter() {
                                 pending_queue.push_back(child);
                             }
@@ -198,17 +198,17 @@ mod tests {
                 }
             })
             .detach();
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
 
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         let _r = shut_tx.try_send(());
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -233,11 +233,11 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         controller.reset();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -265,13 +265,13 @@ mod tests {
 
         let observer = controller.observer();
         for _ in 0..10 {
-            executor.tick(DELTA);
+            executor.tick(DELTA, None);
             println!("Observer: {observer:?}");
         }
         controller.shutdown();
 
         while executor.num_tasks() != 0 {
-            executor.tick(DELTA);
+            executor.tick(DELTA, None);
         }
         assert_eq!(executor.num_tasks(), 0);
     }

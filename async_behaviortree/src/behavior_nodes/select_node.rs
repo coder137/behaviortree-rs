@@ -1,32 +1,31 @@
 use async_trait::async_trait;
 
-use crate::{AsyncChild, AsyncControl};
+use crate::{AsyncAction, AsyncChild};
 
-pub struct AsyncSelectState {
+pub struct AsyncSelectState<S> {
+    children: Vec<AsyncChild<S>>,
     completed: bool,
 }
 
-impl AsyncSelectState {
-    pub fn new() -> Self {
-        Self { completed: false }
+impl<S> AsyncSelectState<S> {
+    pub fn new(children: Vec<AsyncChild<S>>) -> Self {
+        Self {
+            children,
+            completed: false,
+        }
     }
 }
 
 #[async_trait(?Send)]
-impl<S> AsyncControl<S> for AsyncSelectState {
-    async fn run(
-        &mut self,
-        children: &mut [AsyncChild<S>],
-        delta: &mut tokio::sync::watch::Receiver<f64>,
-        shared: &mut S,
-    ) -> bool {
+impl<S> AsyncAction<S> for AsyncSelectState<S> {
+    async fn run(&mut self, delta: &mut tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
         match self.completed {
             true => unreachable!(),
             false => {}
         }
         let mut status = false;
-        let last = children.len() - 1;
-        for (index, child) in children.iter_mut().enumerate() {
+        let last = self.children.len() - 1;
+        for (index, child) in self.children.iter_mut().enumerate() {
             let child_status = child.run(delta, shared).await;
             if child_status {
                 status = true;
@@ -36,15 +35,22 @@ impl<S> AsyncControl<S> for AsyncSelectState {
             // This means that if they are more children after the current child,
             // we must yield back to the executor
             if index != last {
-                async_std::task::yield_now().await;
+                tokio::task::yield_now().await;
             }
         }
         self.completed = true;
         status
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, shared: &mut S) {
+        self.children.iter_mut().for_each(|child| {
+            child.reset(shared);
+        });
         self.completed = false;
+    }
+
+    fn name(&self) -> &'static str {
+        "Select"
     }
 }
 
@@ -59,8 +65,8 @@ mod tests {
 
     #[test]
     fn test_select_success() {
-        let mut children = AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::Success)]);
-        let mut select = AsyncSelectState::new();
+        let behavior = Behavior::Select(vec![Behavior::Action(TestAction::Success)]);
+        let mut select = AsyncChild::from_behavior(behavior);
 
         let executor = TickedAsyncExecutor::default();
 
@@ -69,20 +75,20 @@ mod tests {
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(&mut children, &mut delta, &mut shared).await;
+                let status = select.run(&mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
     #[test]
     fn test_select_failure() {
-        let mut children = AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::Failure)]);
-        let mut select = AsyncSelectState::new();
+        let behavior = Behavior::Select(vec![Behavior::Action(TestAction::Failure)]);
+        let mut select = AsyncChild::from_behavior(behavior);
 
         let executor = TickedAsyncExecutor::default();
 
@@ -91,23 +97,22 @@ mod tests {
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(&mut children, &mut delta, &mut shared).await;
+                let status = select.run(&mut delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
     #[test]
     fn test_select_running() {
-        let mut children =
-            AsyncChild::from_behaviors(vec![Behavior::Action(TestAction::SuccessAfter {
-                times: 1,
-            })]);
-        let mut select = AsyncSelectState::new();
+        let behavior = Behavior::Select(vec![Behavior::Action(TestAction::SuccessAfter {
+            times: 1,
+        })]);
+        let mut select = AsyncChild::from_behavior(behavior);
 
         let executor = TickedAsyncExecutor::default();
 
@@ -116,24 +121,24 @@ mod tests {
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(&mut children, &mut delta, &mut shared).await;
+                let status = select.run(&mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
     #[test]
     fn test_select_multiple_children() {
-        let mut children = AsyncChild::from_behaviors(vec![
+        let behavior = Behavior::Select(vec![
             Behavior::Action(TestAction::Failure),
             Behavior::Action(TestAction::Failure),
         ]);
-        let mut select = AsyncSelectState::new();
+        let mut select = AsyncChild::from_behavior(behavior);
 
         let executor = TickedAsyncExecutor::default();
 
@@ -142,26 +147,26 @@ mod tests {
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(&mut children, &mut delta, &mut shared).await;
+                let status = select.run(&mut delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
     #[test]
     fn test_select_multiple_children_early_failure() {
-        let mut children = AsyncChild::from_behaviors(vec![
+        let behavior = Behavior::Select(vec![
             Behavior::Action(TestAction::Failure),
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut select: Box<dyn AsyncControl<TestShared>> = Box::new(AsyncSelectState::new());
+        let mut select = AsyncChild::from_behavior(behavior);
 
         let executor = TickedAsyncExecutor::default();
 
@@ -170,21 +175,21 @@ mod tests {
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(&mut children, &mut delta, &mut shared).await;
+                let status = select.run(&mut delta, &mut shared).await;
                 assert!(status);
-                select.reset();
-                let status = select.run(&mut children, &mut delta, &mut shared).await;
+                select.reset(&mut shared);
+                let status = select.run(&mut delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         // reset
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 }
