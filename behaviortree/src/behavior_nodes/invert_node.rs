@@ -1,4 +1,4 @@
-use crate::{Action, Child, Status};
+use crate::{child::Child, Action, Status};
 
 pub struct InvertState<S> {
     child: Child<S>,
@@ -35,8 +35,8 @@ impl<S> Action<S> for InvertState<S> {
         }
     }
 
-    fn reset(&mut self) {
-        self.child.reset();
+    fn reset(&mut self, shared: &mut S) {
+        self.child.reset(shared);
         self.completed = false;
     }
 
@@ -103,7 +103,7 @@ mod tests {
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);
 
-        invert.reset();
+        invert.reset(&mut shared);
 
         let status = invert.tick(0.1, &mut shared);
         assert_eq!(status, Status::Failure);

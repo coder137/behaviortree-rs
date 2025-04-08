@@ -21,7 +21,7 @@ impl<S> Action<S> for WaitState {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, _shared: &mut S) {
         self.elapsed = 0.0;
     }
 
@@ -45,8 +45,8 @@ mod tests {
 
     use super::*;
     use crate::{
+        child::Child,
         test_behavior_interface::{TestAction, TestShared},
-        Child,
     };
 
     #[test]
@@ -63,7 +63,7 @@ mod tests {
         assert_eq!(status, Status::Success);
 
         // Reset
-        wait_ref_mut.reset();
+        wait_ref_mut.reset(&mut shared);
 
         let status = wait_ref_mut.tick(1.0, &mut shared);
         assert_eq!(status, Status::Running);
@@ -85,7 +85,7 @@ mod tests {
         assert_eq!(status, Status::Success);
 
         // Reset
-        wait.reset();
+        wait.reset(&mut shared);
 
         let status = wait.tick(1.0, &mut shared);
         assert_eq!(status, Status::Running);

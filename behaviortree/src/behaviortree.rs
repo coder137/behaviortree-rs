@@ -1,4 +1,4 @@
-use crate::{Behavior, Child, State, Status, ToAction};
+use crate::{child::Child, Behavior, State, Status, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -10,10 +10,11 @@ pub enum BehaviorTreePolicy {
 pub struct BehaviorTree<S> {
     behavior_policy: BehaviorTreePolicy,
     child: Child<S>,
+    shared: S,
 }
 
 impl<S> BehaviorTree<S> {
-    pub fn new<A>(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy) -> Self
+    pub fn new<A>(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy, shared: S) -> Self
     where
         A: ToAction<S>,
         S: 'static,
@@ -22,10 +23,11 @@ impl<S> BehaviorTree<S> {
         Self {
             behavior_policy,
             child,
+            shared,
         }
     }
 
-    pub fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
+    pub fn tick(&mut self, dt: f64) -> Status {
         if let Some(status) = self.child.status() {
             if status != Status::Running {
                 match self.behavior_policy {
@@ -42,6 +44,7 @@ impl<S> BehaviorTree<S> {
             }
         }
 
+        let shared = &mut self.shared;
         self.child.tick(dt, shared)
     }
 
@@ -50,7 +53,8 @@ impl<S> BehaviorTree<S> {
     }
 
     pub fn reset(&mut self) {
-        self.child.reset();
+        let shared = &mut self.shared;
+        self.child.reset(shared);
     }
 
     pub fn status(&self) -> Option<Status> {
@@ -69,26 +73,25 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion);
+        let mut tree =
+            BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion, TestShared);
 
         // For unit tests
         let _state = tree.state();
         assert_eq!(tree.status(), None);
 
-        let mut shared = TestShared::default();
-
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
 
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
 
         tree.reset();
 
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
 
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
     }
 
@@ -98,22 +101,21 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut tree = BehaviorTree::new(behavior, BehaviorTreePolicy::ReloadOnCompletion);
+        let mut tree =
+            BehaviorTree::new(behavior, BehaviorTreePolicy::ReloadOnCompletion, TestShared);
 
-        let mut shared = TestShared::default();
-
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
 
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
 
         // Automatically resets after success (Reload on Completion)
 
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
 
-        let status = tree.tick(0.1, &mut shared);
+        let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
     }
 }

@@ -1,4 +1,4 @@
-use crate::{Action, Child, Status};
+use crate::{child::Child, Action, Status};
 
 pub struct SelectState<S> {
     children: Vec<Child<S>>,
@@ -45,8 +45,10 @@ impl<S> Action<S> for SelectState<S> {
         }
     }
 
-    fn reset(&mut self) {
-        self.children.iter_mut().for_each(|child| child.reset());
+    fn reset(&mut self, shared: &mut S) {
+        self.children
+            .iter_mut()
+            .for_each(|child| child.reset(shared));
         self.index = 0;
         self.completed = false;
     }
@@ -133,7 +135,7 @@ mod tests {
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);
 
-        select.reset();
+        select.reset(&mut shared);
 
         let status = select.tick(0.1, &mut shared);
         assert_eq!(status, Status::Running);

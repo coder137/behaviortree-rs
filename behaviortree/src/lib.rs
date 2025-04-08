@@ -10,4 +10,6 @@ mod behaviortree;
 pub use behaviortree::*;
 
 // Not meant to be used externally
+mod child;
+
 mod behavior_nodes;

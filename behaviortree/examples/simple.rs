@@ -40,7 +40,7 @@ impl Action<OperationShared> for AddState {
         Status::Success
     }
 
-    fn reset(&mut self) {}
+    fn reset(&mut self, _shared: &mut OperationShared) {}
 
     fn name(&self) -> &'static str {
         "Add"
@@ -62,7 +62,7 @@ impl Action<OperationShared> for SubState {
         Status::Success
     }
 
-    fn reset(&mut self) {}
+    fn reset(&mut self, _shared: &mut OperationShared) {}
 
     fn name(&self) -> &'static str {
         "Sub"
@@ -88,25 +88,26 @@ fn main() {
     let mut bt = BehaviorTree::new(
         behavior,
         behaviortree::BehaviorTreePolicy::RetainOnCompletion,
+        OperationShared::default(),
     );
 
     let mut shared = OperationShared::default();
     // Shared data can be out, we don't need to keep shared data t
     let now = Instant::now();
-    bt.tick(0.1, &mut shared);
+    bt.tick(0.1);
     assert_eq!(bt.status().unwrap(), Status::Running);
     let data: usize = shared.blackboard.read(&"add".into()).unwrap();
     assert_eq!(data, 30);
     println!("Elapsed: {:?}", now.elapsed());
 
-    bt.tick(0.1, &mut shared);
+    bt.tick(0.1);
     assert_eq!(bt.status().unwrap(), Status::Success);
     let data: usize = shared.blackboard.read(&"sub".into()).unwrap();
     assert_eq!(data, 10);
     println!("Elapsed: {:?}", now.elapsed());
 
     // NOTE, Since our policy is to retain on completion, ticking the behavior tree again does nothing!
-    bt.tick(0.1, &mut shared);
+    bt.tick(0.1);
     assert_eq!(bt.status().unwrap(), Status::Success);
 
     // In this case we need to manually reset
