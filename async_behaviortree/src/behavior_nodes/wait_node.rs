@@ -42,6 +42,10 @@ impl<S> AsyncAction<S> for AsyncWaitState {
     fn reset(&mut self, _shared: &mut S) {
         self.elapsed = 0.0;
     }
+
+    fn name(&self) -> &'static str {
+        "Wait"
+    }
 }
 
 #[cfg(test)]

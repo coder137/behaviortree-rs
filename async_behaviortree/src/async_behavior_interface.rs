@@ -17,6 +17,9 @@ pub trait AsyncAction<S> {
     ///
     /// Decorator and Control nodes need to also reset their ticked children
     fn reset(&mut self, shared: &mut S);
+
+    /// Identify your action
+    fn name(&self) -> &'static str;
 }
 
 pub trait ToAsyncAction<S> {
@@ -57,14 +60,16 @@ pub mod test_async_behavior_interface {
     pub struct TestShared;
 
     struct GenericTestAction {
+        name: &'static str,
         status: bool,
         times: usize,
         elapsed: usize,
     }
 
     impl GenericTestAction {
-        fn new(status: bool, times: usize) -> Self {
+        fn new(name: String, status: bool, times: usize) -> Self {
             Self {
+                name: Box::new(name).leak(),
                 status,
                 times,
                 elapsed: 0,
@@ -95,6 +100,10 @@ pub mod test_async_behavior_interface {
         fn reset(&mut self, _shared: &mut S) {
             self.elapsed = 0;
         }
+
+        fn name(&self) -> &'static str {
+            self.name
+        }
     }
 
     #[derive(Clone, Copy)]
@@ -108,14 +117,18 @@ pub mod test_async_behavior_interface {
     impl<S> ToAsyncAction<S> for TestAction {
         fn to_async_action(self) -> Box<dyn AsyncAction<S>> {
             match self {
-                TestAction::Success => Box::new(GenericTestAction::new(true, 1)),
-                TestAction::Failure => Box::new(GenericTestAction::new(false, 1)),
-                TestAction::SuccessAfter { times } => {
-                    Box::new(GenericTestAction::new(true, times + 1))
-                }
-                TestAction::FailureAfter { times } => {
-                    Box::new(GenericTestAction::new(false, times + 1))
-                }
+                TestAction::Success => Box::new(GenericTestAction::new("Success".into(), true, 1)),
+                TestAction::Failure => Box::new(GenericTestAction::new("Failure".into(), false, 1)),
+                TestAction::SuccessAfter { times } => Box::new(GenericTestAction::new(
+                    format!("SuccessAfter{}", times),
+                    true,
+                    times + 1,
+                )),
+                TestAction::FailureAfter { times } => Box::new(GenericTestAction::new(
+                    format!("FailureAfter{}", times),
+                    false,
+                    times + 1,
+                )),
             }
         }
     }
