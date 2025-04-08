@@ -1,5 +1,3 @@
-use crate::AsyncChild;
-
 #[async_trait::async_trait(?Send)]
 pub trait AsyncAction<S> {
     /// Asynchronously runs the action till completion
@@ -24,30 +22,6 @@ pub trait AsyncAction<S> {
 
 pub trait ToAsyncAction<S> {
     fn to_async_action(self) -> Box<dyn AsyncAction<S>>;
-}
-
-#[async_trait::async_trait(?Send)]
-pub trait AsyncDecorator<S> {
-    async fn run(
-        &mut self,
-        child: &mut AsyncChild<S>,
-        delta: &mut tokio::sync::watch::Receiver<f64>,
-        shared: &mut S,
-    ) -> bool;
-
-    fn reset(&mut self);
-}
-
-#[async_trait::async_trait(?Send)]
-pub trait AsyncControl<S> {
-    async fn run(
-        &mut self,
-        children: &mut [AsyncChild<S>],
-        delta: &mut tokio::sync::watch::Receiver<f64>,
-        shared: &mut S,
-    ) -> bool;
-
-    fn reset(&mut self);
 }
 
 #[cfg(test)]

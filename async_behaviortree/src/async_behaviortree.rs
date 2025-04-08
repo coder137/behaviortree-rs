@@ -1,9 +1,9 @@
 use std::future::Future;
 
 use behaviortree_common::Behavior;
+use behaviortree_common::State;
 
 use crate::AsyncChild;
-use crate::AsyncChildObserver;
 
 use crate::ToAsyncAction;
 
@@ -15,13 +15,13 @@ pub enum AsyncBehaviorTreePolicy {
 }
 
 pub struct AsyncBehaviorController {
-    observer: AsyncChildObserver,
+    observer: State,
     reset_tx: tokio::sync::watch::Sender<()>,
     shutdown_tx: tokio::sync::watch::Sender<()>,
 }
 
 impl AsyncBehaviorController {
-    pub fn observer(&self) -> AsyncChildObserver {
+    pub fn observer(&self) -> State {
         self.observer.clone()
     }
 
@@ -48,7 +48,7 @@ impl AsyncBehaviorTree {
         S: 'static,
     {
         let mut child = AsyncChild::from_behavior(behavior);
-        let observer = child.observer();
+        let observer = child.state();
 
         let (reset_tx, mut reset_rx) = tokio::sync::watch::channel(());
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(());
@@ -158,12 +158,12 @@ mod tests {
                         }
                     };
                     let rx = match tobs {
-                        AsyncChildObserver::NoChild(rx) => rx,
-                        AsyncChildObserver::SingleChild(rx, child) => {
+                        State::NoChild(_name, rx) => rx,
+                        State::SingleChild(_name, rx, child) => {
                             pending_queue.push_back(&*child);
                             rx
                         }
-                        AsyncChildObserver::MultipleChildren(rx, children) => {
+                        State::MultipleChildren(_name, rx, children) => {
                             for child in children.iter() {
                                 pending_queue.push_back(child);
                             }
