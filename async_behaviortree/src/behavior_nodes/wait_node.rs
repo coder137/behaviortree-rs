@@ -71,7 +71,7 @@ mod tests {
             .detach();
 
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -92,15 +92,15 @@ mod tests {
             })
             .detach();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
 
         // reset
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -119,7 +119,7 @@ mod tests {
             })
             .detach();
 
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         drop(executor);
     }
 }

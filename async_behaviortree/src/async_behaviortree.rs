@@ -198,17 +198,17 @@ mod tests {
                 }
             })
             .detach();
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
 
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         let _r = shut_tx.try_send(());
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -233,11 +233,11 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
         controller.reset();
 
-        executor.tick(DELTA);
-        executor.tick(DELTA);
+        executor.tick(DELTA, None);
+        executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -265,13 +265,13 @@ mod tests {
 
         let observer = controller.observer();
         for _ in 0..10 {
-            executor.tick(DELTA);
+            executor.tick(DELTA, None);
             println!("Observer: {observer:?}");
         }
         controller.shutdown();
 
         while executor.num_tasks() != 0 {
-            executor.tick(DELTA);
+            executor.tick(DELTA, None);
         }
         assert_eq!(executor.num_tasks(), 0);
     }
