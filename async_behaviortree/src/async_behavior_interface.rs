@@ -12,8 +12,6 @@ pub trait AsyncAction<S> {
     async fn run(&mut self, delta: &mut tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    ///
-    /// Decorator and Control nodes need to also reset their ticked children
     fn reset(&mut self, shared: &mut S);
 
     /// Identify your action
