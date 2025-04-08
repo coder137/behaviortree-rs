@@ -133,14 +133,16 @@ pub mod test_behavior_interface {
     pub struct TestShared;
 
     struct GenericTestAction {
+        name: &'static str,
         status: bool,
         times: usize,
         elapsed: usize,
     }
 
     impl GenericTestAction {
-        fn new(status: bool, times: usize) -> Self {
+        fn new(name: String, status: bool, times: usize) -> Self {
             Self {
+                name: Box::new(name).leak(),
                 status,
                 times,
                 elapsed: 0,
@@ -168,7 +170,7 @@ pub mod test_behavior_interface {
         }
 
         fn name(&self) -> &'static str {
-            "GenericTestAction"
+            self.name
         }
     }
 
@@ -183,15 +185,23 @@ pub mod test_behavior_interface {
     impl ToAction<TestShared> for TestAction {
         fn to_action(self) -> Box<dyn Action<TestShared>> {
             match self {
-                TestAction::Success => Box::new(GenericTestAction::new(true, 1)),
-                TestAction::Failure => Box::new(GenericTestAction::new(false, 1)),
+                TestAction::Success => Box::new(GenericTestAction::new("Success".into(), true, 1)),
+                TestAction::Failure => Box::new(GenericTestAction::new("Failure".into(), false, 1)),
                 TestAction::SuccessAfter { times } => {
                     assert!(times >= 1);
-                    Box::new(GenericTestAction::new(true, times + 1))
+                    Box::new(GenericTestAction::new(
+                        format!("SuccessAfter{}", times),
+                        true,
+                        times + 1,
+                    ))
                 }
                 TestAction::FailureAfter { times } => {
                     assert!(times >= 1);
-                    Box::new(GenericTestAction::new(false, times + 1))
+                    Box::new(GenericTestAction::new(
+                        format!("FailureAfter{}", times),
+                        false,
+                        times + 1,
+                    ))
                 }
             }
         }
