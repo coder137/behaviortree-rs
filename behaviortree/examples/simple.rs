@@ -1,8 +1,19 @@
-use std::{rc::Rc, sync::RwLock};
+use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use behaviortree::{
-    Action, Behavior, BehaviorTree, Input, Output, Status, ToAction, TypedBlackboard,
-};
+use behaviortree::{Action, Behavior, BehaviorTree, Status, ToAction};
+
+#[derive(Debug, serde::Serialize)]
+enum Input<T> {
+    Literal(T),
+    Blackboard(&'static str),
+}
+
+#[derive(Debug, serde::Serialize)]
+enum Output {
+    Blackboard(String),
+}
+
+pub type TypedBlackboard<T> = HashMap<String, T>;
 
 /// Shared data structure for Operations
 #[derive(Default)]
@@ -10,8 +21,8 @@ struct OperationShared {
     blackboard: Rc<RwLock<TypedBlackboard<usize>>>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub enum Operation {
+#[derive(Debug, serde::Serialize)]
+enum Operation {
     Add(Input<usize>, Input<usize>, Output),
     Subtract(Input<usize>, Input<usize>, Output),
 }
@@ -31,15 +42,26 @@ impl Action<OperationShared> for AddState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
         let mut blackboard = shared.blackboard.write().unwrap();
 
-        let a = self.0.read_ref(&blackboard);
-        let b = self.1.read_ref(&blackboard);
+        let a = match &self.0 {
+            Input::Literal(data) => Some(data),
+            Input::Blackboard(key) => blackboard.get(*key),
+        };
+
+        let b = match &self.1 {
+            Input::Literal(data) => Some(data),
+            Input::Blackboard(key) => blackboard.get(*key),
+        };
 
         if a.is_none() || b.is_none() {
             return Status::Failure;
         }
 
         let c = a.unwrap() + b.unwrap();
-        self.2.write(&mut blackboard, c);
+        match &self.2 {
+            Output::Blackboard(key) => {
+                blackboard.insert(key.clone(), c);
+            }
+        }
         Status::Success
     }
 
@@ -55,15 +77,26 @@ impl Action<OperationShared> for SubState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
         let mut blackboard = shared.blackboard.write().unwrap();
 
-        let a = self.0.read_ref(&blackboard);
-        let b = self.1.read_ref(&blackboard);
+        let a = match &self.0 {
+            Input::Literal(data) => Some(data),
+            Input::Blackboard(key) => blackboard.get(*key),
+        };
+
+        let b = match &self.1 {
+            Input::Literal(data) => Some(data),
+            Input::Blackboard(key) => blackboard.get(*key),
+        };
 
         if a.is_none() || b.is_none() {
             return Status::Failure;
         }
 
         let c = a.unwrap() - b.unwrap();
-        self.2.write(&mut blackboard, c);
+        match &self.2 {
+            Output::Blackboard(key) => {
+                blackboard.insert(key.clone(), c);
+            }
+        }
         Status::Success
     }
 
@@ -113,6 +146,7 @@ fn main() {
     assert_eq!(bt.status(), None);
 
     let blackboard = blackboard.read().unwrap();
-    let sub = blackboard.read_ref(&"sub".to_string()).unwrap();
+    let sub = blackboard.get(&"sub".to_string()).unwrap();
     assert_eq!(*sub, 10);
+    println!("Blackboard: {:?}", &(*blackboard));
 }
