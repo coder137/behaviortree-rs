@@ -12,6 +12,6 @@ behaviortree_common = { path = "../behaviortree_common" }
 async-trait = "0.1.80"
 
 [dev-dependencies]
-ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor", rev = "a792d18fa778613138b91b493e95768d448613a1" }
+ticked_async_executor = "0.2"
 
 tokio-stream = { version = "0.1.15", features = ["full"] }

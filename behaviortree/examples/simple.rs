@@ -1,16 +1,19 @@
-use behaviortree::{Action, Behavior, BehaviorTree, Blackboard, Input, Output, Status, ToAction};
+use std::{rc::Rc, sync::RwLock};
+
+use behaviortree::{
+    Action, Behavior, BehaviorTree, Input, Output, Status, ToAction, TypedBlackboard,
+};
+
+/// Shared data structure for Operations
+#[derive(Default)]
+struct OperationShared {
+    blackboard: Rc<RwLock<TypedBlackboard<usize>>>,
+}
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Operation {
     Add(Input<usize>, Input<usize>, Output),
     Subtract(Input<usize>, Input<usize>, Output),
-}
-
-/// Shared data structure for Operations
-
-#[derive(Default)]
-struct OperationShared {
-    blackboard: std::rc::Rc<std::sync::RwLock<Blackboard>>,
 }
 
 // Convert Operation data to functionality
@@ -110,6 +113,6 @@ fn main() {
     assert_eq!(bt.status(), None);
 
     let blackboard = blackboard.read().unwrap();
-    let sub: usize = blackboard.read(&"sub".to_string()).unwrap();
-    assert_eq!(sub, 10);
+    let sub = blackboard.read_ref(&"sub".to_string()).unwrap();
+    assert_eq!(*sub, 10);
 }

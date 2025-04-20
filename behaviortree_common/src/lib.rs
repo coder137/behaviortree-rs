@@ -6,3 +6,6 @@ pub use behavior::*;
 
 mod state;
 pub use state::*;
+
+mod blackboard;
+pub use blackboard::*;

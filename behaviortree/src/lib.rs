@@ -1,8 +1,5 @@
 pub use behaviortree_common::*;
 
-mod blackboard;
-pub use blackboard::*;
-
 mod behavior_interface;
 pub use behavior_interface::*;
 
