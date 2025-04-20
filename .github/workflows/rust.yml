@@ -28,6 +28,10 @@ jobs:
         run: |
           cargo clippy
           cargo test
+      
+      - name: Examples
+        run: |
+          cargo run --package behaviortree --example simple
     
       - name: Build
         run: |
