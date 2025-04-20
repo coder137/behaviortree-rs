@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Blackboard(HashMap<String, Box<dyn std::any::Any>>);
 
 impl Blackboard {

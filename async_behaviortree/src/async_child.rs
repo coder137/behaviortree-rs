@@ -5,8 +5,6 @@ use crate::{
     AsyncAction, ToAsyncAction,
 };
 
-pub type AsyncChildObserverChannel = tokio::sync::watch::Receiver<Option<Status>>;
-
 pub struct AsyncChild<S> {
     action: Box<dyn AsyncAction<S>>,
     status: tokio::sync::watch::Sender<Option<Status>>,

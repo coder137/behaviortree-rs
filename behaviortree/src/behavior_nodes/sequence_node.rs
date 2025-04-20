@@ -1,4 +1,4 @@
-use crate::{Action, Child, Status};
+use crate::{child::Child, Action, Status};
 
 pub struct SequenceState<S> {
     children: Vec<Child<S>>,
@@ -45,8 +45,10 @@ impl<S> Action<S> for SequenceState<S> {
         }
     }
 
-    fn reset(&mut self) {
-        self.children.iter_mut().for_each(|child| child.reset());
+    fn reset(&mut self, shared: &mut S) {
+        self.children
+            .iter_mut()
+            .for_each(|child| child.reset(shared));
         self.index = 0;
         self.completed = false;
     }
