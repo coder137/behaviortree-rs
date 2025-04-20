@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use behaviortree::{Action, Behavior, BehaviorTree, Blackboard, Input, Output, Status, ToAction};
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -12,7 +10,7 @@ pub enum Operation {
 
 #[derive(Default)]
 struct OperationShared {
-    blackboard: Blackboard,
+    blackboard: std::rc::Rc<std::sync::RwLock<Blackboard>>,
 }
 
 // Convert Operation data to functionality
@@ -28,15 +26,17 @@ impl ToAction<OperationShared> for Operation {
 struct AddState(Input<usize>, Input<usize>, Output);
 impl Action<OperationShared> for AddState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
-        let a = self.0.read_ref(&shared.blackboard);
-        let b = self.1.read_ref(&shared.blackboard);
+        let mut blackboard = shared.blackboard.write().unwrap();
+
+        let a = self.0.read_ref(&blackboard);
+        let b = self.1.read_ref(&blackboard);
 
         if a.is_none() || b.is_none() {
             return Status::Failure;
         }
 
         let c = a.unwrap() + b.unwrap();
-        self.2.write(&mut shared.blackboard, c);
+        self.2.write(&mut blackboard, c);
         Status::Success
     }
 
@@ -50,15 +50,17 @@ impl Action<OperationShared> for AddState {
 struct SubState(Input<usize>, Input<usize>, Output);
 impl Action<OperationShared> for SubState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
-        let a = self.0.read_ref(&shared.blackboard);
-        let b = self.1.read_ref(&shared.blackboard);
+        let mut blackboard = shared.blackboard.write().unwrap();
+
+        let a = self.0.read_ref(&blackboard);
+        let b = self.1.read_ref(&blackboard);
 
         if a.is_none() || b.is_none() {
             return Status::Failure;
         }
 
         let c = a.unwrap() - b.unwrap();
-        self.2.write(&mut shared.blackboard, c);
+        self.2.write(&mut blackboard, c);
         Status::Success
     }
 
@@ -85,26 +87,19 @@ fn main() {
     let output = serde_json::to_string_pretty(&behavior).unwrap();
     println!("Behavior:\n{output}");
 
+    let operation_shared = OperationShared::default();
+    let blackboard = operation_shared.blackboard.clone();
     let mut bt = BehaviorTree::new(
         behavior,
         behaviortree::BehaviorTreePolicy::RetainOnCompletion,
-        OperationShared::default(),
+        operation_shared,
     );
 
-    let mut shared = OperationShared::default();
-    // Shared data can be out, we don't need to keep shared data t
-    let now = Instant::now();
     bt.tick(0.1);
     assert_eq!(bt.status().unwrap(), Status::Running);
-    let data: usize = shared.blackboard.read(&"add".into()).unwrap();
-    assert_eq!(data, 30);
-    println!("Elapsed: {:?}", now.elapsed());
 
     bt.tick(0.1);
     assert_eq!(bt.status().unwrap(), Status::Success);
-    let data: usize = shared.blackboard.read(&"sub".into()).unwrap();
-    assert_eq!(data, 10);
-    println!("Elapsed: {:?}", now.elapsed());
 
     // NOTE, Since our policy is to retain on completion, ticking the behavior tree again does nothing!
     bt.tick(0.1);
@@ -113,4 +108,8 @@ fn main() {
     // In this case we need to manually reset
     bt.reset();
     assert_eq!(bt.status(), None);
+
+    let blackboard = blackboard.read().unwrap();
+    let sub: usize = blackboard.read(&"sub".to_string()).unwrap();
+    assert_eq!(sub, 10);
 }
