@@ -43,3 +43,12 @@ Action <-- ToAction
 ToAction --> Child
 Child --> BehaviorTree
 ```
+
+# Roadmap
+
+- [x] SyncAction
+  - [ ] Rename from `Action` to `SyncAction`
+- [x] AsyncAction
+- [x] ImmediateAction
+- [ ] Unify `SyncAction`, `AsyncAction` and `ImmediateAction`
+- [ ] Behavior Nodes

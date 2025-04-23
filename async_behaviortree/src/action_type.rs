@@ -12,7 +12,10 @@ impl<S> ActionType<S> {
         shared: &mut S,
     ) -> bool {
         match self {
-            ActionType::Immediate(immediate_action) => immediate_action.run(shared),
+            ActionType::Immediate(immediate_action) => {
+                let dt = *delta.borrow_and_update();
+                immediate_action.run(dt, shared)
+            }
             ActionType::Async(async_action) => async_action.run(delta, shared).await,
         }
     }

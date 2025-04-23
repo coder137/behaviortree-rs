@@ -4,7 +4,7 @@ pub trait ImmediateAction<S> {
     /// Cannot return `Status::Running`
     /// true == `Status::Success`
     /// false == `Status::Failure`
-    fn run(&mut self, shared: &mut S) -> bool;
+    fn run(&mut self, delta: f64, shared: &mut S) -> bool;
 
     /// Resets the current action to its initial/newly created state
     fn reset(&mut self, shared: &mut S);
@@ -51,11 +51,11 @@ pub mod test_async_behavior_interface {
     }
 
     impl<S> ImmediateAction<S> for GenericTestImmediateAction {
-        fn run(&mut self, shared: &mut S) -> bool {
+        fn run(&mut self, _delta: f64, _shared: &mut S) -> bool {
             self.status
         }
 
-        fn reset(&mut self, shared: &mut S) {}
+        fn reset(&mut self, _shared: &mut S) {}
 
         fn name(&self) -> &'static str {
             self.name
