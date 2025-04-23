@@ -26,7 +26,7 @@ class SyncAction~S~ {
 
 class AsyncAction~S~ {
     <<trait>>
-    async fn run(&mut self, delta: &mut watch::Receiver<f64>, shared: &mut S) bool
+    async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
     fn reset(&mut self, shared: &mut S)
     fn name(&self) &'static str
 }
@@ -36,6 +36,11 @@ class ActionType~S~ {
     Immediate
     Sync
     Async
+
+    fn tick(&mut self, delta: f64, shared: &mut S) Status
+    async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
 }
 
 class Child~S~ {
