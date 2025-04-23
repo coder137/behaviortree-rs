@@ -3,9 +3,8 @@ use std::future::Future;
 use behaviortree_common::Behavior;
 use behaviortree_common::State;
 
-use crate::AsyncChild;
-
-use crate::ToAsyncAction;
+use crate::action_type::ActionType;
+use crate::async_child::AsyncChild;
 
 pub enum AsyncBehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -44,7 +43,7 @@ impl AsyncBehaviorTree {
         mut shared: S,
     ) -> (impl Future<Output = ()>, AsyncBehaviorController)
     where
-        A: ToAsyncAction<S>,
+        A: Into<ActionType<S>>,
         S: 'static,
     {
         let mut child = AsyncChild::from_behavior(behavior);
@@ -122,7 +121,7 @@ mod tests {
     use tokio::select;
     use tokio_stream::StreamExt;
 
-    use crate::test_async_behavior_interface::{TestAction, TestShared, DELTA};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
 
     #[test]
     fn test_async_behaviortree() {

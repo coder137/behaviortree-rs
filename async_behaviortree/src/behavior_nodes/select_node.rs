@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, AsyncChild};
+use crate::{AsyncAction, async_child::AsyncChild};
 
 pub struct AsyncSelectState<S> {
     children: Vec<AsyncChild<S>>,
@@ -59,7 +59,7 @@ mod tests {
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
 
-    use crate::test_async_behavior_interface::{TestAction, TestShared, DELTA};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
 
     use super::*;
 

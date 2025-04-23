@@ -53,7 +53,7 @@ mod tests {
     use ticked_async_executor::TickedAsyncExecutor;
 
     use super::*;
-    use crate::test_async_behavior_interface::{TestShared, DELTA};
+    use crate::test_async_behavior_interface::{DELTA, TestShared};
 
     #[test]
     fn test_wait_success() {
@@ -120,6 +120,17 @@ mod tests {
             .detach();
 
         executor.tick(DELTA, None);
+        let mut r = executor.tick_channel();
+        let mut r1 = r.clone();
+        executor.tick(DELTA, None);
+        assert!(r.has_changed().unwrap());
+        assert!(r1.has_changed().unwrap());
+        r.borrow_and_update();
+        assert!(!r.has_changed().unwrap());
+        assert!(r1.has_changed().unwrap());
+        r1.borrow_and_update();
+        assert!(!r.has_changed().unwrap());
+        assert!(!r1.has_changed().unwrap());
         drop(executor);
     }
 }
