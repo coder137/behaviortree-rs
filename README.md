@@ -3,12 +3,6 @@
 ```mermaid
 classDiagram
 
-class Action~S~ {
-    <<trait>>
-    fn tick(&mut self, delta: f64, shared: &mut S)
-    fn reset(&mut self)
-}
-
 class Behavior~A~ {
     <<enum>>
     Leaf
@@ -16,17 +10,40 @@ class Behavior~A~ {
     Control
 }
 
-class ToAction~S~ {
+class ImmediateAction~S~ {
     <<trait>>
-    fn to_action(self) Box~dyn Action~S~~
+    fn run(&mut self, delta: f64, shared: &mut S) bool
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class SyncAction~S~ {
+    <<trait>>
+    fn tick(&mut self, delta: f64, shared: &mut S) Status
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class AsyncAction~S~ {
+    <<trait>>
+    async fn run(&mut self, delta: &mut watch::Receiver<f64>, shared: &mut S) bool
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class ActionType~S~ {
+    <<enum>>
+    Immediate
+    Sync
+    Async
 }
 
 class Child~S~ {
     <<struct>>
-    Box~dyn Action~S~~ action
+    ActionType~S~ action_type
     tokio::sync::watch::Sender~Option~Status~~ status
 
-    fn from_behavior~A~(Behavior~A~ behavior) Self where A: ToAction~S~, S: 'static
+    fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~ActionType~S~~
 }
 
 class BehaviorTree {
@@ -38,17 +55,25 @@ class BehaviorTree {
     reset(&mut self)
 }
 
-Behavior --> Child
-Action <-- ToAction
-ToAction --> Child
+Behavior --> ImmediateAction
+Behavior --> SyncAction
+Behavior --> AsyncAction
+ImmediateAction --> ActionType
+SyncAction --> ActionType
+AsyncAction --> ActionType
+ActionType --> Child
 Child --> BehaviorTree
 ```
 
 # Roadmap
 
-- [x] SyncAction
+- [x] Action trait
   - [ ] Rename from `Action` to `SyncAction`
-- [x] AsyncAction
-- [x] ImmediateAction
-- [ ] Unify `SyncAction`, `AsyncAction` and `ImmediateAction`
+- [x] AsyncAction trait
+- [x] ImmediateAction trait
+- [ ] Unify `ImmediateAction`, `SyncAction` and `AsyncAction`
 - [ ] Behavior Nodes
+  - [x] Wait
+  - [x] Invert
+  - [x] Sequence
+  - [x] Select
