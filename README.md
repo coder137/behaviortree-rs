@@ -35,9 +35,17 @@ class ActionType~S~ {
     <<enum>>
     Immediate
     Sync
-    Async
 
     fn tick(&mut self, delta: f64, shared: &mut S) Status
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class AsyncActionType~S~ {
+    <<enum>>
+    Immediate
+    Async
+
     async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
     fn reset(&mut self, shared: &mut S)
     fn name(&self) &'static str
@@ -46,9 +54,15 @@ class ActionType~S~ {
 class Child~S~ {
     <<struct>>
     ActionType~S~ action_type
-    tokio::sync::watch::Sender~Option~Status~~ status
 
     fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~ActionType~S~~
+}
+
+class AsyncChild~S~ {
+    <<struct>>
+    AsyncActionType~S~ action_type
+
+    fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~AsyncActionType~S~~
 }
 
 class BehaviorTree {
@@ -63,11 +77,16 @@ class BehaviorTree {
 Behavior --> ImmediateAction
 Behavior --> SyncAction
 Behavior --> AsyncAction
-ImmediateAction --> ActionType
+
 SyncAction --> ActionType
-AsyncAction --> ActionType
+ImmediateAction --> ActionType
+ImmediateAction --> AsyncActionType
+AsyncAction --> AsyncActionType
+
 ActionType --> Child
 Child --> BehaviorTree
+
+AsyncActionType --> AsyncChild
 ```
 
 # Roadmap
@@ -76,7 +95,10 @@ Child --> BehaviorTree
   - [ ] Rename from `Action` to `SyncAction`
 - [x] AsyncAction trait
 - [x] ImmediateAction trait
-- [ ] Unify `ImmediateAction`, `SyncAction` and `AsyncAction`
+- [ ] Unification
+  - [ ] Remove workspace and keep only 1 crate
+  - [ ] Unify `SyncAction` with `ImmediateAction`
+  - [ ] Unify `AsyncAction` with `ImmediateAction`
 - [ ] Behavior Nodes
   - [x] Wait
   - [x] Invert

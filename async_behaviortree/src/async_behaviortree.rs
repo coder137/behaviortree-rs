@@ -3,7 +3,7 @@ use std::future::Future;
 use behaviortree_common::Behavior;
 use behaviortree_common::State;
 
-use crate::action_type::ActionType;
+use crate::async_action_type::AsyncActionType;
 use crate::async_child::AsyncChild;
 
 pub enum AsyncBehaviorTreePolicy {
@@ -43,7 +43,7 @@ impl AsyncBehaviorTree {
         mut shared: S,
     ) -> (impl Future<Output = ()>, AsyncBehaviorController)
     where
-        A: Into<ActionType<S>>,
+        A: Into<AsyncActionType<S>>,
         S: 'static,
     {
         let mut child = AsyncChild::from_behavior(behavior);

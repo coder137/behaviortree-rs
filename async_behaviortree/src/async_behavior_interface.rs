@@ -36,7 +36,7 @@ pub trait AsyncAction<S> {
 // TODO, Shift this also
 #[cfg(test)]
 pub mod test_async_behavior_interface {
-    use crate::action_type::ActionType;
+    use crate::async_action_type::AsyncActionType;
 
     use super::*;
 
@@ -117,22 +117,22 @@ pub mod test_async_behavior_interface {
         FailureAfter { times: usize },
     }
 
-    impl<S> Into<ActionType<S>> for TestAction {
-        fn into(self) -> ActionType<S> {
+    impl<S> Into<AsyncActionType<S>> for TestAction {
+        fn into(self) -> AsyncActionType<S> {
             match self {
                 TestAction::Success => {
                     let action = Box::new(GenericTestImmediateAction {
                         name: "Success",
                         status: true,
                     });
-                    ActionType::Immediate(action)
+                    AsyncActionType::Immediate(action)
                 }
                 TestAction::Failure => {
                     let action = Box::new(GenericTestImmediateAction {
                         name: "Failure",
                         status: false,
                     });
-                    ActionType::Immediate(action)
+                    AsyncActionType::Immediate(action)
                 }
                 TestAction::SuccessAfter { times } => {
                     let action = Box::new(GenericTestAsyncAction::new(
@@ -140,7 +140,7 @@ pub mod test_async_behavior_interface {
                         true,
                         times + 1,
                     ));
-                    ActionType::Async(action)
+                    AsyncActionType::Async(action)
                 }
                 TestAction::FailureAfter { times } => {
                     let action = Box::new(GenericTestAsyncAction::new(
@@ -148,7 +148,7 @@ pub mod test_async_behavior_interface {
                         false,
                         times + 1,
                     ));
-                    ActionType::Async(action)
+                    AsyncActionType::Async(action)
                 }
             }
         }
