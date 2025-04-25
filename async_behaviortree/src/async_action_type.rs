@@ -1,4 +1,6 @@
-use crate::{AsyncAction, ImmediateAction};
+use behaviortree_common::ImmediateAction;
+
+use crate::AsyncAction;
 
 pub enum AsyncActionType<S> {
     Immediate(Box<dyn ImmediateAction<S>>),
