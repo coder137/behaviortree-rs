@@ -1,16 +1,16 @@
 use behaviortree_common::{Behavior, State, Status};
 
-use crate::{behavior_nodes::*, Action, ToAction};
+use crate::{behavior_nodes::*, SyncAction, ToAction};
 
 pub struct Child<S> {
-    action: Box<dyn Action<S>>,
+    action: Box<dyn SyncAction<S>>,
     status: tokio::sync::watch::Sender<Option<Status>>,
     state: State,
 }
 
 impl<S> Child<S> {
     pub fn new(
-        action: Box<dyn Action<S>>,
+        action: Box<dyn SyncAction<S>>,
         status: tokio::sync::watch::Sender<Option<Status>>,
         state: State,
     ) -> Self {
@@ -35,7 +35,7 @@ impl<S> Child<S> {
                 Self::new(action, tx, state)
             }
             Behavior::Wait(target) => {
-                let action: Box<dyn Action<S>> = Box::new(WaitState::new(target));
+                let action: Box<dyn SyncAction<S>> = Box::new(WaitState::new(target));
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 let state = State::NoChild(action.name(), rx);
 

@@ -1,4 +1,4 @@
-use crate::{child::Child, Action, Status};
+use crate::{child::Child, Status, SyncAction};
 
 pub struct InvertState<S> {
     child: Child<S>,
@@ -14,7 +14,7 @@ impl<S> InvertState<S> {
     }
 }
 
-impl<S> Action<S> for InvertState<S> {
+impl<S> SyncAction<S> for InvertState<S> {
     #[tracing::instrument(level = "trace", name = "Invert", skip_all, ret)]
     fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         match self.completed {

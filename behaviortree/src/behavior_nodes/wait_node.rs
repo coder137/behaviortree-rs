@@ -1,11 +1,11 @@
-use crate::{Action, Status};
+use crate::{Status, SyncAction};
 
 pub struct WaitState {
     target: f64,
     elapsed: f64,
 }
 
-impl<S> Action<S> for WaitState {
+impl<S> SyncAction<S> for WaitState {
     #[tracing::instrument(level = "trace", name = "Wait", skip_all, ret)]
     fn tick(&mut self, dt: f64, _shared: &mut S) -> Status {
         match self.elapsed >= self.target {
@@ -54,7 +54,7 @@ mod tests {
         let mut shared = TestShared::default();
 
         let mut wait = WaitState::new(2.0);
-        let wait_ref_mut: &mut dyn Action<TestShared> = &mut wait;
+        let wait_ref_mut: &mut dyn SyncAction<TestShared> = &mut wait;
 
         let status = wait_ref_mut.tick(1.0, &mut shared);
         assert_eq!(status, Status::Running);

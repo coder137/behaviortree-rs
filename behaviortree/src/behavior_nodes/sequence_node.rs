@@ -1,4 +1,4 @@
-use crate::{child::Child, Action, Status};
+use crate::{child::Child, Status, SyncAction};
 
 pub struct SequenceState<S> {
     children: Vec<Child<S>>,
@@ -17,7 +17,7 @@ impl<S> SequenceState<S> {
     }
 }
 
-impl<S> Action<S> for SequenceState<S> {
+impl<S> SyncAction<S> for SequenceState<S> {
     #[tracing::instrument(level = "trace", name = "Sequence", skip_all, ret)]
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         match self.completed {

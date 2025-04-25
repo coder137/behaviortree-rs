@@ -1,7 +1,7 @@
 use crate::Status;
 
 /// Modelled after the `std::future::Future` trait
-pub trait Action<S> {
+pub trait SyncAction<S> {
     /// Ticks the action once.
     ///
     /// User implementation must ensure that calls to `tick` are non-blocking.
@@ -20,7 +20,7 @@ pub trait Action<S> {
 }
 
 pub trait ToAction<S> {
-    fn to_action(self) -> Box<dyn Action<S>>;
+    fn to_action(self) -> Box<dyn SyncAction<S>>;
 }
 
 #[cfg(test)]
@@ -48,7 +48,7 @@ pub mod test_behavior_interface {
         }
     }
 
-    impl<S> Action<S> for GenericTestAction {
+    impl<S> SyncAction<S> for GenericTestAction {
         #[tracing::instrument(level = "trace", name = "GenericTestAction", skip_all, ret)]
         fn tick(&mut self, _dt: f64, _shared: &mut S) -> Status {
             let mut status = if self.status {
@@ -81,7 +81,7 @@ pub mod test_behavior_interface {
     }
 
     impl ToAction<TestShared> for TestAction {
-        fn to_action(self) -> Box<dyn Action<TestShared>> {
+        fn to_action(self) -> Box<dyn SyncAction<TestShared>> {
             match self {
                 TestAction::Success => Box::new(GenericTestAction::new("Success".into(), true, 1)),
                 TestAction::Failure => Box::new(GenericTestAction::new("Failure".into(), false, 1)),

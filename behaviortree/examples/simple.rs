@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use behaviortree::{Action, Behavior, BehaviorTree, Status, ToAction};
+use behaviortree::{Behavior, BehaviorTree, Status, SyncAction, ToAction};
 
 #[derive(Debug, serde::Serialize)]
 enum Input<T> {
@@ -29,7 +29,7 @@ enum Operation {
 
 // Convert Operation data to functionality
 impl ToAction<OperationShared> for Operation {
-    fn to_action(self) -> Box<dyn Action<OperationShared>> {
+    fn to_action(self) -> Box<dyn SyncAction<OperationShared>> {
         match self {
             Operation::Add(a, b, c) => Box::new(AddState(a, b, c)),
             Operation::Subtract(a, b, c) => Box::new(SubState(a, b, c)),
@@ -38,7 +38,7 @@ impl ToAction<OperationShared> for Operation {
 }
 
 struct AddState(Input<usize>, Input<usize>, Output);
-impl Action<OperationShared> for AddState {
+impl SyncAction<OperationShared> for AddState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
         let mut blackboard = shared.blackboard.write().unwrap();
 
@@ -73,7 +73,7 @@ impl Action<OperationShared> for AddState {
 }
 
 struct SubState(Input<usize>, Input<usize>, Output);
-impl Action<OperationShared> for SubState {
+impl SyncAction<OperationShared> for SubState {
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
         let mut blackboard = shared.blackboard.write().unwrap();
 

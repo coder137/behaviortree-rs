@@ -1,4 +1,4 @@
-use crate::{child::Child, Action, Status};
+use crate::{child::Child, Status, SyncAction};
 
 pub struct SelectState<S> {
     children: Vec<Child<S>>,
@@ -17,7 +17,7 @@ impl<S> SelectState<S> {
     }
 }
 
-impl<S> Action<S> for SelectState<S> {
+impl<S> SyncAction<S> for SelectState<S> {
     #[tracing::instrument(level = "trace", name = "Select", skip_all, ret)]
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         match self.completed {
