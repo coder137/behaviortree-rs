@@ -1,4 +1,6 @@
-use crate::{Status, SyncAction};
+use behaviortree_common::Status;
+
+use crate::SyncAction;
 
 pub struct WaitState {
     target: f64,

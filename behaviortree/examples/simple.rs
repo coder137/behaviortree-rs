@@ -1,6 +1,7 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use behaviortree::{Behavior, BehaviorTree, Status, SyncAction, ToAction};
+use behaviortree::{BehaviorTree, SyncAction, ToAction};
+use behaviortree_common::{Behavior, Status};
 
 #[derive(Debug, serde::Serialize)]
 enum Input<T> {

@@ -1,4 +1,6 @@
-use crate::{child::Child, Behavior, State, Status, ToAction};
+use behaviortree_common::{Behavior, State, Status};
+
+use crate::{child::Child, ToAction};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed

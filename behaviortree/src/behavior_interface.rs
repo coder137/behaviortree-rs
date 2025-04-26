@@ -1,4 +1,4 @@
-use crate::Status;
+use behaviortree_common::Status;
 
 /// Modelled after the `std::future::Future` trait
 pub trait SyncAction<S> {

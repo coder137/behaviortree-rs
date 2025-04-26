@@ -1,4 +1,6 @@
-use crate::{child::Child, Status, SyncAction};
+use behaviortree_common::Status;
+
+use crate::{child::Child, SyncAction};
 
 pub struct InvertState<S> {
     child: Child<S>,
@@ -47,10 +49,9 @@ impl<S> SyncAction<S> for InvertState<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        test_behavior_interface::{TestAction, TestShared},
-        Behavior,
-    };
+    use behaviortree_common::Behavior;
+
+    use crate::test_behavior_interface::{TestAction, TestShared};
 
     use super::*;
 
