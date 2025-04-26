@@ -3,12 +3,6 @@
 ```mermaid
 classDiagram
 
-class Action~S~ {
-    <<trait>>
-    fn tick(&mut self, delta: f64, shared: &mut S)
-    fn reset(&mut self)
-}
-
 class Behavior~A~ {
     <<enum>>
     Leaf
@@ -16,17 +10,59 @@ class Behavior~A~ {
     Control
 }
 
-class ToAction~S~ {
+class ImmediateAction~S~ {
     <<trait>>
-    fn to_action(self) Box~dyn Action~S~~
+    fn run(&mut self, delta: f64, shared: &mut S) bool
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class SyncAction~S~ {
+    <<trait>>
+    fn tick(&mut self, delta: f64, shared: &mut S) Status
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class AsyncAction~S~ {
+    <<trait>>
+    async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class ActionType~S~ {
+    <<enum>>
+    Immediate
+    Sync
+
+    fn tick(&mut self, delta: f64, shared: &mut S) Status
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
+}
+
+class AsyncActionType~S~ {
+    <<enum>>
+    Immediate
+    Async
+
+    async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
+    fn reset(&mut self, shared: &mut S)
+    fn name(&self) &'static str
 }
 
 class Child~S~ {
     <<struct>>
-    Box~dyn Action~S~~ action
-    tokio::sync::watch::Sender~Option~Status~~ status
+    ActionType~S~ action_type
 
-    fn from_behavior~A~(Behavior~A~ behavior) Self where A: ToAction~S~, S: 'static
+    fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~ActionType~S~~
+}
+
+class AsyncChild~S~ {
+    <<struct>>
+    AsyncActionType~S~ action_type
+
+    fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~AsyncActionType~S~~
 }
 
 class BehaviorTree {
@@ -38,8 +74,37 @@ class BehaviorTree {
     reset(&mut self)
 }
 
-Behavior --> Child
-Action <-- ToAction
-ToAction --> Child
+class AsyncBehaviorTree {
+    <<struct>>
+    AsyncChild~S~ child
+}
+
+Behavior --> ImmediateAction
+Behavior --> SyncAction
+Behavior --> AsyncAction
+
+SyncAction --> ActionType
+ImmediateAction --> ActionType
+ImmediateAction --> AsyncActionType
+AsyncAction --> AsyncActionType
+
+ActionType --> Child
 Child --> BehaviorTree
+
+AsyncActionType --> AsyncChild
+AsyncChild --> AsyncBehaviorTree
 ```
+
+# Roadmap
+
+- [x] ImmediateAction trait
+- [x] SyncAction trait
+- [x] AsyncAction trait
+- [ ] Behavior Nodes
+  - [x] Wait
+  - [x] Invert
+  - [x] Sequence
+  - [x] Select
+- [ ] Tracing
+  - [x] BehaviorTree
+  - [ ] AsyncBehaviorTree

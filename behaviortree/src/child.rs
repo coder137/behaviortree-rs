@@ -1,16 +1,16 @@
 use behaviortree_common::{Behavior, State, Status};
 
-use crate::{behavior_nodes::*, Action, ToAction};
+use crate::{action_type::ActionType, behavior_nodes::*};
 
 pub struct Child<S> {
-    action: Box<dyn Action<S>>,
+    action: ActionType<S>,
     status: tokio::sync::watch::Sender<Option<Status>>,
     state: State,
 }
 
 impl<S> Child<S> {
     pub fn new(
-        action: Box<dyn Action<S>>,
+        action: ActionType<S>,
         status: tokio::sync::watch::Sender<Option<Status>>,
         state: State,
     ) -> Self {
@@ -23,19 +23,21 @@ impl<S> Child<S> {
 
     pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
     where
-        A: ToAction<S>,
+        A: Into<ActionType<S>>,
         S: 'static,
     {
         match behavior {
             Behavior::Action(action) => {
-                let action = action.to_action();
+                let action = action.into();
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 let state = State::NoChild(action.name(), rx);
 
                 Self::new(action, tx, state)
             }
             Behavior::Wait(target) => {
-                let action: Box<dyn Action<S>> = Box::new(WaitState::new(target));
+                let action = Box::new(WaitState::new(target));
+                let action = ActionType::Sync(action);
+
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 let state = State::NoChild(action.name(), rx);
 
@@ -45,11 +47,13 @@ impl<S> Child<S> {
                 let child = Child::from_behavior(*child);
                 let child_state = child.state();
 
-                let action = InvertState::new(child);
+                let action = Box::new(InvertState::new(child));
+                let action = ActionType::Sync(action);
+
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 let state = State::SingleChild(action.name(), rx, child_state.into());
 
-                Self::new(Box::new(action), tx, state)
+                Self::new(action, tx, state)
             }
             Behavior::Sequence(children) => {
                 let children = children
@@ -59,11 +63,13 @@ impl<S> Child<S> {
                 let children_states = children.iter().map(|child| child.state());
                 let children_states = std::rc::Rc::from_iter(children_states);
 
-                let action = SequenceState::new(children);
+                let action = Box::new(SequenceState::new(children));
+                let action = ActionType::Sync(action);
+
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 let state = State::MultipleChildren(action.name(), rx, children_states);
 
-                Self::new(Box::new(action), tx, state)
+                Self::new(action, tx, state)
             }
             Behavior::Select(children) => {
                 let children = children
@@ -73,11 +79,13 @@ impl<S> Child<S> {
                 let children_states = children.iter().map(|child| child.state());
                 let children_states = std::rc::Rc::from_iter(children_states);
 
-                let action = SelectState::new(children);
+                let action = Box::new(SelectState::new(children));
+                let action = ActionType::Sync(action);
+
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 let state = State::MultipleChildren(action.name(), rx, children_states);
 
-                Self::new(Box::new(action), tx, state)
+                Self::new(action, tx, state)
             }
         }
     }

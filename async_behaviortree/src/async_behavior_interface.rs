@@ -18,12 +18,13 @@ pub trait AsyncAction<S> {
     fn name(&self) -> &'static str;
 }
 
-pub trait ToAsyncAction<S> {
-    fn to_async_action(self) -> Box<dyn AsyncAction<S>>;
-}
-
+// TODO, Shift this also
 #[cfg(test)]
 pub mod test_async_behavior_interface {
+    use behaviortree_common::ImmediateAction;
+
+    use crate::async_action_type::AsyncActionType;
+
     use super::*;
 
     pub const DELTA: f64 = 1000.0 / 60.0;
@@ -31,14 +32,31 @@ pub mod test_async_behavior_interface {
     #[derive(Debug, Default)]
     pub struct TestShared;
 
-    struct GenericTestAction {
+    struct GenericTestImmediateAction {
+        name: &'static str,
+        status: bool,
+    }
+
+    impl<S> ImmediateAction<S> for GenericTestImmediateAction {
+        fn run(&mut self, _delta: f64, _shared: &mut S) -> bool {
+            self.status
+        }
+
+        fn reset(&mut self, _shared: &mut S) {}
+
+        fn name(&self) -> &'static str {
+            self.name
+        }
+    }
+
+    struct GenericTestAsyncAction {
         name: &'static str,
         status: bool,
         times: usize,
         elapsed: usize,
     }
 
-    impl GenericTestAction {
+    impl GenericTestAsyncAction {
         fn new(name: String, status: bool, times: usize) -> Self {
             Self {
                 name: Box::new(name).leak(),
@@ -50,7 +68,7 @@ pub mod test_async_behavior_interface {
     }
 
     #[async_trait::async_trait(?Send)]
-    impl<S> AsyncAction<S> for GenericTestAction {
+    impl<S> AsyncAction<S> for GenericTestAsyncAction {
         async fn run(
             &mut self,
             delta: &mut tokio::sync::watch::Receiver<f64>,
@@ -86,21 +104,39 @@ pub mod test_async_behavior_interface {
         FailureAfter { times: usize },
     }
 
-    impl<S> ToAsyncAction<S> for TestAction {
-        fn to_async_action(self) -> Box<dyn AsyncAction<S>> {
+    impl<S> Into<AsyncActionType<S>> for TestAction {
+        fn into(self) -> AsyncActionType<S> {
             match self {
-                TestAction::Success => Box::new(GenericTestAction::new("Success".into(), true, 1)),
-                TestAction::Failure => Box::new(GenericTestAction::new("Failure".into(), false, 1)),
-                TestAction::SuccessAfter { times } => Box::new(GenericTestAction::new(
-                    format!("SuccessAfter{}", times),
-                    true,
-                    times + 1,
-                )),
-                TestAction::FailureAfter { times } => Box::new(GenericTestAction::new(
-                    format!("FailureAfter{}", times),
-                    false,
-                    times + 1,
-                )),
+                TestAction::Success => {
+                    let action = Box::new(GenericTestImmediateAction {
+                        name: "Success",
+                        status: true,
+                    });
+                    AsyncActionType::Immediate(action)
+                }
+                TestAction::Failure => {
+                    let action = Box::new(GenericTestImmediateAction {
+                        name: "Failure",
+                        status: false,
+                    });
+                    AsyncActionType::Immediate(action)
+                }
+                TestAction::SuccessAfter { times } => {
+                    let action = Box::new(GenericTestAsyncAction::new(
+                        format!("SuccessAfter{}", times),
+                        true,
+                        times + 1,
+                    ));
+                    AsyncActionType::Async(action)
+                }
+                TestAction::FailureAfter { times } => {
+                    let action = Box::new(GenericTestAsyncAction::new(
+                        format!("FailureAfter{}", times),
+                        false,
+                        times + 1,
+                    ));
+                    AsyncActionType::Async(action)
+                }
             }
         }
     }

@@ -53,7 +53,7 @@ mod tests {
     use ticked_async_executor::TickedAsyncExecutor;
 
     use super::*;
-    use crate::test_async_behavior_interface::{TestShared, DELTA};
+    use crate::test_async_behavior_interface::{DELTA, TestShared};
 
     #[test]
     fn test_wait_success() {
