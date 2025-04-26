@@ -19,25 +19,43 @@ pub trait SyncAction<S> {
     fn name(&self) -> &'static str;
 }
 
-pub trait ToAction<S> {
-    fn to_action(self) -> Box<dyn SyncAction<S>>;
-}
-
+// TODO, Shift this also
 #[cfg(test)]
 pub mod test_behavior_interface {
+    use behaviortree_common::ImmediateAction;
+
+    use crate::action_type::ActionType;
+
     use super::*;
 
     #[derive(Default)]
     pub struct TestShared;
 
-    struct GenericTestAction {
+    struct GenericTestImmediateAction {
+        name: &'static str,
+        status: bool,
+    }
+
+    impl<S> ImmediateAction<S> for GenericTestImmediateAction {
+        fn run(&mut self, _delta: f64, _shared: &mut S) -> bool {
+            self.status
+        }
+
+        fn reset(&mut self, _shared: &mut S) {}
+
+        fn name(&self) -> &'static str {
+            self.name
+        }
+    }
+
+    struct GenericTestSyncAction {
         name: &'static str,
         status: bool,
         times: usize,
         elapsed: usize,
     }
 
-    impl GenericTestAction {
+    impl GenericTestSyncAction {
         fn new(name: String, status: bool, times: usize) -> Self {
             Self {
                 name: Box::new(name).leak(),
@@ -48,8 +66,8 @@ pub mod test_behavior_interface {
         }
     }
 
-    impl<S> SyncAction<S> for GenericTestAction {
-        #[tracing::instrument(level = "trace", name = "GenericTestAction", skip_all, ret)]
+    impl<S> SyncAction<S> for GenericTestSyncAction {
+        #[tracing::instrument(level = "trace", name = "GenericTestSyncAction", skip_all, ret)]
         fn tick(&mut self, _dt: f64, _shared: &mut S) -> Status {
             let mut status = if self.status {
                 Status::Success
@@ -80,26 +98,42 @@ pub mod test_behavior_interface {
         FailureAfter { times: usize },
     }
 
-    impl ToAction<TestShared> for TestAction {
-        fn to_action(self) -> Box<dyn SyncAction<TestShared>> {
+    impl Into<ActionType<TestShared>> for TestAction {
+        fn into(self) -> ActionType<TestShared> {
             match self {
-                TestAction::Success => Box::new(GenericTestAction::new("Success".into(), true, 1)),
-                TestAction::Failure => Box::new(GenericTestAction::new("Failure".into(), false, 1)),
+                TestAction::Success => {
+                    // let action = Box::new(GenericTestSyncAction::new("Success".into(), true, 1));
+                    // ActionType::Sync()
+                    let action = Box::new(GenericTestImmediateAction {
+                        name: "Success",
+                        status: true,
+                    });
+                    ActionType::Immediate(action)
+                }
+                TestAction::Failure => {
+                    let action = Box::new(GenericTestImmediateAction {
+                        name: "Failure",
+                        status: false,
+                    });
+                    ActionType::Immediate(action)
+                }
                 TestAction::SuccessAfter { times } => {
                     assert!(times >= 1);
-                    Box::new(GenericTestAction::new(
+                    let action = Box::new(GenericTestSyncAction::new(
                         format!("SuccessAfter{}", times),
                         true,
                         times + 1,
-                    ))
+                    ));
+                    ActionType::Sync(action)
                 }
                 TestAction::FailureAfter { times } => {
                     assert!(times >= 1);
-                    Box::new(GenericTestAction::new(
+                    let action = Box::new(GenericTestSyncAction::new(
                         format!("FailureAfter{}", times),
                         false,
                         times + 1,
-                    ))
+                    ));
+                    ActionType::Sync(action)
                 }
             }
         }

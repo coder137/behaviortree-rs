@@ -1,6 +1,6 @@
 use behaviortree_common::{Behavior, State, Status};
 
-use crate::{child::Child, ToAction};
+use crate::{action_type::ActionType, child::Child};
 
 pub enum BehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -18,7 +18,7 @@ pub struct BehaviorTree<S> {
 impl<S> BehaviorTree<S> {
     pub fn new<A>(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy, shared: S) -> Self
     where
-        A: ToAction<S>,
+        A: Into<ActionType<S>>,
         S: 'static,
     {
         let child = Child::from_behavior(behavior);

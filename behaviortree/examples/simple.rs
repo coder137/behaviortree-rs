@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use behaviortree::{BehaviorTree, SyncAction, ToAction};
+use behaviortree::{ActionType, BehaviorTree, SyncAction};
 use behaviortree_common::{Behavior, Status};
 
 #[derive(Debug, serde::Serialize)]
@@ -28,12 +28,17 @@ enum Operation {
     Subtract(Input<usize>, Input<usize>, Output),
 }
 
-// Convert Operation data to functionality
-impl ToAction<OperationShared> for Operation {
-    fn to_action(self) -> Box<dyn SyncAction<OperationShared>> {
+impl Into<ActionType<OperationShared>> for Operation {
+    fn into(self) -> ActionType<OperationShared> {
         match self {
-            Operation::Add(a, b, c) => Box::new(AddState(a, b, c)),
-            Operation::Subtract(a, b, c) => Box::new(SubState(a, b, c)),
+            Operation::Add(a, b, c) => {
+                let action = Box::new(AddState(a, b, c));
+                ActionType::Sync(action)
+            }
+            Operation::Subtract(a, b, c) => {
+                let action = Box::new(SubState(a, b, c));
+                ActionType::Sync(action)
+            }
         }
     }
 }
