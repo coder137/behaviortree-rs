@@ -1,3 +1,5 @@
+pub use behaviortree_common::*;
+
 mod behavior_interface;
 pub use behavior_interface::*;
 
