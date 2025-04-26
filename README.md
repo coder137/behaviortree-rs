@@ -74,6 +74,11 @@ class BehaviorTree {
     reset(&mut self)
 }
 
+class AsyncBehaviorTree {
+    <<struct>>
+    AsyncChild~S~ child
+}
+
 Behavior --> ImmediateAction
 Behavior --> SyncAction
 Behavior --> AsyncAction
@@ -87,20 +92,19 @@ ActionType --> Child
 Child --> BehaviorTree
 
 AsyncActionType --> AsyncChild
+AsyncChild --> AsyncBehaviorTree
 ```
 
 # Roadmap
 
-- [x] Action trait
-  - [ ] Rename from `Action` to `SyncAction`
-- [x] AsyncAction trait
 - [x] ImmediateAction trait
-- [ ] Unification
-  - [ ] Remove workspace and keep only 1 crate
-  - [ ] Unify `SyncAction` with `ImmediateAction`
-  - [ ] Unify `AsyncAction` with `ImmediateAction`
+- [x] SyncAction trait
+- [x] AsyncAction trait
 - [ ] Behavior Nodes
   - [x] Wait
   - [x] Invert
   - [x] Sequence
   - [x] Select
+- [ ] Tracing
+  - [x] BehaviorTree
+  - [ ] AsyncBehaviorTree
