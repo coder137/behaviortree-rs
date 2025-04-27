@@ -18,6 +18,7 @@ impl<S> AsyncSelectState<S> {
 
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncSelectState<S> {
+    #[tracing::instrument(level = "trace", name = "Select::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         match self.completed {
             true => unreachable!(),
@@ -42,6 +43,7 @@ impl<S> AsyncAction<S> for AsyncSelectState<S> {
         status
     }
 
+    #[tracing::instrument(level = "trace", name = "Select::reset", skip_all, ret)]
     fn reset(&mut self, shared: &mut S) {
         self.children.iter_mut().for_each(|child| {
             child.reset(shared);

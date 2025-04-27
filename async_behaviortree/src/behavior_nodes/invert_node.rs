@@ -18,6 +18,7 @@ impl<S> AsyncInvertState<S> {
 
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncInvertState<S> {
+    #[tracing::instrument(level = "trace", name = "Invert::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         match self.completed {
             true => {
@@ -30,6 +31,7 @@ impl<S> AsyncAction<S> for AsyncInvertState<S> {
         status
     }
 
+    #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all, ret)]
     fn reset(&mut self, shared: &mut S) {
         self.child.reset(shared);
         self.completed = false;

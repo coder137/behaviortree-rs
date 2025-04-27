@@ -18,6 +18,7 @@ impl<S> AsyncSequenceState<S> {
 
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncSequenceState<S> {
+    #[tracing::instrument(level = "trace", name = "Sequence::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         match self.completed {
             true => {
@@ -44,6 +45,7 @@ impl<S> AsyncAction<S> for AsyncSequenceState<S> {
         status
     }
 
+    #[tracing::instrument(level = "trace", name = "Sequence::reset", skip_all, ret)]
     fn reset(&mut self, shared: &mut S) {
         self.children
             .iter_mut()

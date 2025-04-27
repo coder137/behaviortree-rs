@@ -18,6 +18,7 @@ impl AsyncWaitState {
 
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncWaitState {
+    #[tracing::instrument(level = "trace", name = "Wait::run", skip_all, ret)]
     async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &S) -> bool {
         loop {
             let _r = delta.changed().await;
@@ -35,6 +36,7 @@ impl<S> AsyncAction<S> for AsyncWaitState {
         true
     }
 
+    #[tracing::instrument(level = "trace", name = "Wait::reset", skip_all, ret)]
     fn reset(&mut self, _shared: &mut S) {
         self.elapsed = 0.0;
     }
