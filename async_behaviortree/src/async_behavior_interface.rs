@@ -36,7 +36,7 @@ pub trait AsyncAction<S> {
 // TODO, Shift this also
 #[cfg(test)]
 pub mod test_async_behavior_interface {
-    use crate::async_action_type::AsyncActionType;
+    use crate::{async_action_type::AsyncActionType, util::yield_now};
 
     use super::*;
 
@@ -88,7 +88,7 @@ pub mod test_async_behavior_interface {
                 let _dt = *delta.borrow_and_update();
                 self.elapsed += 1;
                 if self.elapsed < self.times {
-                    tokio::task::yield_now().await;
+                    yield_now().await;
                 } else {
                     break;
                 }

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::AsyncAction;
+use crate::{AsyncAction, util::yield_now};
 
 pub struct AsyncWaitState {
     target: f64,
@@ -31,7 +31,7 @@ impl<S> AsyncAction<S> for AsyncWaitState {
             if self.elapsed >= self.target {
                 break;
             }
-            tokio::task::yield_now().await;
+            yield_now().await;
         }
         true
     }

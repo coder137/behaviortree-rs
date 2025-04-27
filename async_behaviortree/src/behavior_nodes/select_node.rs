@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, async_child::AsyncChild};
+use crate::{AsyncAction, async_child::AsyncChild, util::yield_now};
 
 pub struct AsyncSelectState<S> {
     children: Vec<AsyncChild<S>>,
@@ -36,7 +36,7 @@ impl<S> AsyncAction<S> for AsyncSelectState<S> {
             // This means that if they are more children after the current child,
             // we must yield back to the executor
             if index != last {
-                tokio::task::yield_now().await;
+                yield_now().await;
             }
         }
         self.completed = true;
