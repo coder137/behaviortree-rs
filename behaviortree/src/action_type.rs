@@ -1,6 +1,6 @@
-use behaviortree_common::{ImmediateAction, Status};
+use behaviortree_common::Status;
 
-use crate::SyncAction;
+use crate::{ImmediateAction, SyncAction};
 
 pub enum ActionType<S> {
     Immediate(Box<dyn ImmediateAction<S>>),
