@@ -2,6 +2,7 @@ use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
 use behaviortree::{ActionType, BehaviorTree, SyncAction};
 use behaviortree_common::{Behavior, Status};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, serde::Serialize)]
 enum Input<T> {
@@ -45,6 +46,7 @@ impl Into<ActionType<OperationShared>> for Operation {
 
 struct AddState(Input<usize>, Input<usize>, Output);
 impl SyncAction<OperationShared> for AddState {
+    #[tracing::instrument(level = "trace", name = "Add::tick", skip(self, shared), ret)]
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
         let mut blackboard = shared.blackboard.write().unwrap();
 
@@ -71,6 +73,7 @@ impl SyncAction<OperationShared> for AddState {
         Status::Success
     }
 
+    #[tracing::instrument(level = "trace", name = "Add::reset", skip_all)]
     fn reset(&mut self, _shared: &mut OperationShared) {}
 
     fn name(&self) -> &'static str {
@@ -80,6 +83,7 @@ impl SyncAction<OperationShared> for AddState {
 
 struct SubState(Input<usize>, Input<usize>, Output);
 impl SyncAction<OperationShared> for SubState {
+    #[tracing::instrument(level = "trace", name = "Sub::tick", skip(self, shared), ret)]
     fn tick(&mut self, _dt: f64, shared: &mut OperationShared) -> Status {
         let mut blackboard = shared.blackboard.write().unwrap();
 
@@ -106,6 +110,7 @@ impl SyncAction<OperationShared> for SubState {
         Status::Success
     }
 
+    #[tracing::instrument(level = "trace", name = "Sub::reset", skip_all)]
     fn reset(&mut self, _shared: &mut OperationShared) {}
 
     fn name(&self) -> &'static str {
@@ -113,7 +118,12 @@ impl SyncAction<OperationShared> for SubState {
     }
 }
 
-fn main() {
+fn main() -> Result<(), String> {
+    tracing_subscriber::Registry::default()
+        .with(tracing_forest::ForestLayer::default())
+        .try_init()
+        .map_err(|e| e.to_string())?;
+
     let behavior = Behavior::Sequence(vec![
         Behavior::Action(Operation::Add(
             Input::Literal(10),
@@ -127,7 +137,7 @@ fn main() {
         )),
     ]);
     let output = serde_json::to_string_pretty(&behavior).unwrap();
-    println!("Behavior:\n{output}");
+    tracing::info!("Behavior:\n{output}");
 
     let operation_shared = OperationShared::default();
     let blackboard = operation_shared.blackboard.clone();
@@ -154,5 +164,6 @@ fn main() {
     let blackboard = blackboard.read().unwrap();
     let sub = blackboard.get(&"sub".to_string()).unwrap();
     assert_eq!(*sub, 10);
-    println!("Blackboard: {:?}", &(*blackboard));
+    tracing::info!("Blackboard: {:?}", &(*blackboard));
+    Ok(())
 }
