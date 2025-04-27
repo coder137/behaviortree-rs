@@ -74,6 +74,30 @@ mod tests {
     }
 
     #[test]
+    fn test_wait_success_with_time() {
+        let executor = TickedAsyncExecutor::default();
+
+        let mut wait = AsyncWaitState::new(1.0);
+
+        let delta = executor.tick_channel();
+        let shared = TestShared;
+
+        executor
+            .spawn_local("WaitFuture", async move {
+                wait.run(delta, &shared).await;
+            })
+            .detach();
+
+        assert_eq!(executor.num_tasks(), 1);
+
+        executor.tick(0.5, None);
+        assert_eq!(executor.num_tasks(), 1);
+
+        executor.tick(0.5, None);
+        assert_eq!(executor.num_tasks(), 0);
+    }
+
+    #[test]
     fn test_wait_running() {
         let executor = TickedAsyncExecutor::default();
 
