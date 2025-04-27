@@ -18,7 +18,7 @@ impl<S> AsyncSequenceState<S> {
 
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncSequenceState<S> {
-    async fn run(&mut self, delta: &mut tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         match self.completed {
             true => {
                 unreachable!()
@@ -28,7 +28,7 @@ impl<S> AsyncAction<S> for AsyncSequenceState<S> {
         let mut status = true;
         let last = self.children.len() - 1;
         for (index, child) in self.children.iter_mut().enumerate() {
-            let child_status = child.run(delta, shared).await;
+            let child_status = child.run(delta.clone(), shared).await;
             if !child_status {
                 status = false;
                 break;
@@ -72,12 +72,12 @@ mod tests {
 
         let executor = TickedAsyncExecutor::default();
 
-        let mut delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let delta = executor.tick_channel();
+        let shared = TestShared;
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(delta, &shared).await;
                 assert!(status);
             })
             .detach();
@@ -94,12 +94,12 @@ mod tests {
 
         let executor = TickedAsyncExecutor::default();
 
-        let mut delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let delta = executor.tick_channel();
+        let shared = TestShared;
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(delta, &shared).await;
                 assert!(!status);
             })
             .detach();
@@ -118,12 +118,12 @@ mod tests {
 
         let executor = TickedAsyncExecutor::default();
 
-        let mut delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let delta = executor.tick_channel();
+        let shared = TestShared;
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(delta, &shared).await;
                 assert!(status);
             })
             .detach();
@@ -144,12 +144,12 @@ mod tests {
 
         let executor = TickedAsyncExecutor::default();
 
-        let mut delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let delta = executor.tick_channel();
+        let shared = TestShared;
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(delta, &shared).await;
                 assert!(status);
             })
             .detach();
@@ -172,15 +172,15 @@ mod tests {
 
         let executor = TickedAsyncExecutor::default();
 
-        let mut delta = executor.tick_channel();
+        let delta = executor.tick_channel();
         let mut shared = TestShared;
 
         executor
             .spawn_local("SequenceFuture", async move {
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(delta.clone(), &shared).await;
                 assert!(!status);
                 sequence.reset(&mut shared);
-                let status = sequence.run(&mut delta, &mut shared).await;
+                let status = sequence.run(delta, &shared).await;
                 assert!(!status);
             })
             .detach();

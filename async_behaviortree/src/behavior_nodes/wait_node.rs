@@ -18,11 +18,7 @@ impl AsyncWaitState {
 
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncWaitState {
-    async fn run(
-        &mut self,
-        delta: &mut tokio::sync::watch::Receiver<f64>,
-        _shared: &mut S,
-    ) -> bool {
+    async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &S) -> bool {
         loop {
             let _r = delta.changed().await;
             if _r.is_err() {
@@ -61,12 +57,12 @@ mod tests {
 
         let mut wait = AsyncWaitState::new(0.0);
 
-        let mut delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let delta = executor.tick_channel();
+        let shared = TestShared;
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(&mut delta, &mut shared).await;
+                wait.run(delta, &shared).await;
             })
             .detach();
 
@@ -81,14 +77,14 @@ mod tests {
 
         let mut wait: Box<dyn AsyncAction<TestShared>> = Box::new(AsyncWaitState::new(49.0));
 
-        let mut delta = executor.tick_channel();
+        let delta = executor.tick_channel();
         let mut shared = TestShared;
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(&mut delta, &mut shared).await;
+                wait.run(delta.clone(), &shared).await;
                 wait.reset(&mut shared);
-                wait.run(&mut delta, &mut shared).await;
+                wait.run(delta, &shared).await;
             })
             .detach();
 
@@ -110,12 +106,12 @@ mod tests {
 
         let mut wait = AsyncWaitState::new(50.0);
 
-        let mut delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let delta = executor.tick_channel();
+        let shared = TestShared;
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(&mut delta, &mut shared).await;
+                wait.run(delta, &shared).await;
             })
             .detach();
 
