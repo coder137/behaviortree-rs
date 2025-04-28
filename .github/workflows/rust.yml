@@ -32,6 +32,7 @@ jobs:
       - name: Examples
         run: |
           cargo run --package behaviortree --example simple
+          cargo run --package async_behaviortree --example simple
     
       - name: Build
         run: |
