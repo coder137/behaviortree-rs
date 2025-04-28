@@ -13,6 +13,9 @@ behaviortree_common = { path = "../behaviortree_common" }
 async-trait = "0.1.80"
 
 [dev-dependencies]
-ticked_async_executor = "0.2"
+serde_json = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-forest = { workspace = true }
 
+ticked_async_executor = "0.2"
 tokio-stream = { version = "0.1.15", features = ["full"] }

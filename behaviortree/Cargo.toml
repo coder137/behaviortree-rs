@@ -11,8 +11,6 @@ tracing = { workspace = true }
 behaviortree_common = { path = "../behaviortree_common" }
 
 [dev-dependencies]
-serde_json = "1.0"
-
-# Tracing
-tracing-subscriber = "0.3"
-tracing-forest = "0.1"
+serde_json = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-forest = { workspace = true }

@@ -60,7 +60,7 @@ impl AsyncBehaviorTree {
             }
             loop {
                 let state = tokio::select! {
-                    _ = child.run(delta.clone(), &mut shared) => {
+                    _ = child.run(delta.clone(), &shared) => {
                         State::ChildCompleted
                     }
                     _ = reset_rx.changed() => {
