@@ -5,6 +5,7 @@ use behaviortree_common::State;
 
 use crate::async_action_type::AsyncActionType;
 use crate::async_child::AsyncChild;
+use crate::util::yield_now;
 
 pub enum AsyncBehaviorTreePolicy {
     /// Resets/Reloads the behavior tree once it is completed
@@ -39,7 +40,7 @@ impl AsyncBehaviorTree {
     pub fn new<A, S>(
         behavior: Behavior<A>,
         behavior_policy: AsyncBehaviorTreePolicy,
-        mut delta: tokio::sync::watch::Receiver<f64>,
+        delta: tokio::sync::watch::Receiver<f64>,
         mut shared: S,
     ) -> (impl Future<Output = ()>, AsyncBehaviorController)
     where
@@ -59,7 +60,7 @@ impl AsyncBehaviorTree {
             }
             loop {
                 let state = tokio::select! {
-                    _ = child.run(&mut delta, &mut shared) => {
+                    _ = child.run(delta.clone(), &shared) => {
                         State::ChildCompleted
                     }
                     _ = reset_rx.changed() => {
@@ -73,7 +74,7 @@ impl AsyncBehaviorTree {
                 match state {
                     State::ChildCompleted => match behavior_policy {
                         AsyncBehaviorTreePolicy::ReloadOnCompletion => {
-                            tokio::task::yield_now().await;
+                            yield_now().await;
                             child.reset(&mut shared);
                         }
                         AsyncBehaviorTreePolicy::RetainOnCompletion => {
@@ -82,7 +83,7 @@ impl AsyncBehaviorTree {
                     },
                     State::ResetNotification => {
                         reset_rx.mark_unchanged();
-                        tokio::task::yield_now().await;
+                        yield_now().await;
                         child.reset(&mut shared);
                         match behavior_policy {
                             AsyncBehaviorTreePolicy::ReloadOnCompletion => {}

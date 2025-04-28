@@ -90,11 +90,7 @@ impl<S> AsyncChild<S> {
         }
     }
 
-    pub async fn run(
-        &mut self,
-        delta: &mut tokio::sync::watch::Receiver<f64>,
-        shared: &mut S,
-    ) -> bool {
+    pub async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         let _ignore = self.status.send(Some(Status::Running));
         let success = self.action_type.run(delta, shared).await;
         let status = if success {
@@ -142,11 +138,11 @@ mod tests {
 
         let executor = TickedAsyncExecutor::default();
 
-        let mut shared = TestShared;
-        let mut delta = executor.tick_channel();
+        let shared = TestShared;
+        let delta = executor.tick_channel();
         executor
             .spawn_local("WaitFuture", async move {
-                child.run(&mut delta, &mut shared).await;
+                child.run(delta, &shared).await;
             })
             .detach();
 

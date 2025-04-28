@@ -1,6 +1,4 @@
-use behaviortree_common::ImmediateAction;
-
-use crate::AsyncAction;
+use crate::{AsyncAction, async_behavior_interface::ImmediateAction};
 
 pub enum AsyncActionType<S> {
     Immediate(Box<dyn ImmediateAction<S>>),
@@ -8,11 +6,7 @@ pub enum AsyncActionType<S> {
 }
 
 impl<S> AsyncActionType<S> {
-    pub async fn run(
-        &mut self,
-        delta: &mut tokio::sync::watch::Receiver<f64>,
-        shared: &mut S,
-    ) -> bool {
+    pub async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         match self {
             AsyncActionType::Immediate(immediate_action) => {
                 let dt = *delta.borrow_and_update();

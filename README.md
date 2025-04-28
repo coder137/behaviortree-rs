@@ -105,6 +105,13 @@ AsyncChild --> AsyncBehaviorTree
   - [x] Invert
   - [x] Sequence
   - [x] Select
-- [ ] Tracing
+- [x] Tracing
   - [x] BehaviorTree
+  - [x] AsyncBehaviorTree
+- [ ] Examples
+  - [ ] BehaviorTree
+    - [x] Simple Immediate
+    - [ ] Simple Sync
   - [ ] AsyncBehaviorTree
+    - [x] Simple Immediate
+    - [ ] Simple Async

@@ -1,3 +1,18 @@
+pub trait ImmediateAction<S> {
+    /// Runs the action in a single tick
+    ///
+    /// Cannot return `Status::Running`
+    /// true == `Status::Success`
+    /// false == `Status::Failure`
+    fn run(&mut self, delta: f64, shared: &S) -> bool;
+
+    /// Resets the current action to its initial/newly created state
+    fn reset(&mut self, shared: &mut S);
+
+    /// Identify your action
+    fn name(&self) -> &'static str;
+}
+
 #[async_trait::async_trait(?Send)]
 pub trait AsyncAction<S> {
     /// Asynchronously runs the action till completion
@@ -9,7 +24,7 @@ pub trait AsyncAction<S> {
     ///
     /// Once `run` has completed i.e returns `true`/`false`,
     /// clients should `reset` before `run`ning.
-    async fn run(&mut self, delta: &mut tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool;
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool;
 
     /// Resets the current action to its initial/newly created state
     fn reset(&mut self, shared: &mut S);
@@ -21,9 +36,7 @@ pub trait AsyncAction<S> {
 // TODO, Shift this also
 #[cfg(test)]
 pub mod test_async_behavior_interface {
-    use behaviortree_common::ImmediateAction;
-
-    use crate::async_action_type::AsyncActionType;
+    use crate::{async_action_type::AsyncActionType, util::yield_now};
 
     use super::*;
 
@@ -38,7 +51,7 @@ pub mod test_async_behavior_interface {
     }
 
     impl<S> ImmediateAction<S> for GenericTestImmediateAction {
-        fn run(&mut self, _delta: f64, _shared: &mut S) -> bool {
+        fn run(&mut self, _delta: f64, _shared: &S) -> bool {
             self.status
         }
 
@@ -69,17 +82,13 @@ pub mod test_async_behavior_interface {
 
     #[async_trait::async_trait(?Send)]
     impl<S> AsyncAction<S> for GenericTestAsyncAction {
-        async fn run(
-            &mut self,
-            delta: &mut tokio::sync::watch::Receiver<f64>,
-            _shared: &mut S,
-        ) -> bool {
+        async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &S) -> bool {
             loop {
                 let _r = delta.changed().await.unwrap();
                 let _dt = *delta.borrow_and_update();
                 self.elapsed += 1;
                 if self.elapsed < self.times {
-                    tokio::task::yield_now().await;
+                    yield_now().await;
                 } else {
                     break;
                 }

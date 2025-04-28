@@ -29,6 +29,7 @@ impl<S> BehaviorTree<S> {
         }
     }
 
+    #[tracing::instrument(level = "trace", name = "BehaviorTree::tick", skip(self), ret)]
     pub fn tick(&mut self, dt: f64) -> Status {
         if let Some(status) = self.child.status() {
             if status != Status::Running {
@@ -54,9 +55,9 @@ impl<S> BehaviorTree<S> {
         self.child.state()
     }
 
+    #[tracing::instrument(level = "trace", name = "BehaviorTree::reset", skip(self))]
     pub fn reset(&mut self) {
-        let shared = &mut self.shared;
-        self.child.reset(shared);
+        self.child.reset(&mut self.shared);
     }
 
     pub fn status(&self) -> Option<Status> {
