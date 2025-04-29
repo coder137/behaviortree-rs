@@ -21,9 +21,7 @@ impl<S> AsyncAction<S> for AsyncInvertState<S> {
     #[tracing::instrument(level = "trace", name = "Invert::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         match self.completed {
-            true => {
-                unreachable!()
-            }
+            true => unreachable!(),
             false => {}
         }
         let status = !self.child.run(delta, shared).await;
@@ -48,6 +46,7 @@ mod tests {
     use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     #[test]
     fn test_invert_success() {
@@ -95,6 +94,10 @@ mod tests {
 
     #[test]
     fn test_invert_running_with_reset() {
+        let _ignore = tracing_subscriber::Registry::default()
+            .with(tracing_forest::ForestLayer::default())
+            .try_init();
+
         let behavior =
             Behavior::Invert(Behavior::Action(TestAction::SuccessAfter { times: 2 }).into());
         let mut invert = AsyncChild::from_behavior(behavior);
@@ -102,14 +105,12 @@ mod tests {
         let executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
-
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta.clone(), &shared).await;
+                let status = invert.run(delta.clone(), &()).await;
                 assert!(!status);
-                invert.reset(&mut shared);
-                let status = invert.run(delta, &shared).await;
+                invert.reset(&());
+                let status = invert.run(delta, &()).await;
                 assert!(!status);
             })
             .detach();

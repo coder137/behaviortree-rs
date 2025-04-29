@@ -9,6 +9,7 @@ use crate::behavior_nodes::{
 pub struct AsyncChild<S> {
     action_type: AsyncActionType<S>,
     status: tokio::sync::watch::Sender<Option<Status>>,
+    _status_rx: tokio::sync::watch::Receiver<Option<Status>>,
 }
 
 impl<S> AsyncChild<S> {
@@ -16,9 +17,11 @@ impl<S> AsyncChild<S> {
         action_type: AsyncActionType<S>,
         status: tokio::sync::watch::Sender<Option<Status>>,
     ) -> Self {
+        let _status_rx = status.subscribe();
         Self {
             action_type,
             status,
+            _status_rx,
         }
     }
 
