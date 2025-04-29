@@ -81,10 +81,9 @@ mod tests {
 
     #[test]
     fn test_async_behaviortree() {
-        tracing_subscriber::Registry::default()
+        let _ignore = tracing_subscriber::Registry::default()
             .with(tracing_forest::ForestLayer::default())
-            .try_init()
-            .unwrap();
+            .try_init();
 
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
@@ -171,10 +170,9 @@ mod tests {
 
     #[test]
     fn test_async_behaviortree_shutdown() {
-        tracing_subscriber::Registry::default()
+        let _ignore = tracing_subscriber::Registry::default()
             .with(tracing_forest::ForestLayer::default())
-            .try_init()
-            .unwrap();
+            .try_init();
 
         let behavior = Behavior::Sequence(vec![
             Behavior::Invert(Box::new(Behavior::Action(TestAction::Failure))),

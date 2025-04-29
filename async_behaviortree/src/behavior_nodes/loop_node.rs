@@ -54,10 +54,9 @@ mod tests {
 
     #[test]
     fn test_loop_all_success() {
-        tracing_subscriber::Registry::default()
+        let _ignore = tracing_subscriber::Registry::default()
             .with(tracing_forest::ForestLayer::default())
-            .try_init()
-            .unwrap();
+            .try_init();
 
         let behavior = Behavior::Loop(vec![
             Behavior::Action(TestAction::Success),
@@ -82,10 +81,9 @@ mod tests {
 
     #[test]
     fn test_loop_with_failure() {
-        tracing_subscriber::Registry::default()
+        let _ignore = tracing_subscriber::Registry::default()
             .with(tracing_forest::ForestLayer::default())
-            .try_init()
-            .unwrap();
+            .try_init();
 
         let behavior = Behavior::Loop(vec![
             Behavior::Action(TestAction::Success),
