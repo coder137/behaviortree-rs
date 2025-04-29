@@ -16,7 +16,7 @@ impl<S> AsyncActionType<S> {
         }
     }
 
-    pub fn reset(&mut self, shared: &mut S) {
+    pub fn reset(&mut self, shared: &S) {
         match self {
             AsyncActionType::Immediate(immediate_action) => immediate_action.reset(shared),
             AsyncActionType::Async(async_action) => async_action.reset(shared),

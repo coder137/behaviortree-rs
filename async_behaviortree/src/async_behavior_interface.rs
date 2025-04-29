@@ -7,7 +7,7 @@ pub trait ImmediateAction<S> {
     fn run(&mut self, delta: f64, shared: &S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &mut S);
+    fn reset(&mut self, shared: &S);
 
     /// Identify your action
     fn name(&self) -> &'static str;
@@ -27,7 +27,7 @@ pub trait AsyncAction<S> {
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &mut S);
+    fn reset(&mut self, shared: &S);
 
     /// Identify your action
     fn name(&self) -> &'static str;
@@ -55,7 +55,7 @@ pub mod test_async_behavior_interface {
             self.status
         }
 
-        fn reset(&mut self, _shared: &mut S) {}
+        fn reset(&mut self, _shared: &S) {}
 
         fn name(&self) -> &'static str {
             self.name
@@ -96,7 +96,7 @@ pub mod test_async_behavior_interface {
             self.status
         }
 
-        fn reset(&mut self, _shared: &mut S) {
+        fn reset(&mut self, _shared: &S) {
             self.elapsed = 0;
         }
 

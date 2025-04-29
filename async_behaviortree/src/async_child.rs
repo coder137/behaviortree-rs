@@ -102,7 +102,7 @@ impl<S> AsyncChild<S> {
         success
     }
 
-    pub fn reset(&mut self, shared: &mut S) {
+    pub fn reset(&mut self, shared: &S) {
         if self.status.borrow().is_none() {
             return;
         }

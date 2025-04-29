@@ -32,7 +32,7 @@ impl<S> AsyncAction<S> for AsyncInvertState<S> {
     }
 
     #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all, ret)]
-    fn reset(&mut self, shared: &mut S) {
+    fn reset(&mut self, shared: &S) {
         self.child.reset(shared);
         self.completed = false;
     }

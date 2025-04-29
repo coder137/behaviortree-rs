@@ -37,7 +37,7 @@ impl<S> AsyncAction<S> for AsyncWaitState {
     }
 
     #[tracing::instrument(level = "trace", name = "Wait::reset", skip_all, ret)]
-    fn reset(&mut self, _shared: &mut S) {
+    fn reset(&mut self, _shared: &S) {
         self.elapsed = 0.0;
     }
 

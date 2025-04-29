@@ -78,7 +78,7 @@ impl ImmediateAction<OperationShared> for AddState {
     }
 
     #[tracing::instrument(level = "trace", name = "Add::reset", skip_all)]
-    fn reset(&mut self, _shared: &mut OperationShared) {}
+    fn reset(&mut self, _shared: &OperationShared) {}
 
     fn name(&self) -> &'static str {
         "Add"
@@ -116,7 +116,7 @@ impl ImmediateAction<OperationShared> for SubState {
     }
 
     #[tracing::instrument(level = "trace", name = "Sub::reset", skip_all)]
-    fn reset(&mut self, _shared: &mut OperationShared) {}
+    fn reset(&mut self, _shared: &OperationShared) {}
 
     fn name(&self) -> &'static str {
         "Sub"
