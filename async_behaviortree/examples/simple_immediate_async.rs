@@ -1,8 +1,6 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use async_behaviortree::{
-    AsyncActionType, AsyncBehaviorTree, AsyncBehaviorTreePolicy, ImmediateAction,
-};
+use async_behaviortree::{AsyncActionType, AsyncBehaviorTree, ImmediateAction};
 use behaviortree_common::Behavior;
 use ticked_async_executor::TickedAsyncExecutor;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -150,18 +148,17 @@ fn main() -> Result<(), String> {
     let executor = TickedAsyncExecutor::default();
     let delta_rx = executor.tick_channel();
 
-    let (future, controller) = AsyncBehaviorTree::new(
-        behavior,
-        AsyncBehaviorTreePolicy::RetainOnCompletion,
-        delta_rx,
-        operation_shared,
-    );
+    let (future, controller) = AsyncBehaviorTree::new(behavior, delta_rx, operation_shared);
 
     executor
         .spawn_local("AsyncBehaviorTree::future", future)
         .detach();
 
-    let state = controller.observer();
+    let state = controller.state();
+
+    executor.tick(0.1, None);
+    assert_eq!(executor.num_tasks(), 1);
+    tracing::info!("State: {:?}", state);
 
     executor.tick(0.1, None);
     assert_eq!(executor.num_tasks(), 1);

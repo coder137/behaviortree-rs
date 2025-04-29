@@ -11,6 +11,7 @@ tokio = { version = "1", default-features = false, features = [
     "macros",
     "sync",
 ] }
+tokio-util = "0.7"
 
 # Tracing
 tracing = "0.1"

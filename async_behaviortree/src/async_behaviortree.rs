@@ -1,36 +1,29 @@
-use std::future::Future;
-
 use behaviortree_common::Behavior;
 use behaviortree_common::State;
+use tokio_util::sync::CancellationToken;
 
 use crate::async_action_type::AsyncActionType;
 use crate::async_child::AsyncChild;
 use crate::util::yield_now;
 
-pub enum AsyncBehaviorTreePolicy {
-    /// Resets/Reloads the behavior tree once it is completed
-    ReloadOnCompletion,
-    /// On completion, needs manual reset
-    RetainOnCompletion,
-}
-
 pub struct AsyncBehaviorController {
-    observer: State,
-    reset_tx: tokio::sync::watch::Sender<()>,
-    shutdown_tx: tokio::sync::watch::Sender<()>,
+    state: State,
+    cancellation: CancellationToken,
 }
 
 impl AsyncBehaviorController {
-    pub fn observer(&self) -> State {
-        self.observer.clone()
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancellation.clone()
     }
 
-    pub fn reset(&self) {
-        let _ignore = self.reset_tx.send(());
+    pub fn state(&self) -> State {
+        self.state.clone()
     }
+}
 
-    pub fn shutdown(&self) {
-        let _ignore = self.shutdown_tx.send(());
+impl Drop for AsyncBehaviorController {
+    fn drop(&mut self) {
+        self.cancellation.cancel();
     }
 }
 
@@ -39,74 +32,36 @@ pub struct AsyncBehaviorTree;
 impl AsyncBehaviorTree {
     pub fn new<A, S>(
         behavior: Behavior<A>,
-        behavior_policy: AsyncBehaviorTreePolicy,
         delta: tokio::sync::watch::Receiver<f64>,
-        mut shared: S,
-    ) -> (impl Future<Output = ()>, AsyncBehaviorController)
+        shared: S,
+    ) -> (
+        impl std::future::Future<Output = ()>,
+        AsyncBehaviorController,
+    )
     where
         A: Into<AsyncActionType<S>>,
         S: 'static,
     {
-        let mut child = AsyncChild::from_behavior(behavior);
-        let observer = child.state();
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let cancellation_clone = cancellation.clone();
 
-        let (reset_tx, mut reset_rx) = tokio::sync::watch::channel(());
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(());
-        let behavior_future = async move {
-            enum State {
-                ChildCompleted,
-                ResetNotification,
-                ShutdownNotification,
-            }
-            loop {
-                let state = tokio::select! {
-                    _ = child.run(delta.clone(), &shared) => {
-                        State::ChildCompleted
-                    }
-                    _ = reset_rx.changed() => {
-                        State::ResetNotification
-                    }
-                    _ = shutdown_rx.changed() => {
-                        State::ShutdownNotification
-                    }
-                };
+        let (mut child, state) = AsyncChild::from_behavior_with_state(behavior);
 
-                match state {
-                    State::ChildCompleted => match behavior_policy {
-                        AsyncBehaviorTreePolicy::ReloadOnCompletion => {
-                            yield_now().await;
-                            child.reset(&mut shared);
-                        }
-                        AsyncBehaviorTreePolicy::RetainOnCompletion => {
-                            break;
-                        }
-                    },
-                    State::ResetNotification => {
-                        reset_rx.mark_unchanged();
-                        yield_now().await;
-                        child.reset(&mut shared);
-                        match behavior_policy {
-                            AsyncBehaviorTreePolicy::ReloadOnCompletion => {}
-                            AsyncBehaviorTreePolicy::RetainOnCompletion => {
-                                break;
-                            }
-                        }
-                    }
-                    State::ShutdownNotification => {
-                        shutdown_rx.mark_unchanged();
-                        child.reset(&mut shared);
-                        break;
-                    }
-                }
-            }
+        let future = async move {
+            let _status = cancellation_clone
+                .run_until_cancelled_owned(async {
+                    let status = child.run(delta, &shared).await;
+                    yield_now().await;
+                    status
+                })
+                .await;
+            child.reset(&shared);
         };
-
         (
-            behavior_future,
+            future,
             AsyncBehaviorController {
-                observer,
-                reset_tx,
-                shutdown_tx,
+                state,
+                cancellation,
             },
         )
     }
@@ -119,13 +74,18 @@ mod tests {
     use super::*;
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
-    use tokio::select;
     use tokio_stream::StreamExt;
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
 
     #[test]
     fn test_async_behaviortree() {
+        tracing_subscriber::Registry::default()
+            .with(tracing_forest::ForestLayer::default())
+            .try_init()
+            .unwrap();
+
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
@@ -134,21 +94,16 @@ mod tests {
         let executor = TickedAsyncExecutor::default();
         let shared = TestShared;
 
-        let (behaviortree_future, _controller) = AsyncBehaviorTree::new(
-            behavior,
-            AsyncBehaviorTreePolicy::RetainOnCompletion,
-            executor.tick_channel(),
-            shared,
-        );
+        let (behaviortree_future, controller) =
+            AsyncBehaviorTree::new(behavior, executor.tick_channel(), shared);
 
-        let observer = _controller.observer.clone();
-        let (shut_tx, mut shut_rx) = tokio::sync::mpsc::channel::<()>(1);
+        let state = controller.state();
+        let cancel = controller.cancel_token();
         executor
             .spawn_local("AsyncObserver", async move {
                 let mut streams = tokio_stream::StreamMap::new();
-                let mut counter = 0;
 
-                let mut pending_queue = VecDeque::from_iter([&observer]);
+                let mut pending_queue = VecDeque::from_iter([&state]);
                 loop {
                     let tobs = pending_queue.pop_front();
                     let tobs = match tobs {
@@ -157,26 +112,21 @@ mod tests {
                             break;
                         }
                     };
-                    let rx = match tobs {
-                        State::NoChild(_name, rx) => rx,
-                        State::SingleChild(_name, rx, child) => {
+                    let (name, rx) = match tobs {
+                        State::NoChild(name, rx) => (name, rx),
+                        State::SingleChild(name, rx, child) => {
                             pending_queue.push_back(&*child);
-                            rx
+                            (name, rx)
                         }
-                        State::MultipleChildren(_name, rx, children) => {
+                        State::MultipleChildren(name, rx, children) => {
                             for child in children.iter() {
                                 pending_queue.push_back(child);
                             }
-                            rx
+                            (name, rx)
                         }
                     };
-                    // let data = (counter, *rx.borrow());
-                    // println!("Data: {:?}", data);
-                    streams.insert(
-                        counter,
-                        tokio_stream::wrappers::WatchStream::new(rx.clone()),
-                    );
-                    counter += 1;
+
+                    streams.insert(name, tokio_stream::wrappers::WatchStream::new(rx.clone()));
                 }
 
                 let fut = async move {
@@ -188,14 +138,10 @@ mod tests {
                                 break;
                             }
                         };
-                        println!("Data: {:?}", data);
+                        tracing::info!("State: {:?}", data);
                     }
                 };
-
-                select! {
-                    _ = fut => {}
-                    _ = shut_rx.recv() => {}
-                }
+                let _r = cancel.run_until_cancelled(fut).await;
             })
             .detach();
         executor.tick(DELTA, None);
@@ -204,71 +150,55 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
+        tracing::info!("Start 1");
         executor.tick(DELTA, None);
+        assert_eq!(executor.num_tasks(), 2);
+
+        tracing::info!("2");
         executor.tick(DELTA, None);
+        assert_eq!(executor.num_tasks(), 2);
+
+        tracing::info!("3");
         executor.tick(DELTA, None);
-        let _r = shut_tx.try_send(());
+        assert_eq!(executor.num_tasks(), 1);
+
+        tracing::info!("4");
         executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
-    }
 
-    #[test]
-    fn test_async_behaviortree_early_reset() {
-        let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestAction::Success),
-            Behavior::Action(TestAction::Success),
-        ]);
-
-        let executor = TickedAsyncExecutor::default();
-        let shared = TestShared;
-
-        let (behaviortree_future, controller) = AsyncBehaviorTree::new(
-            behavior,
-            AsyncBehaviorTreePolicy::RetainOnCompletion,
-            executor.tick_channel(),
-            shared,
-        );
-
-        executor
-            .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
-            .detach();
-
-        executor.tick(DELTA, None);
-        controller.reset();
-
-        executor.tick(DELTA, None);
-        executor.tick(DELTA, None);
-        assert_eq!(executor.num_tasks(), 0);
+        tracing::info!("End 5");
     }
 
     #[test]
     fn test_async_behaviortree_shutdown() {
+        tracing_subscriber::Registry::default()
+            .with(tracing_forest::ForestLayer::default())
+            .try_init()
+            .unwrap();
+
         let behavior = Behavior::Sequence(vec![
             Behavior::Invert(Box::new(Behavior::Action(TestAction::Failure))),
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
+        let behavior = Behavior::Loop(vec![behavior]);
 
         let executor = TickedAsyncExecutor::default();
         let shared = TestShared;
 
-        let (behaviortree_future, controller) = AsyncBehaviorTree::new(
-            behavior,
-            AsyncBehaviorTreePolicy::ReloadOnCompletion,
-            executor.tick_channel(),
-            shared,
-        );
+        let (behaviortree_future, controller) =
+            AsyncBehaviorTree::new(behavior, executor.tick_channel(), shared);
 
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        let observer = controller.observer();
+        let state = controller.state();
         for _ in 0..10 {
             executor.tick(DELTA, None);
-            println!("Observer: {observer:?}");
+            tracing::info!("Observer: {state:?}");
         }
-        controller.shutdown();
+        drop(controller);
 
         while executor.num_tasks() != 0 {
             executor.tick(DELTA, None);
