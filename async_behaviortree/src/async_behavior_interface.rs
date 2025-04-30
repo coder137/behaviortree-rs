@@ -113,6 +113,8 @@ pub mod test_async_behavior_interface {
     pub enum TestAction {
         Success,
         Failure,
+        SuccessNamed { name: &'static str },
+        FailureNamed { name: &'static str },
         SuccessAfter { times: usize },
         FailureAfter { times: usize },
     }
@@ -130,6 +132,17 @@ pub mod test_async_behavior_interface {
                 TestAction::Failure => {
                     let action = Box::new(GenericTestImmediateAction {
                         name: "Failure",
+                        status: false,
+                    });
+                    AsyncActionType::Immediate(action)
+                }
+                TestAction::SuccessNamed { name } => {
+                    let action = Box::new(GenericTestImmediateAction { name, status: true });
+                    AsyncActionType::Immediate(action)
+                }
+                TestAction::FailureNamed { name } => {
+                    let action = Box::new(GenericTestImmediateAction {
+                        name,
                         status: false,
                     });
                     AsyncActionType::Immediate(action)

@@ -1,12 +1,12 @@
 use crate::{AsyncAction, async_child::AsyncChild, util::yield_now};
 
 pub struct AsyncLoopState<S> {
-    children: Vec<AsyncChild<S>>,
+    child: AsyncChild<S>,
 }
 
 impl<S> AsyncLoopState<S> {
-    pub fn new(children: Vec<AsyncChild<S>>) -> Self {
-        Self { children }
+    pub fn new(child: AsyncChild<S>) -> Self {
+        Self { child }
     }
 }
 
@@ -15,26 +15,15 @@ impl<S> AsyncAction<S> for AsyncLoopState<S> {
     #[tracing::instrument(level = "trace", name = "Loop::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         loop {
-            for child in self.children.iter_mut() {
-                let child_status = child.run(delta.clone(), shared).await;
-                yield_now().await;
-                if !child_status {
-                    break;
-                }
-            }
-
-            // We reset if all children succeeded
-            self.children.iter_mut().for_each(|child| {
-                child.reset(shared);
-            });
+            let _child_status = self.child.run(delta.clone(), shared).await;
+            yield_now().await;
+            self.child.reset(shared);
         }
     }
 
     #[tracing::instrument(level = "trace", name = "Loop::reset", skip_all, ret)]
     fn reset(&mut self, shared: &S) {
-        self.children.iter_mut().for_each(|child| {
-            child.reset(shared);
-        });
+        self.child.reset(shared);
     }
 
     fn name(&self) -> &'static str {
@@ -58,11 +47,12 @@ mod tests {
             .with(tracing_forest::ForestLayer::default())
             .try_init();
 
-        let behavior = Behavior::Loop(vec![
+        let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
+        let behavior = Behavior::Loop(behavior.into());
         let (mut async_loop, state) = AsyncChild::from_behavior_with_state(behavior);
 
         let executor = TickedAsyncExecutor::default();
@@ -85,11 +75,12 @@ mod tests {
             .with(tracing_forest::ForestLayer::default())
             .try_init();
 
-        let behavior = Behavior::Loop(vec![
+        let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Failure),
             Behavior::Action(TestAction::Success),
         ]);
+        let behavior = Behavior::Loop(behavior.into());
         let (mut async_loop, state) = AsyncChild::from_behavior_with_state(behavior);
 
         let executor = TickedAsyncExecutor::default();

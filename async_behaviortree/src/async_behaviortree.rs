@@ -179,7 +179,7 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let behavior = Behavior::Loop(vec![behavior]);
+        let behavior = Behavior::Loop(Box::new(behavior));
 
         let executor = TickedAsyncExecutor::default();
         let shared = TestShared;

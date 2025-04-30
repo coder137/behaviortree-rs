@@ -93,18 +93,14 @@ impl<S> AsyncChild<S> {
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
-            Behavior::Loop(children) => {
-                let (children, children_state): (Vec<_>, Vec<_>) = children
-                    .into_iter()
-                    .map(|child| AsyncChild::from_behavior_with_state(child))
-                    .unzip();
-                let children_state = std::rc::Rc::from_iter(children_state);
+            Behavior::Loop(child) => {
+                let (child, child_state) = Self::from_behavior_with_state(*child);
 
-                let action = Box::new(AsyncLoopState::new(children));
+                let action = Box::new(AsyncLoopState::new(child));
                 let action = AsyncActionType::Async(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
-                let state = State::MultipleChildren(action.name(), rx, children_state);
+                let state = State::SingleChild(action.name(), rx, child_state.into());
                 (Self::new(action, tx), state)
             }
         }
