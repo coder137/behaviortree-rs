@@ -12,6 +12,7 @@ pub enum BehaviorTreePolicy {
 pub struct BehaviorTree<S> {
     behavior_policy: BehaviorTreePolicy,
     child: Child<S>,
+    state: State,
     shared: S,
 }
 
@@ -21,10 +22,11 @@ impl<S> BehaviorTree<S> {
         A: Into<ActionType<S>>,
         S: 'static,
     {
-        let child = Child::from_behavior(behavior);
+        let (child, state) = Child::from_behavior_with_state(behavior);
         Self {
             behavior_policy,
             child,
+            state,
             shared,
         }
     }
@@ -52,7 +54,7 @@ impl<S> BehaviorTree<S> {
     }
 
     pub fn state(&self) -> State {
-        self.child.state()
+        self.state.clone()
     }
 
     #[tracing::instrument(level = "trace", name = "BehaviorTree::reset", skip(self))]
