@@ -87,6 +87,18 @@ impl<S> Child<S> {
 
                 Self::new(action, tx, state)
             }
+            Behavior::Loop(child) => {
+                let child = Child::from_behavior(*child);
+                let child_state = child.state();
+
+                let action = Box::new(LoopState::new(child));
+                let action = ActionType::Sync(action);
+
+                let (tx, rx) = tokio::sync::watch::channel(None);
+                let state = State::SingleChild(action.name(), rx, child_state.into());
+
+                Self::new(action, tx, state)
+            }
         }
     }
 
