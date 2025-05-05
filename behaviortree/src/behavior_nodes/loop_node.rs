@@ -22,7 +22,8 @@ impl<S> SyncAction<S> for LoopState<S> {
             }
         }
 
-        self.child.tick(delta, shared)
+        let _child_status = self.child.tick(delta, shared);
+        Status::Running
     }
 
     fn reset(&mut self, shared: &mut S) {
