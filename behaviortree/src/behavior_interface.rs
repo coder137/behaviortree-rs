@@ -115,8 +115,6 @@ pub mod test_behavior_interface {
         fn into(self) -> ActionType<TestShared> {
             match self {
                 TestAction::Success => {
-                    // let action = Box::new(GenericTestSyncAction::new("Success".into(), true, 1));
-                    // ActionType::Sync()
                     let action = Box::new(GenericTestImmediateAction {
                         name: "Success",
                         status: true,

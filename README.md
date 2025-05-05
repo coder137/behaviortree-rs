@@ -1,5 +1,7 @@
 # behaviortree-rs
 
+# Class Diagram
+
 ```mermaid
 classDiagram
 
@@ -101,10 +103,23 @@ AsyncChild --> AsyncBehaviorTree
 - [x] SyncAction trait
 - [x] AsyncAction trait
 - [ ] Behavior Nodes
-  - [x] Wait
-  - [x] Invert
-  - [x] Sequence
-  - [x] Select
+  - [ ] Action
+    - [x] Wait
+  - [ ] Decorator
+    - [x] Invert
+    - [ ] ForceSuccess
+    - [ ] ForceFailure
+    - [ ] Repeat
+    - [ ] RunTillSuccess
+    - [ ] RunTillFailure
+  - [ ] Control
+    - [x] Sequence
+    - [x] Select
+    - [x] Loop
+    - [ ] ReactiveSequence/WhileTrue
+    - [ ] WhileRunning
+    - [ ] ReactiveSelect/WhileFalse
+    - [ ] Parallel
 - [x] Tracing
   - [x] BehaviorTree
   - [x] AsyncBehaviorTree

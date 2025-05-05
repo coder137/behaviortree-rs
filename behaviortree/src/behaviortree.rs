@@ -2,29 +2,22 @@ use behaviortree_common::{Behavior, State, Status};
 
 use crate::{action_type::ActionType, child::Child};
 
-pub enum BehaviorTreePolicy {
-    /// Resets/Reloads the behavior tree once it is completed
-    ReloadOnCompletion,
-    /// On completion, needs manual reset
-    RetainOnCompletion,
-}
-
 pub struct BehaviorTree<S> {
-    behavior_policy: BehaviorTreePolicy,
     child: Child<S>,
+    state: State,
     shared: S,
 }
 
 impl<S> BehaviorTree<S> {
-    pub fn new<A>(behavior: Behavior<A>, behavior_policy: BehaviorTreePolicy, shared: S) -> Self
+    pub fn new<A>(behavior: Behavior<A>, shared: S) -> Self
     where
         A: Into<ActionType<S>>,
         S: 'static,
     {
-        let child = Child::from_behavior(behavior);
+        let (child, state) = Child::from_behavior_with_state(behavior);
         Self {
-            behavior_policy,
             child,
+            state,
             shared,
         }
     }
@@ -33,17 +26,7 @@ impl<S> BehaviorTree<S> {
     pub fn tick(&mut self, dt: f64) -> Status {
         if let Some(status) = self.child.status() {
             if status != Status::Running {
-                match self.behavior_policy {
-                    BehaviorTreePolicy::ReloadOnCompletion => {
-                        self.reset();
-                        // Ticks the action below
-                    }
-                    BehaviorTreePolicy::RetainOnCompletion => {
-                        // Do nothing!
-                        // `status` returns the already completed value
-                        return status;
-                    }
-                }
+                return status;
             }
         }
 
@@ -52,7 +35,7 @@ impl<S> BehaviorTree<S> {
     }
 
     pub fn state(&self) -> State {
-        self.child.state()
+        self.state.clone()
     }
 
     #[tracing::instrument(level = "trace", name = "BehaviorTree::reset", skip(self))]
@@ -67,27 +50,41 @@ impl<S> BehaviorTree<S> {
 
 #[cfg(test)]
 mod tests {
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
     use super::*;
     use crate::test_behavior_interface::{TestAction, TestShared};
 
     #[test]
     fn behavior_tree_with_reset() {
+        let _ignore = tracing_subscriber::Registry::default()
+            .with(tracing_forest::ForestLayer::default())
+            .try_init();
+
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut tree =
-            BehaviorTree::new(behavior, BehaviorTreePolicy::RetainOnCompletion, TestShared);
+        let mut tree = BehaviorTree::new(behavior, TestShared);
+        let state = tree.state();
 
         // For unit tests
         let _state = tree.state();
         assert_eq!(tree.status(), None);
+        tracing::info!("State: {state:?}");
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
+        tracing::info!("State: {state:?}");
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
+        tracing::info!("State: {state:?}");
+
+        // Ticking again returns the same status
+        let status = tree.tick(0.1);
+        assert_eq!(status, Status::Success);
+        tracing::info!("State: {state:?}");
 
         tree.reset();
 
@@ -104,14 +101,14 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut tree =
-            BehaviorTree::new(behavior, BehaviorTreePolicy::ReloadOnCompletion, TestShared);
+        let behavior = Behavior::Loop(behavior.into());
+        let mut tree = BehaviorTree::new(behavior, TestShared);
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1);
-        assert_eq!(status, Status::Success);
+        assert_eq!(status, Status::Running);
 
         // Automatically resets after success (Reload on Completion)
 
@@ -119,6 +116,6 @@ mod tests {
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1);
-        assert_eq!(status, Status::Success);
+        assert_eq!(status, Status::Running);
     }
 }

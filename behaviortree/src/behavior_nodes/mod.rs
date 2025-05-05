@@ -12,3 +12,6 @@ pub use sequence_node::*;
 
 mod select_node;
 pub use select_node::*;
+
+mod loop_node;
+pub use loop_node::*;

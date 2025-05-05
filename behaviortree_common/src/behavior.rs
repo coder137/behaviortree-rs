@@ -26,4 +26,8 @@ pub enum Behavior<A> {
     /// Fails if the last behavior fails.
     /// Can be thought of as a short-circuited logical OR gate.
     Select(Vec<Behavior<A>>),
+    /// Runs behavior in a loop
+    ///
+    /// If behavior fails / suceeds, reset and restart the behavior
+    Loop(Box<Behavior<A>>),
 }

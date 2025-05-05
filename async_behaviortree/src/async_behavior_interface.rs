@@ -7,7 +7,7 @@ pub trait ImmediateAction<S> {
     fn run(&mut self, delta: f64, shared: &S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &mut S);
+    fn reset(&mut self, shared: &S);
 
     /// Identify your action
     fn name(&self) -> &'static str;
@@ -27,7 +27,7 @@ pub trait AsyncAction<S> {
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &mut S);
+    fn reset(&mut self, shared: &S);
 
     /// Identify your action
     fn name(&self) -> &'static str;
@@ -51,11 +51,13 @@ pub mod test_async_behavior_interface {
     }
 
     impl<S> ImmediateAction<S> for GenericTestImmediateAction {
+        #[tracing::instrument(level = "trace", name = "GenericTestImmediateAction::run", fields(name=<GenericTestImmediateAction as ImmediateAction<S>>::name(self)), skip_all, ret)]
         fn run(&mut self, _delta: f64, _shared: &S) -> bool {
             self.status
         }
 
-        fn reset(&mut self, _shared: &mut S) {}
+        #[tracing::instrument(level = "trace", name = "GenericTestImmediateAction::reset", fields(name=<GenericTestImmediateAction as ImmediateAction<S>>::name(self)), skip_all)]
+        fn reset(&mut self, _shared: &S) {}
 
         fn name(&self) -> &'static str {
             self.name
@@ -82,6 +84,7 @@ pub mod test_async_behavior_interface {
 
     #[async_trait::async_trait(?Send)]
     impl<S> AsyncAction<S> for GenericTestAsyncAction {
+        #[tracing::instrument(level = "trace", name = "GenericTestAsyncAction::run", fields(name=<GenericTestAsyncAction as AsyncAction<S>>::name(self)), skip_all, ret)]
         async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &S) -> bool {
             loop {
                 let _r = delta.changed().await.unwrap();
@@ -96,7 +99,8 @@ pub mod test_async_behavior_interface {
             self.status
         }
 
-        fn reset(&mut self, _shared: &mut S) {
+        #[tracing::instrument(level = "trace", name = "GenericTestAsyncAction::reset", fields(name=<GenericTestAsyncAction as AsyncAction<S>>::name(self)), skip_all)]
+        fn reset(&mut self, _shared: &S) {
             self.elapsed = 0;
         }
 
@@ -109,6 +113,8 @@ pub mod test_async_behavior_interface {
     pub enum TestAction {
         Success,
         Failure,
+        SuccessNamed { name: &'static str },
+        FailureNamed { name: &'static str },
         SuccessAfter { times: usize },
         FailureAfter { times: usize },
     }
@@ -126,6 +132,17 @@ pub mod test_async_behavior_interface {
                 TestAction::Failure => {
                     let action = Box::new(GenericTestImmediateAction {
                         name: "Failure",
+                        status: false,
+                    });
+                    AsyncActionType::Immediate(action)
+                }
+                TestAction::SuccessNamed { name } => {
+                    let action = Box::new(GenericTestImmediateAction { name, status: true });
+                    AsyncActionType::Immediate(action)
+                }
+                TestAction::FailureNamed { name } => {
+                    let action = Box::new(GenericTestImmediateAction {
+                        name,
                         status: false,
                     });
                     AsyncActionType::Immediate(action)
