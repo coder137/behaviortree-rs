@@ -55,7 +55,7 @@ mod tests {
 
     #[test]
     fn test_wait_success() {
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let mut wait = AsyncWaitState::new(0.0);
 
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn test_wait_success_with_time() {
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let mut wait = AsyncWaitState::new(1.0);
 
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_wait_running() {
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let mut wait: Box<dyn AsyncAction<TestShared>> = Box::new(AsyncWaitState::new(49.0));
 
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_executor_drop() {
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let mut wait = AsyncWaitState::new(50.0);
 

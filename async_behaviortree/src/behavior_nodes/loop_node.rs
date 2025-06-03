@@ -55,7 +55,7 @@ mod tests {
         let behavior = Behavior::Loop(behavior.into());
         let (mut async_loop, state) = AsyncChild::from_behavior_with_state(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
         let delta_rx = executor.tick_channel();
         executor
             .spawn_local("_", async move {
@@ -83,7 +83,7 @@ mod tests {
         let behavior = Behavior::Loop(behavior.into());
         let (mut async_loop, state) = AsyncChild::from_behavior_with_state(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
         let delta_rx = executor.tick_channel();
 
         let cancel = tokio_util::sync::CancellationToken::new();

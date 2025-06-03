@@ -31,7 +31,7 @@ mod tests {
 
     #[test]
     fn test_yield_now() {
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         executor
             .spawn_local("", async {

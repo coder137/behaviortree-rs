@@ -90,7 +90,7 @@ mod tests {
             Behavior::Action(TestAction::Success),
         ]);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
         let shared = TestShared;
 
         let (behaviortree_future, controller) =
@@ -181,7 +181,7 @@ mod tests {
         ]);
         let behavior = Behavior::Loop(Box::new(behavior));
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
         let shared = TestShared;
 
         let (behaviortree_future, controller) =
