@@ -26,6 +26,7 @@ impl<S> AsyncChild<S> {
         }
     }
 
+    #[cfg(test)]
     pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
     where
         A: Into<AsyncActionType<S>>,

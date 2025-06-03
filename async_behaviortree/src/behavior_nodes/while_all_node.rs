@@ -89,7 +89,6 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
 mod tests {
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
-    use tracing_forest::ForestLayer;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
