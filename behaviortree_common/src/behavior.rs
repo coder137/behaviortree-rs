@@ -28,10 +28,17 @@ pub enum Behavior<A> {
     Select(Vec<Behavior<A>>),
     /// Runs behavior in a loop
     ///
-    /// If behavior fails / suceeds, reset and restart the behavior
+    /// If behavior fails / succeeds, reset and restart the behavior
     Loop(Box<Behavior<A>>),
-
-    /// While conditional behavior is running / success
-    /// Run the child behavior
+    /// Run this behavior while all conditional actions are running / success
+    /// and child behavior is running / success
+    /// Fails if any conditional action or the child behavior fails
+    ///
+    /// If the child behavior succeeds, reset and restart the behavior
+    /// If all conditional actions succeed, reset and restart the actions
+    ///
+    /// Important:
+    /// - Conditional actions are meant to be immediate checks and should
+    /// ideally not return `Status::Running`
     WhileAll(Vec<A>, Box<Behavior<A>>),
 }
