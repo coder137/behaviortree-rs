@@ -30,4 +30,8 @@ pub enum Behavior<A> {
     ///
     /// If behavior fails / suceeds, reset and restart the behavior
     Loop(Box<Behavior<A>>),
+
+    /// While conditional behavior is running / success
+    /// Run the child behavior
+    WhileAll(Vec<A>, Box<Behavior<A>>),
 }
