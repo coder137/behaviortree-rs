@@ -45,7 +45,6 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
                 }
                 yield_now().await;
             }
-
             failure_token.cancel();
         }
         .instrument(tracing::trace_span!("ConditionsFuture"));
@@ -53,8 +52,11 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
         let child_future = async {
             loop {
                 let status = self.child.run(delta.clone(), shared).await;
+
+                // Reset
                 self.child.reset(shared);
 
+                //
                 if !status {
                     break;
                 }
@@ -68,10 +70,14 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
             failure_token.run_until_cancelled(conditions_future),
             failure_token.run_until_cancelled(child_future)
         );
+
+        // NOTE: This reset is important here since the condition task could return failure abruptly
+        // In that case the child task should stop gracefully
+        self.reset(shared);
         false
     }
 
-    /// Resets the current action to its initial/newly created state
+    #[tracing::instrument(level = "trace", name = "WhileAll::reset", skip_all, ret)]
     fn reset(&mut self, shared: &S) {
         self.conditions.iter_mut().for_each(|condition| {
             condition.reset(shared);
@@ -79,7 +85,6 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
         self.child.reset(shared);
     }
 
-    /// Identify your action
     fn name(&self) -> &'static str {
         "WhileAll"
     }

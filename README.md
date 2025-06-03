@@ -116,9 +116,8 @@ AsyncChild --> AsyncBehaviorTree
     - [x] Sequence
     - [x] Select
     - [x] Loop
-    - [ ] ReactiveSequence/WhileTrue
-    - [ ] WhileRunning
-    - [ ] ReactiveSelect/WhileFalse
+    - [x] WhileAll
+    - [ ] WhileAny
     - [ ] Parallel
 - [x] Tracing
   - [x] BehaviorTree
