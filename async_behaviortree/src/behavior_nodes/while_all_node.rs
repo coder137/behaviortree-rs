@@ -19,15 +19,17 @@ impl<S> AsyncWhileAll<S> {
         delta: tokio::sync::watch::Receiver<f64>,
         shared: &S,
         failure_token: CancellationToken,
+        allow_failure: bool,
     ) {
         let future = async {
             loop {
                 let status = child.run(delta.clone(), shared).await;
-                if !status {
+                // If we allow failure and the child returns a filure, then we exit
+                if allow_failure && !status {
                     break;
                 }
                 yield_now().await;
-                child.reset(shared);
+                child.reset_action(shared);
             }
             failure_token.cancel();
         };
@@ -44,13 +46,17 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
         let mut futures = self
             .conditions
             .iter_mut()
-            .map(|child| Self::handle_child(child, delta.clone(), shared, failure_token.clone()))
+            .map(|child| {
+                Self::handle_child(child, delta.clone(), shared, failure_token.clone(), true)
+            })
             .collect::<Vec<_>>();
+        // NOTE: child should not be able to mark failure even if it fails
         futures.push(Self::handle_child(
             &mut self.child,
             delta,
             shared,
             failure_token,
+            false,
         ));
         futures::future::join_all(futures).await;
 
@@ -95,11 +101,11 @@ mod tests {
         let behavior = Behavior::WhileAll(
             vec![
                 Behavior::Action(TestAction::Success),
-                Behavior::Action(TestAction::Success),
+                Behavior::Action(TestAction::Failure),
             ],
             Behavior::Sequence(vec![
                 Behavior::Action(TestAction::Success),
-                Behavior::Action(TestAction::Failure),
+                Behavior::Action(TestAction::Success),
             ])
             .into(),
         );
@@ -125,10 +131,6 @@ mod tests {
 
         executor.tick(DELTA, None);
         tracing::info!("TICK 2");
-        assert_eq!(executor.num_tasks(), 1);
-
-        executor.tick(DELTA, None);
-        tracing::info!("TICK 3");
         assert_eq!(executor.num_tasks(), 0);
     }
 }
