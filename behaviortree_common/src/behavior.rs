@@ -40,5 +40,5 @@ pub enum Behavior<A> {
     /// Important:
     /// - Conditional actions are meant to be immediate checks and should
     /// ideally not return `Status::Running`
-    WhileAll(Vec<A>, Box<Behavior<A>>),
+    WhileAll(Vec<Behavior<A>>, Box<Behavior<A>>),
 }

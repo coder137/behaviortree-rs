@@ -13,6 +13,8 @@ behaviortree_common = { path = "../behaviortree_common" }
 
 async-trait = "0.1.80"
 
+futures = "0.3.31"
+
 [dev-dependencies]
 serde_json = { workspace = true }
 tracing-subscriber = { workspace = true }

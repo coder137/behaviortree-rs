@@ -102,7 +102,7 @@ impl<S> AsyncChild<S> {
             Behavior::WhileAll(conditions, child) => {
                 let (conditions, mut children_states): (Vec<_>, Vec<_>) = conditions
                     .into_iter()
-                    .map(|condition| Self::from_action_with_state(condition))
+                    .map(|condition| Self::from_behavior_with_state(condition))
                     .unzip();
 
                 //
@@ -133,12 +133,19 @@ impl<S> AsyncChild<S> {
         success
     }
 
+    // Reset action and status
     pub fn reset(&mut self, shared: &S) {
         if self.status.borrow().is_none() {
             return;
         }
         self.action_type.reset(shared);
         let _ignore = self.status.send(None);
+    }
+
+    // Reset action
+    // Does not reset the status
+    pub fn reset_action(&mut self, shared: &S) {
+        self.action_type.reset(shared);
     }
 
     fn from_action_with_state<A>(action: A) -> (Self, State)

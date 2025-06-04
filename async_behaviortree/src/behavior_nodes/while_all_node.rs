@@ -1,4 +1,4 @@
-use tracing::Instrument;
+use tokio_util::sync::CancellationToken;
 
 use crate::AsyncAction;
 use crate::async_child::AsyncChild;
@@ -13,6 +13,26 @@ impl<S> AsyncWhileAll<S> {
     pub fn new(conditions: Vec<AsyncChild<S>>, child: AsyncChild<S>) -> Self {
         Self { conditions, child }
     }
+
+    async fn handle_child(
+        child: &mut AsyncChild<S>,
+        delta: tokio::sync::watch::Receiver<f64>,
+        shared: &S,
+        failure_token: CancellationToken,
+    ) {
+        let future = async {
+            loop {
+                let status = child.run(delta.clone(), shared).await;
+                if !status {
+                    break;
+                }
+                yield_now().await;
+                child.reset(shared);
+            }
+            failure_token.cancel();
+        };
+        failure_token.run_until_cancelled(future).await;
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -21,59 +41,24 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
         let failure_token = tokio_util::sync::CancellationToken::new();
 
-        let delta_clone = delta.clone();
-        let conditions_future = async {
-            loop {
-                // Check conditions
-                let mut conditions_status = true;
-                for condition in self.conditions.iter_mut() {
-                    let status = condition.run(delta_clone.clone(), shared).await;
-                    if !status {
-                        conditions_status = false;
-                        break;
-                    }
-                }
+        let mut futures = self
+            .conditions
+            .iter_mut()
+            .map(|child| Self::handle_child(child, delta.clone(), shared, failure_token.clone()))
+            .collect::<Vec<_>>();
+        futures.push(Self::handle_child(
+            &mut self.child,
+            delta,
+            shared,
+            failure_token,
+        ));
+        futures::future::join_all(futures).await;
 
-                //
-                if !conditions_status {
-                    break;
-                }
-                yield_now().await;
-
-                // Reset
-                self.conditions.iter_mut().for_each(|condition| {
-                    condition.reset(shared);
-                });
-            }
-            failure_token.cancel();
-        }
-        .instrument(tracing::trace_span!("ConditionsFuture"));
-
-        let child_future = async {
-            loop {
-                let status = self.child.run(delta.clone(), shared).await;
-
-                //
-                if !status {
-                    break;
-                }
-                yield_now().await;
-
-                // Reset
-                self.child.reset(shared);
-            }
-            failure_token.cancel();
-        }
-        .instrument(tracing::trace_span!("ChildFuture"));
-
-        tokio::join!(
-            failure_token.run_until_cancelled(conditions_future),
-            failure_token.run_until_cancelled(child_future)
-        );
-
-        // NOTE: This reset is important here since the condition task could return failure abruptly
-        // In that case the child task should stop gracefully
-        self.child.reset(shared);
+        // Reset action only
+        self.conditions.iter_mut().for_each(|condition| {
+            condition.reset_action(shared);
+        });
+        self.child.reset_action(shared);
         false
     }
 
@@ -108,7 +93,10 @@ mod tests {
             .try_init();
 
         let behavior = Behavior::WhileAll(
-            vec![TestAction::Success, TestAction::Success],
+            vec![
+                Behavior::Action(TestAction::Success),
+                Behavior::Action(TestAction::Success),
+            ],
             Behavior::Sequence(vec![
                 Behavior::Action(TestAction::Success),
                 Behavior::Action(TestAction::Failure),
@@ -137,6 +125,10 @@ mod tests {
 
         executor.tick(DELTA, None);
         tracing::info!("TICK 2");
+        assert_eq!(executor.num_tasks(), 1);
+
+        executor.tick(DELTA, None);
+        tracing::info!("TICK 3");
         assert_eq!(executor.num_tasks(), 0);
     }
 }
