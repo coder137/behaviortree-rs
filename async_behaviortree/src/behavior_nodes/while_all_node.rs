@@ -34,16 +34,16 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
                     }
                 }
 
-                // Reset
-                self.conditions.iter_mut().for_each(|condition| {
-                    condition.reset(shared);
-                });
-
                 //
                 if !conditions_status {
                     break;
                 }
                 yield_now().await;
+
+                // Reset
+                self.conditions.iter_mut().for_each(|condition| {
+                    condition.reset(shared);
+                });
             }
             failure_token.cancel();
         }
@@ -53,14 +53,14 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
             loop {
                 let status = self.child.run(delta.clone(), shared).await;
 
-                // Reset
-                self.child.reset(shared);
-
                 //
                 if !status {
                     break;
                 }
                 yield_now().await;
+
+                // Reset
+                self.child.reset(shared);
             }
             failure_token.cancel();
         }
