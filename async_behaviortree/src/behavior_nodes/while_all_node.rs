@@ -73,7 +73,7 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
 
         // NOTE: This reset is important here since the condition task could return failure abruptly
         // In that case the child task should stop gracefully
-        self.reset(shared);
+        self.child.reset(shared);
         false
     }
 
