@@ -29,6 +29,7 @@ pub enum Behavior<A> {
     /// Runs behavior in a loop
     ///
     /// If behavior fails / succeeds, reset and restart the behavior
+    #[deprecated]
     Loop(Box<Behavior<A>>),
     /// Run this behavior while all conditional actions are running / success
     /// Fails if any conditional action fails
