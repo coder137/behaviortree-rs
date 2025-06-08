@@ -148,7 +148,7 @@ fn main() -> Result<(), String> {
     let mut executor = TickedAsyncExecutor::default();
     let delta_rx = executor.tick_channel();
 
-    let (future, controller) = AsyncBehaviorTree::new(behavior, delta_rx, operation_shared);
+    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, operation_shared);
 
     executor
         .spawn_local("AsyncBehaviorTree::future", future)
