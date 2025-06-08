@@ -32,6 +32,7 @@ pub struct AsyncBehaviorTree;
 impl AsyncBehaviorTree {
     pub fn new<A, S>(
         behavior: Behavior<A>,
+        should_loop: bool,
         delta: tokio::sync::watch::Receiver<f64>,
         shared: S,
     ) -> (
@@ -45,16 +46,32 @@ impl AsyncBehaviorTree {
         let cancellation = tokio_util::sync::CancellationToken::new();
         let cancellation_clone = cancellation.clone();
 
-        let (mut child, state) = AsyncChild::from_behavior_with_state(behavior);
+        let mut statuses = vec![];
+        let (mut child, state) =
+            AsyncChild::from_behavior_with_state_and_status(behavior, &mut statuses);
 
         let future = async move {
-            let _status = cancellation_clone
-                .run_until_cancelled_owned(async {
-                    let status = child.run(delta, &shared).await;
-                    yield_now().await;
-                    status
-                })
-                .await;
+            if should_loop {
+                cancellation_clone
+                    .run_until_cancelled_owned(async {
+                        loop {
+                            let _status = child.run(delta.clone(), &shared).await;
+                            yield_now().await;
+                            statuses.iter().for_each(|status| {
+                                status.send_replace(None);
+                            });
+                            child.reset(&shared);
+                        }
+                    })
+                    .await;
+            } else {
+                cancellation_clone
+                    .run_until_cancelled_owned(async {
+                        let _status = child.run(delta, &shared).await;
+                        yield_now().await;
+                    })
+                    .await;
+            }
             child.reset(&shared);
         };
         (
@@ -94,7 +111,7 @@ mod tests {
         let shared = TestShared;
 
         let (behaviortree_future, controller) =
-            AsyncBehaviorTree::new(behavior, executor.tick_channel(), shared);
+            AsyncBehaviorTree::new(behavior, false, executor.tick_channel(), shared);
 
         let state = controller.state();
         let cancel = controller.cancel_token();
@@ -179,13 +196,13 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let behavior = Behavior::Loop(Box::new(behavior));
+        // let behavior = Behavior::Loop(Box::new(behavior));
 
         let mut executor = TickedAsyncExecutor::default();
         let shared = TestShared;
 
         let (behaviortree_future, controller) =
-            AsyncBehaviorTree::new(behavior, executor.tick_channel(), shared);
+            AsyncBehaviorTree::new(behavior, true, executor.tick_channel(), shared);
 
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
@@ -210,7 +227,7 @@ mod tests {
         let changed = rx.has_changed().unwrap();
         assert!(!changed);
 
-        let _r = tx.send(());
+        let _r = tx.send_replace(());
         let changed = rx.has_changed().unwrap();
         assert!(changed);
         rx.mark_unchanged();

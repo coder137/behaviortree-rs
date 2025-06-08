@@ -29,7 +29,7 @@ impl<S> AsyncWhileAll<S> {
                     break;
                 }
                 yield_now().await;
-                child.reset_action(shared);
+                child.reset(shared);
             }
             failure_token.cancel();
         };
@@ -60,11 +60,12 @@ impl<S> AsyncAction<S> for AsyncWhileAll<S> {
         ));
         futures::future::join_all(futures).await;
 
-        // Reset action only
+        // Reset
         self.conditions.iter_mut().for_each(|condition| {
-            condition.reset_action(shared);
+            condition.reset(shared);
         });
-        self.child.reset_action(shared);
+        self.child.reset(shared);
+
         false
     }
 
