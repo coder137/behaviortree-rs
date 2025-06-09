@@ -141,7 +141,7 @@ fn main() -> Result<(), String> {
 
     let operation_shared = OperationShared::default();
     let blackboard = operation_shared.blackboard.clone();
-    let mut bt = BehaviorTree::new(behavior, operation_shared);
+    let mut bt = BehaviorTree::new(behavior, false, operation_shared);
 
     bt.tick(0.1);
     assert_eq!(bt.status().unwrap(), Status::Running);

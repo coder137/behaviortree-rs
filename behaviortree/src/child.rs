@@ -5,17 +5,11 @@ use crate::{action_type::ActionType, behavior_nodes::*};
 pub struct Child<S> {
     action: ActionType<S>,
     status: tokio::sync::watch::Sender<Option<Status>>,
-    _status_rx: tokio::sync::watch::Receiver<Option<Status>>,
 }
 
 impl<S> Child<S> {
     pub fn new(action: ActionType<S>, status: tokio::sync::watch::Sender<Option<Status>>) -> Self {
-        let _status_rx = status.subscribe();
-        Self {
-            action,
-            status,
-            _status_rx,
-        }
+        Self { action, status }
     }
 
     #[cfg(test)]
@@ -28,7 +22,20 @@ impl<S> Child<S> {
         child
     }
 
+    #[cfg(test)]
     pub fn from_behavior_with_state<A>(behavior: Behavior<A>) -> (Self, State)
+    where
+        A: Into<ActionType<S>>,
+        S: 'static,
+    {
+        let mut statuses = vec![];
+        Self::from_behavior_with_state_and_status(behavior, &mut statuses)
+    }
+
+    pub fn from_behavior_with_state_and_status<A>(
+        behavior: Behavior<A>,
+        statuses: &mut Vec<tokio::sync::watch::Sender<Option<Status>>>,
+    ) -> (Self, State)
     where
         A: Into<ActionType<S>>,
         S: 'static,
@@ -38,6 +45,8 @@ impl<S> Child<S> {
                 let action = action.into();
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::NoChild(action.name(), rx);
                 (Self::new(action, tx), state)
             }
@@ -46,23 +55,28 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::NoChild(action.name(), rx);
                 (Self::new(action, tx), state)
             }
             Behavior::Invert(child) => {
-                let (child, child_state) = Self::from_behavior_with_state(*child);
+                let (child, child_state) =
+                    Self::from_behavior_with_state_and_status(*child, statuses);
 
                 let action = Box::new(InvertState::new(child));
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::SingleChild(action.name(), rx, child_state.into());
                 (Self::new(action, tx), state)
             }
             Behavior::Sequence(children) => {
                 let (children, children_state): (Vec<_>, Vec<_>) = children
                     .into_iter()
-                    .map(|child| Child::from_behavior_with_state(child))
+                    .map(|child| Child::from_behavior_with_state_and_status(child, statuses))
                     .unzip();
                 let children_state = std::rc::Rc::from_iter(children_state);
 
@@ -70,13 +84,15 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
             Behavior::Select(children) => {
                 let (children, children_state): (Vec<_>, Vec<_>) = children
                     .into_iter()
-                    .map(|child| Child::from_behavior_with_state(child))
+                    .map(|child| Child::from_behavior_with_state_and_status(child, statuses))
                     .unzip();
                 let children_state = std::rc::Rc::from_iter(children_state);
 
@@ -84,40 +100,25 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
-            Behavior::Loop(child) => {
-                let (child, child_state) = Self::from_behavior_with_state(*child);
-
-                let action = Box::new(LoopState::new(child));
-                let action = ActionType::Sync(action);
-
-                let (tx, rx) = tokio::sync::watch::channel(None);
-                let state = State::SingleChild(action.name(), rx, child_state.into());
-                (Self::new(action, tx), state)
-            }
-            Behavior::WhileAll(conditions, child) => {
+            Behavior::WhileAll(_conditions, _child) => {
                 todo!()
             }
         }
     }
 
-    pub fn from_behavior_with_state_and_status<A>(
-        behavior: Behavior<A>,
-    ) -> (Self, Vec<tokio::sync::watch::Sender<Option<Status>>>, State) {
-        todo!()
-    }
-
     pub fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         let status = self.action.tick(delta, shared);
-        let _ignore = self.status.send(Some(status));
+        self.status.send_replace(Some(status));
         status
     }
 
     pub fn reset(&mut self, shared: &mut S) {
         self.action.reset(shared);
-        let _ignore = self.status.send(None);
     }
 
     pub fn status(&self) -> Option<Status> {

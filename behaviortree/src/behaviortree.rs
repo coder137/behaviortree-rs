@@ -4,34 +4,43 @@ use crate::{action_type::ActionType, child::Child};
 
 pub struct BehaviorTree<S> {
     child: Child<S>,
+    should_loop: bool,
     state: State,
     shared: S,
+    statuses: Vec<tokio::sync::watch::Sender<Option<Status>>>,
 }
 
 impl<S> BehaviorTree<S> {
-    pub fn new<A>(behavior: Behavior<A>, shared: S) -> Self
+    pub fn new<A>(behavior: Behavior<A>, should_loop: bool, shared: S) -> Self
     where
         A: Into<ActionType<S>>,
         S: 'static,
     {
-        let (child, state) = Child::from_behavior_with_state(behavior);
+        let mut statuses = vec![];
+        let (child, state) = Child::from_behavior_with_state_and_status(behavior, &mut statuses);
         Self {
             child,
+            should_loop,
             state,
             shared,
+            statuses,
         }
     }
 
     #[tracing::instrument(level = "trace", name = "BehaviorTree::tick", skip(self), ret)]
     pub fn tick(&mut self, dt: f64) -> Status {
         if let Some(status) = self.child.status() {
-            if status != Status::Running {
-                return status;
+            let completed = status != Status::Running;
+            if completed {
+                if self.should_loop {
+                    self.reset();
+                } else {
+                    return status;
+                }
             }
         }
 
-        let shared = &mut self.shared;
-        self.child.tick(dt, shared)
+        self.child.tick(dt, &mut self.shared)
     }
 
     pub fn state(&self) -> State {
@@ -40,6 +49,9 @@ impl<S> BehaviorTree<S> {
 
     #[tracing::instrument(level = "trace", name = "BehaviorTree::reset", skip(self))]
     pub fn reset(&mut self) {
+        self.statuses.iter_mut().for_each(|status| {
+            status.send_replace(None);
+        });
         self.child.reset(&mut self.shared);
     }
 
@@ -65,7 +77,7 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut tree = BehaviorTree::new(behavior, TestShared);
+        let mut tree = BehaviorTree::new(behavior, false, TestShared);
         let state = tree.state();
 
         // For unit tests
@@ -101,14 +113,13 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let behavior = Behavior::Loop(behavior.into());
-        let mut tree = BehaviorTree::new(behavior, TestShared);
+        let mut tree = BehaviorTree::new(behavior, true, TestShared);
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1);
-        assert_eq!(status, Status::Running);
+        assert_eq!(status, Status::Success);
 
         // Automatically resets after success (Reload on Completion)
 
@@ -116,6 +127,6 @@ mod tests {
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1);
-        assert_eq!(status, Status::Running);
+        assert_eq!(status, Status::Success);
     }
 }
