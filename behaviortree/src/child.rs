@@ -18,6 +18,7 @@ impl<S> Child<S> {
         }
     }
 
+    #[cfg(test)]
     pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
     where
         A: Into<ActionType<S>>,
@@ -96,7 +97,16 @@ impl<S> Child<S> {
                 let state = State::SingleChild(action.name(), rx, child_state.into());
                 (Self::new(action, tx), state)
             }
+            Behavior::WhileAll(conditions, child) => {
+                todo!()
+            }
         }
+    }
+
+    pub fn from_behavior_with_state_and_status<A>(
+        behavior: Behavior<A>,
+    ) -> (Self, Vec<tokio::sync::watch::Sender<Option<Status>>>, State) {
+        todo!()
     }
 
     pub fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
