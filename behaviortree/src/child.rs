@@ -28,6 +28,7 @@ impl<S> Child<S> {
         child
     }
 
+    #[cfg(test)]
     pub fn from_behavior_with_state<A>(behavior: Behavior<A>) -> (Self, State)
     where
         A: Into<ActionType<S>>,
@@ -66,7 +67,8 @@ impl<S> Child<S> {
                 (Self::new(action, tx), state)
             }
             Behavior::Invert(child) => {
-                let (child, child_state) = Self::from_behavior_with_state(*child);
+                let (child, child_state) =
+                    Self::from_behavior_with_state_and_status(*child, statuses);
 
                 let action = Box::new(InvertState::new(child));
                 let action = ActionType::Sync(action);
@@ -80,7 +82,7 @@ impl<S> Child<S> {
             Behavior::Sequence(children) => {
                 let (children, children_state): (Vec<_>, Vec<_>) = children
                     .into_iter()
-                    .map(|child| Child::from_behavior_with_state(child))
+                    .map(|child| Child::from_behavior_with_state_and_status(child, statuses))
                     .unzip();
                 let children_state = std::rc::Rc::from_iter(children_state);
 
@@ -96,7 +98,7 @@ impl<S> Child<S> {
             Behavior::Select(children) => {
                 let (children, children_state): (Vec<_>, Vec<_>) = children
                     .into_iter()
-                    .map(|child| Child::from_behavior_with_state(child))
+                    .map(|child| Child::from_behavior_with_state_and_status(child, statuses))
                     .unzip();
                 let children_state = std::rc::Rc::from_iter(children_state);
 

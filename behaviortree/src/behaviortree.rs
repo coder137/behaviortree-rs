@@ -7,6 +7,7 @@ pub struct BehaviorTree<S> {
     should_loop: bool,
     state: State,
     shared: S,
+    statuses: Vec<tokio::sync::watch::Sender<Option<Status>>>,
 }
 
 impl<S> BehaviorTree<S> {
@@ -15,12 +16,14 @@ impl<S> BehaviorTree<S> {
         A: Into<ActionType<S>>,
         S: 'static,
     {
-        let (child, state) = Child::from_behavior_with_state(behavior);
+        let mut statuses = vec![];
+        let (child, state) = Child::from_behavior_with_state_and_status(behavior, &mut statuses);
         Self {
             child,
             should_loop,
             state,
             shared,
+            statuses,
         }
     }
 
@@ -30,15 +33,17 @@ impl<S> BehaviorTree<S> {
             let completed = status != Status::Running;
             if completed {
                 if self.should_loop {
-                    // TODO, Reset
+                    self.statuses.iter_mut().for_each(|status| {
+                        status.send_replace(None);
+                    });
+                    self.child.reset(&mut self.shared);
                 } else {
                     return status;
                 }
             }
         }
 
-        let shared = &mut self.shared;
-        self.child.tick(dt, shared)
+        self.child.tick(dt, &mut self.shared)
     }
 
     pub fn state(&self) -> State {
