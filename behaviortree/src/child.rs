@@ -5,17 +5,11 @@ use crate::{action_type::ActionType, behavior_nodes::*};
 pub struct Child<S> {
     action: ActionType<S>,
     status: tokio::sync::watch::Sender<Option<Status>>,
-    _status_rx: tokio::sync::watch::Receiver<Option<Status>>,
 }
 
 impl<S> Child<S> {
     pub fn new(action: ActionType<S>, status: tokio::sync::watch::Sender<Option<Status>>) -> Self {
-        let _status_rx = status.subscribe();
-        Self {
-            action,
-            status,
-            _status_rx,
-        }
+        Self { action, status }
     }
 
     #[cfg(test)]
@@ -119,13 +113,12 @@ impl<S> Child<S> {
 
     pub fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         let status = self.action.tick(delta, shared);
-        let _ignore = self.status.send(Some(status));
+        self.status.send_replace(Some(status));
         status
     }
 
     pub fn reset(&mut self, shared: &mut S) {
         self.action.reset(shared);
-        let _ignore = self.status.send(None);
     }
 
     pub fn status(&self) -> Option<Status> {

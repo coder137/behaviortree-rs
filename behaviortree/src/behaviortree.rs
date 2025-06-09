@@ -33,10 +33,7 @@ impl<S> BehaviorTree<S> {
             let completed = status != Status::Running;
             if completed {
                 if self.should_loop {
-                    self.statuses.iter_mut().for_each(|status| {
-                        status.send_replace(None);
-                    });
-                    self.child.reset(&mut self.shared);
+                    self.reset();
                 } else {
                     return status;
                 }
@@ -52,6 +49,9 @@ impl<S> BehaviorTree<S> {
 
     #[tracing::instrument(level = "trace", name = "BehaviorTree::reset", skip(self))]
     pub fn reset(&mut self) {
+        self.statuses.iter_mut().for_each(|status| {
+            status.send_replace(None);
+        });
         self.child.reset(&mut self.shared);
     }
 
@@ -119,7 +119,7 @@ mod tests {
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1);
-        assert_eq!(status, Status::Running);
+        assert_eq!(status, Status::Success);
 
         // Automatically resets after success (Reload on Completion)
 
@@ -127,6 +127,6 @@ mod tests {
         assert_eq!(status, Status::Running);
 
         let status = tree.tick(0.1);
-        assert_eq!(status, Status::Running);
+        assert_eq!(status, Status::Success);
     }
 }
