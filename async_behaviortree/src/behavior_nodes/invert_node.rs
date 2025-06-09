@@ -53,7 +53,7 @@ mod tests {
         let behavior = Behavior::Invert(Behavior::Action(TestAction::Success).into());
         let mut invert = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let shared = TestShared;
@@ -75,7 +75,7 @@ mod tests {
         let behavior = Behavior::Invert(Behavior::Action(TestAction::Failure).into());
         let mut invert = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let shared = TestShared;
@@ -102,7 +102,7 @@ mod tests {
             Behavior::Invert(Behavior::Action(TestAction::SuccessAfter { times: 2 }).into());
         let mut invert = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         executor

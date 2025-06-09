@@ -70,7 +70,7 @@ mod tests {
         let behavior = Behavior::Select(vec![Behavior::Action(TestAction::Success)]);
         let mut select = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let shared = TestShared;
@@ -92,7 +92,7 @@ mod tests {
         let behavior = Behavior::Select(vec![Behavior::Action(TestAction::Failure)]);
         let mut select = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let shared = TestShared;
@@ -116,7 +116,7 @@ mod tests {
         })]);
         let mut select = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let shared = TestShared;
@@ -142,7 +142,7 @@ mod tests {
         ]);
         let mut select = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let shared = TestShared;
@@ -170,7 +170,7 @@ mod tests {
         ]);
         let mut select = AsyncChild::from_behavior(behavior);
 
-        let executor = TickedAsyncExecutor::default();
+        let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
         let mut shared = TestShared;

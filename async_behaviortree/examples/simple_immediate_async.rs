@@ -145,10 +145,10 @@ fn main() -> Result<(), String> {
     let operation_shared = OperationShared::default();
     let blackboard = operation_shared.blackboard.clone();
 
-    let executor = TickedAsyncExecutor::default();
+    let mut executor = TickedAsyncExecutor::default();
     let delta_rx = executor.tick_channel();
 
-    let (future, controller) = AsyncBehaviorTree::new(behavior, delta_rx, operation_shared);
+    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, operation_shared);
 
     executor
         .spawn_local("AsyncBehaviorTree::future", future)
