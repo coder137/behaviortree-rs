@@ -4,12 +4,13 @@ use crate::{action_type::ActionType, child::Child};
 
 pub struct BehaviorTree<S> {
     child: Child<S>,
+    should_loop: bool,
     state: State,
     shared: S,
 }
 
 impl<S> BehaviorTree<S> {
-    pub fn new<A>(behavior: Behavior<A>, shared: S) -> Self
+    pub fn new<A>(behavior: Behavior<A>, should_loop: bool, shared: S) -> Self
     where
         A: Into<ActionType<S>>,
         S: 'static,
@@ -17,6 +18,7 @@ impl<S> BehaviorTree<S> {
         let (child, state) = Child::from_behavior_with_state(behavior);
         Self {
             child,
+            should_loop,
             state,
             shared,
         }
@@ -25,8 +27,13 @@ impl<S> BehaviorTree<S> {
     #[tracing::instrument(level = "trace", name = "BehaviorTree::tick", skip(self), ret)]
     pub fn tick(&mut self, dt: f64) -> Status {
         if let Some(status) = self.child.status() {
-            if status != Status::Running {
-                return status;
+            let completed = status != Status::Running;
+            if completed {
+                if self.should_loop {
+                    // TODO, Reset
+                } else {
+                    return status;
+                }
             }
         }
 
@@ -65,7 +72,7 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let mut tree = BehaviorTree::new(behavior, TestShared);
+        let mut tree = BehaviorTree::new(behavior, false, TestShared);
         let state = tree.state();
 
         // For unit tests
@@ -101,8 +108,7 @@ mod tests {
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
-        let behavior = Behavior::Loop(behavior.into());
-        let mut tree = BehaviorTree::new(behavior, TestShared);
+        let mut tree = BehaviorTree::new(behavior, true, TestShared);
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);

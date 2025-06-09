@@ -33,11 +33,25 @@ impl<S> Child<S> {
         A: Into<ActionType<S>>,
         S: 'static,
     {
+        let mut statuses = vec![];
+        Self::from_behavior_with_state_and_status(behavior, &mut statuses)
+    }
+
+    pub fn from_behavior_with_state_and_status<A>(
+        behavior: Behavior<A>,
+        statuses: &mut Vec<tokio::sync::watch::Sender<Option<Status>>>,
+    ) -> (Self, State)
+    where
+        A: Into<ActionType<S>>,
+        S: 'static,
+    {
         match behavior {
             Behavior::Action(action) => {
                 let action = action.into();
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::NoChild(action.name(), rx);
                 (Self::new(action, tx), state)
             }
@@ -46,6 +60,8 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::NoChild(action.name(), rx);
                 (Self::new(action, tx), state)
             }
@@ -56,6 +72,8 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::SingleChild(action.name(), rx, child_state.into());
                 (Self::new(action, tx), state)
             }
@@ -70,6 +88,8 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
@@ -84,29 +104,15 @@ impl<S> Child<S> {
                 let action = ActionType::Sync(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
+                statuses.push(tx.clone());
+
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
-            Behavior::Loop(child) => {
-                let (child, child_state) = Self::from_behavior_with_state(*child);
-
-                let action = Box::new(LoopState::new(child));
-                let action = ActionType::Sync(action);
-
-                let (tx, rx) = tokio::sync::watch::channel(None);
-                let state = State::SingleChild(action.name(), rx, child_state.into());
-                (Self::new(action, tx), state)
-            }
-            Behavior::WhileAll(conditions, child) => {
+            Behavior::WhileAll(_conditions, _child) => {
                 todo!()
             }
         }
-    }
-
-    pub fn from_behavior_with_state_and_status<A>(
-        behavior: Behavior<A>,
-    ) -> (Self, Vec<tokio::sync::watch::Sender<Option<Status>>>, State) {
-        todo!()
     }
 
     pub fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
