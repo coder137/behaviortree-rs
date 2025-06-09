@@ -1,5 +1,9 @@
 # behaviortree-rs
 
+Contains `async_behaviortree` and `behaviortree` packages
+
+`async_behaviortree` is actively maintained
+
 # Class Diagram
 
 ```mermaid
@@ -19,26 +23,9 @@ class ImmediateAction~S~ {
     fn name(&self) &'static str
 }
 
-class SyncAction~S~ {
-    <<trait>>
-    fn tick(&mut self, delta: f64, shared: &mut S) Status
-    fn reset(&mut self, shared: &mut S)
-    fn name(&self) &'static str
-}
-
 class AsyncAction~S~ {
     <<trait>>
     async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
-    fn reset(&mut self, shared: &mut S)
-    fn name(&self) &'static str
-}
-
-class ActionType~S~ {
-    <<enum>>
-    Immediate
-    Sync
-
-    fn tick(&mut self, delta: f64, shared: &mut S) Status
     fn reset(&mut self, shared: &mut S)
     fn name(&self) &'static str
 }
@@ -53,27 +40,10 @@ class AsyncActionType~S~ {
     fn name(&self) &'static str
 }
 
-class Child~S~ {
-    <<struct>>
-    ActionType~S~ action_type
-
-    fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~ActionType~S~~
-}
-
 class AsyncChild~S~ {
     <<struct>>
     AsyncActionType~S~ action_type
-
-    fn from_behavior~A~(Behavior~A~ behavior) Self where A: Into~AsyncActionType~S~~
-}
-
-class BehaviorTree {
-    <<struct>>
-    Child~S~ child
-
-    new(Behavior~A~ behavior) BehaviorTree
-    tick(&mut self) Status
-    reset(&mut self)
+    watch::Sender~Option~Status~~ status
 }
 
 class AsyncBehaviorTree {
@@ -82,16 +52,10 @@ class AsyncBehaviorTree {
 }
 
 Behavior --> ImmediateAction
-Behavior --> SyncAction
 Behavior --> AsyncAction
 
-SyncAction --> ActionType
-ImmediateAction --> ActionType
 ImmediateAction --> AsyncActionType
 AsyncAction --> AsyncActionType
-
-ActionType --> Child
-Child --> BehaviorTree
 
 AsyncActionType --> AsyncChild
 AsyncChild --> AsyncBehaviorTree
@@ -100,7 +64,6 @@ AsyncChild --> AsyncBehaviorTree
 # Roadmap
 
 - [x] ImmediateAction trait
-- [x] SyncAction trait
 - [x] AsyncAction trait
 - [ ] Behavior Nodes
   - [ ] Action
@@ -109,16 +72,10 @@ AsyncChild --> AsyncBehaviorTree
     - [x] Invert
     - [ ] ForceSuccess
     - [ ] ForceFailure
-    - [ ] Repeat
-    - [ ] RunTillSuccess
-    - [ ] RunTillFailure
   - [ ] Control
     - [x] Sequence
     - [x] Select
-    - [x] Loop
     - [x] WhileAll
-    - [ ] WhileAny
-    - [ ] Parallel
 - [x] Tracing
   - [x] BehaviorTree
   - [x] AsyncBehaviorTree
