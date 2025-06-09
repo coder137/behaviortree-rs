@@ -115,9 +115,6 @@ impl<S> AsyncChild<S> {
                 let state = State::MultipleChildren(action.name(), rx, children_states);
                 (Self::new(action, tx), state)
             }
-            Behavior::Loop(_) => {
-                panic!("Do not use")
-            }
             Behavior::WhileAll(conditions, child) => {
                 let (conditions, mut children_states): (Vec<_>, Vec<_>) = conditions
                     .into_iter()
