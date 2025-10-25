@@ -3,7 +3,7 @@ use behaviortree_common::{Behavior, State, Status};
 use crate::async_action_type::AsyncActionType;
 
 use crate::behavior_nodes::{
-    AsyncInvertState, AsyncSelectState, AsyncSequenceState, AsyncWaitState, AsyncWhileAll,
+    AsyncInvertState, AsyncSelectState, AsyncSequenceState, AsyncWaitState,
 };
 
 pub struct AsyncChild<S> {
@@ -116,31 +116,32 @@ impl<S> AsyncChild<S> {
                 (Self::new(action, tx), state)
             }
             Behavior::WhileAll(conditions, child) => {
-                let (conditions, mut children_states): (Vec<_>, Vec<_>) = conditions
-                    .into_iter()
-                    .map(|condition| Self::from_behavior_with_state_and_status(condition, statuses))
-                    .unzip();
+                // let (conditions, mut children_states): (Vec<_>, Vec<_>) = conditions
+                //     .into_iter()
+                //     .map(|condition| Self::from_behavior_with_state_and_status(condition, statuses))
+                //     .unzip();
 
-                //
-                let (child, child_state) =
-                    Self::from_behavior_with_state_and_status(*child, statuses);
-                children_states.push(child_state);
+                // //
+                // let (child, child_state) =
+                //     Self::from_behavior_with_state_and_status(*child, statuses);
+                // children_states.push(child_state);
 
-                let children_states = std::rc::Rc::from_iter(children_states);
+                // let children_states = std::rc::Rc::from_iter(children_states);
 
-                let action = Box::new(AsyncWhileAll::new(conditions, child));
-                let action = AsyncActionType::Async(action);
+                // let action = Box::new(AsyncWhileAll::new(conditions, child));
+                // let action = AsyncActionType::Async(action);
 
-                let (tx, rx) = tokio::sync::watch::channel(None);
-                statuses.push(tx.clone());
+                // let (tx, rx) = tokio::sync::watch::channel(None);
+                // statuses.push(tx.clone());
 
-                let state = State::MultipleChildren(action.name(), rx, children_states);
-                (Self::new(action, tx), state)
+                // let state = State::MultipleChildren(action.name(), rx, children_states);
+                // (Self::new(action, tx), state)
+                todo!()
             }
         }
     }
 
-    pub async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
+    pub async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
         self.status.send_replace(Some(Status::Running));
         let success = self.action_type.run(delta, shared).await;
         let status = if success {
@@ -153,7 +154,7 @@ impl<S> AsyncChild<S> {
     }
 
     // Reset action and status
-    pub fn reset(&mut self, shared: &S) {
+    pub fn reset(&mut self, shared: &mut S) {
         self.action_type.reset(shared);
     }
 }
@@ -179,11 +180,11 @@ mod tests {
         let mut child = AsyncChild::from_behavior(behavior);
         let mut executor = TickedAsyncExecutor::default();
 
-        let shared = TestShared;
+        let mut shared = TestShared;
         let delta = executor.tick_channel();
         executor
             .spawn_local("WaitFuture", async move {
-                child.run(delta, &shared).await;
+                child.run(delta, &mut shared).await;
             })
             .detach();
 

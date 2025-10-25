@@ -19,7 +19,7 @@ impl<S> AsyncSelectState<S> {
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncSelectState<S> {
     #[tracing::instrument(level = "trace", name = "Select::run", skip_all, ret)]
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
         match self.completed {
             true => unreachable!(),
             false => {}
@@ -44,7 +44,7 @@ impl<S> AsyncAction<S> for AsyncSelectState<S> {
     }
 
     #[tracing::instrument(level = "trace", name = "Select::reset", skip_all, ret)]
-    fn reset(&mut self, shared: &S) {
+    fn reset(&mut self, shared: &mut S) {
         self.children.iter_mut().for_each(|child| {
             child.reset(shared);
         });
@@ -73,11 +73,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(delta, &shared).await;
+                let status = select.run(delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -95,11 +95,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(delta, &shared).await;
+                let status = select.run(delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
@@ -119,11 +119,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(delta, &shared).await;
+                let status = select.run(delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -145,11 +145,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(delta, &shared).await;
+                let status = select.run(delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
@@ -177,10 +177,10 @@ mod tests {
 
         executor
             .spawn_local("SelectFuture", async move {
-                let status = select.run(delta.clone(), &shared).await;
+                let status = select.run(delta.clone(), &mut shared).await;
                 assert!(status);
                 select.reset(&mut shared);
-                let status = select.run(delta, &shared).await;
+                let status = select.run(delta, &mut shared).await;
                 assert!(status);
             })
             .detach();

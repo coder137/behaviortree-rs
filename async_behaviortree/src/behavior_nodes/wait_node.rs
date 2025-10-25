@@ -19,7 +19,7 @@ impl AsyncWaitState {
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncWaitState {
     #[tracing::instrument(level = "trace", name = "Wait::run", skip_all, ret)]
-    async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &S) -> bool {
+    async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &mut S) -> bool {
         loop {
             let _r = delta.changed().await;
             if _r.is_err() {
@@ -37,7 +37,7 @@ impl<S> AsyncAction<S> for AsyncWaitState {
     }
 
     #[tracing::instrument(level = "trace", name = "Wait::reset", skip_all, ret)]
-    fn reset(&mut self, _shared: &S) {
+    fn reset(&mut self, _shared: &mut S) {
         self.elapsed = 0.0;
     }
 
@@ -60,11 +60,11 @@ mod tests {
         let mut wait = AsyncWaitState::new(0.0);
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(delta, &shared).await;
+                wait.run(delta, &mut shared).await;
             })
             .detach();
 
@@ -80,11 +80,11 @@ mod tests {
         let mut wait = AsyncWaitState::new(1.0);
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(delta, &shared).await;
+                wait.run(delta, &mut shared).await;
             })
             .detach();
 
@@ -108,9 +108,9 @@ mod tests {
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(delta.clone(), &shared).await;
+                wait.run(delta.clone(), &mut shared).await;
                 wait.reset(&mut shared);
-                wait.run(delta, &shared).await;
+                wait.run(delta, &mut shared).await;
             })
             .detach();
 
@@ -133,11 +133,11 @@ mod tests {
         let mut wait = AsyncWaitState::new(50.0);
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("WaitFuture", async move {
-                wait.run(delta, &shared).await;
+                wait.run(delta, &mut shared).await;
             })
             .detach();
 

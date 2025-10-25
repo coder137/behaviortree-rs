@@ -34,7 +34,7 @@ impl AsyncBehaviorTree {
         behavior: Behavior<A>,
         should_loop: bool,
         delta: tokio::sync::watch::Receiver<f64>,
-        shared: S,
+        mut shared: S,
     ) -> (
         impl std::future::Future<Output = ()>,
         AsyncBehaviorController,
@@ -55,24 +55,24 @@ impl AsyncBehaviorTree {
                 cancellation_clone
                     .run_until_cancelled_owned(async {
                         loop {
-                            let _status = child.run(delta.clone(), &shared).await;
+                            let _status = child.run(delta.clone(), &mut shared).await;
                             yield_now().await;
                             statuses.iter().for_each(|status| {
                                 status.send_replace(None);
                             });
-                            child.reset(&shared);
+                            child.reset(&mut shared);
                         }
                     })
                     .await;
             } else {
                 cancellation_clone
                     .run_until_cancelled_owned(async {
-                        let _status = child.run(delta, &shared).await;
+                        let _status = child.run(delta, &mut shared).await;
                         yield_now().await;
                     })
                     .await;
             }
-            child.reset(&shared);
+            child.reset(&mut shared);
         };
         (
             future,

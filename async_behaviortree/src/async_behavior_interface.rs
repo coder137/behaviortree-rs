@@ -4,10 +4,10 @@ pub trait ImmediateAction<S> {
     /// Cannot return `Status::Running`
     /// true == `Status::Success`
     /// false == `Status::Failure`
-    fn run(&mut self, delta: f64, shared: &S) -> bool;
+    fn run(&mut self, delta: f64, shared: &mut S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &S);
+    fn reset(&mut self, shared: &mut S);
 
     /// Identify your action
     fn name(&self) -> &'static str;
@@ -24,10 +24,10 @@ pub trait AsyncAction<S> {
     ///
     /// Once `run` has completed i.e returns `true`/`false`,
     /// clients should `reset` before `run`ning.
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool;
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &S);
+    fn reset(&mut self, shared: &mut S);
 
     /// Identify your action
     fn name(&self) -> &'static str;
@@ -52,12 +52,12 @@ pub mod test_async_behavior_interface {
 
     impl<S> ImmediateAction<S> for GenericTestImmediateAction {
         #[tracing::instrument(level = "trace", name = "GenericTestImmediateAction::run", fields(name=<GenericTestImmediateAction as ImmediateAction<S>>::name(self)), skip_all, ret)]
-        fn run(&mut self, _delta: f64, _shared: &S) -> bool {
+        fn run(&mut self, _delta: f64, _shared: &mut S) -> bool {
             self.status
         }
 
         #[tracing::instrument(level = "trace", name = "GenericTestImmediateAction::reset", fields(name=<GenericTestImmediateAction as ImmediateAction<S>>::name(self)), skip_all)]
-        fn reset(&mut self, _shared: &S) {}
+        fn reset(&mut self, _shared: &mut S) {}
 
         fn name(&self) -> &'static str {
             self.name
@@ -85,7 +85,11 @@ pub mod test_async_behavior_interface {
     #[async_trait::async_trait(?Send)]
     impl<S> AsyncAction<S> for GenericTestAsyncAction {
         #[tracing::instrument(level = "trace", name = "GenericTestAsyncAction::run", fields(name=<GenericTestAsyncAction as AsyncAction<S>>::name(self)), skip_all, ret)]
-        async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _shared: &S) -> bool {
+        async fn run(
+            &mut self,
+            mut delta: tokio::sync::watch::Receiver<f64>,
+            _shared: &mut S,
+        ) -> bool {
             loop {
                 let _r = delta.changed().await.unwrap();
                 let _dt = *delta.borrow_and_update();
@@ -100,7 +104,7 @@ pub mod test_async_behavior_interface {
         }
 
         #[tracing::instrument(level = "trace", name = "GenericTestAsyncAction::reset", fields(name=<GenericTestAsyncAction as AsyncAction<S>>::name(self)), skip_all)]
-        fn reset(&mut self, _shared: &S) {
+        fn reset(&mut self, _shared: &mut S) {
             self.elapsed = 0;
         }
 

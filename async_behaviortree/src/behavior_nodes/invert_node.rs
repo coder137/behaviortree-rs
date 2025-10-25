@@ -19,7 +19,7 @@ impl<S> AsyncInvertState<S> {
 #[async_trait(?Send)]
 impl<S> AsyncAction<S> for AsyncInvertState<S> {
     #[tracing::instrument(level = "trace", name = "Invert::run", skip_all, ret)]
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
         match self.completed {
             true => unreachable!(),
             false => {}
@@ -30,7 +30,7 @@ impl<S> AsyncAction<S> for AsyncInvertState<S> {
     }
 
     #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all, ret)]
-    fn reset(&mut self, shared: &S) {
+    fn reset(&mut self, shared: &mut S) {
         self.child.reset(shared);
         self.completed = false;
     }
@@ -56,11 +56,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta, &shared).await;
+                let status = invert.run(delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
@@ -78,11 +78,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut shared = TestShared;
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta, &shared).await;
+                let status = invert.run(delta, &mut shared).await;
                 assert!(status);
             })
             .detach();
@@ -107,10 +107,10 @@ mod tests {
         let delta = executor.tick_channel();
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta.clone(), &()).await;
+                let status = invert.run(delta.clone(), &mut ()).await;
                 assert!(!status);
-                invert.reset(&());
-                let status = invert.run(delta, &()).await;
+                invert.reset(&mut ());
+                let status = invert.run(delta, &mut ()).await;
                 assert!(!status);
             })
             .detach();

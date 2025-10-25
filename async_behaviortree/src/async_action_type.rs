@@ -6,7 +6,11 @@ pub enum AsyncActionType<S> {
 }
 
 impl<S> AsyncActionType<S> {
-    pub async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
+    pub async fn run(
+        &mut self,
+        mut delta: tokio::sync::watch::Receiver<f64>,
+        shared: &mut S,
+    ) -> bool {
         match self {
             AsyncActionType::Immediate(immediate_action) => {
                 let dt = *delta.borrow_and_update();
@@ -16,7 +20,7 @@ impl<S> AsyncActionType<S> {
         }
     }
 
-    pub fn reset(&mut self, shared: &S) {
+    pub fn reset(&mut self, shared: &mut S) {
         match self {
             AsyncActionType::Immediate(immediate_action) => immediate_action.reset(shared),
             AsyncActionType::Async(async_action) => async_action.reset(shared),
