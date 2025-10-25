@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, AsyncActionName, AsyncBehaviorRunner};
+use crate::{AsyncActionName, AsyncBehaviorRunner, behavior_nodes::AsyncAction};
 
 pub struct AsyncActionState<A> {
     action: A,

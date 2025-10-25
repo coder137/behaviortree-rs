@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, util::yield_now};
+use crate::{behavior_nodes::AsyncAction, util::yield_now};
 
 pub struct AsyncWaitState {
     target: f64,

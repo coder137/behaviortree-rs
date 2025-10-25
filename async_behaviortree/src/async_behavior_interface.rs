@@ -9,26 +9,6 @@ pub trait AsyncBehaviorRunner<A> {
     fn reset(&mut self, action: &A);
 }
 
-#[async_trait::async_trait(?Send)]
-pub trait AsyncAction<S> {
-    /// Asynchronously runs the action till completion
-    ///
-    /// User implementation must ensure that `run` is non-blocking.
-    /// - Should `.await` internally if action has not completed.
-    /// - Nodes with child(ren) internally must also ensure that only one child is run
-    /// before yielding back to the executor.
-    ///
-    /// Once `run` has completed i.e returns `true`/`false`,
-    /// clients should `reset` before `run`ning.
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool;
-
-    /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &mut S);
-
-    /// Identify your action
-    fn name(&self) -> &'static str;
-}
-
 // TODO, Shift this also
 #[cfg(test)]
 pub mod test_async_behavior_interface {

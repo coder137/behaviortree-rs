@@ -1,9 +1,10 @@
 use behaviortree_common::{Behavior, State, Status};
 
 use crate::behavior_nodes::{
-    AsyncActionState, AsyncInvertState, AsyncSelectState, AsyncSequenceState, AsyncWaitState,
+    AsyncAction, AsyncActionState, AsyncInvertState, AsyncSelectState, AsyncSequenceState,
+    AsyncWaitState,
 };
-use crate::{AsyncAction, AsyncActionName, AsyncBehaviorRunner};
+use crate::{AsyncActionName, AsyncBehaviorRunner};
 
 pub struct AsyncChild<S> {
     action_type: Box<dyn AsyncAction<S>>,

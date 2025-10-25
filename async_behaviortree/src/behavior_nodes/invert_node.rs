@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, async_child::AsyncChild};
+use crate::{async_child::AsyncChild, behavior_nodes::AsyncAction};
 
 pub struct AsyncInvertState<S> {
     child: AsyncChild<S>,

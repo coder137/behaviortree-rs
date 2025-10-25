@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncAction, async_child::AsyncChild, util::yield_now};
+use crate::{async_child::AsyncChild, behavior_nodes::AsyncAction, util::yield_now};
 
 pub struct AsyncSelectState<S> {
     children: Vec<AsyncChild<S>>,
