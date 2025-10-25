@@ -1,20 +1,18 @@
 use behaviortree_common::{Behavior, State, Status};
 
-use crate::async_action_type::AsyncActionType;
-
 use crate::behavior_nodes::{
     AsyncActionState, AsyncInvertState, AsyncSelectState, AsyncSequenceState, AsyncWaitState,
 };
-use crate::{AsyncActionName, AsyncBehaviorRunner};
+use crate::{AsyncAction, AsyncActionName, AsyncBehaviorRunner};
 
 pub struct AsyncChild<S> {
-    action_type: AsyncActionType<S>,
+    action_type: Box<dyn AsyncAction<S>>,
     status: tokio::sync::watch::Sender<Option<Status>>,
 }
 
 impl<S> AsyncChild<S> {
     pub fn new(
-        action_type: AsyncActionType<S>,
+        action_type: Box<dyn AsyncAction<S>>,
         status: tokio::sync::watch::Sender<Option<Status>>,
     ) -> Self {
         Self {
@@ -53,8 +51,7 @@ impl<S> AsyncChild<S> {
     {
         match behavior {
             Behavior::Action(action) => {
-                let action = Box::new(AsyncActionState::new(action));
-                let action = AsyncActionType::Async(action);
+                let action: Box<dyn AsyncAction<S>> = Box::new(AsyncActionState::new(action));
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 statuses.push(tx.clone());
@@ -63,8 +60,7 @@ impl<S> AsyncChild<S> {
                 (Self::new(action, tx), state)
             }
             Behavior::Wait(target) => {
-                let action = Box::new(AsyncWaitState::new(target));
-                let action = AsyncActionType::Async(action);
+                let action: Box<dyn AsyncAction<S>> = Box::new(AsyncWaitState::new(target));
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 statuses.push(tx.clone());
@@ -77,7 +73,6 @@ impl<S> AsyncChild<S> {
                     Self::from_behavior_with_state_and_status(*child, statuses);
 
                 let action = Box::new(AsyncInvertState::new(child));
-                let action = AsyncActionType::Async(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 statuses.push(tx.clone());
@@ -93,7 +88,6 @@ impl<S> AsyncChild<S> {
                 let children_states = std::rc::Rc::from_iter(children_states);
 
                 let action = Box::new(AsyncSequenceState::new(children));
-                let action = AsyncActionType::Async(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 statuses.push(tx.clone());
@@ -109,7 +103,6 @@ impl<S> AsyncChild<S> {
                 let children_states = std::rc::Rc::from_iter(children_states);
 
                 let action = Box::new(AsyncSelectState::new(children));
-                let action = AsyncActionType::Async(action);
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
                 statuses.push(tx.clone());
