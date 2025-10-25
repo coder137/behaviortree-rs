@@ -98,6 +98,8 @@ mod tests {
             .with(tracing_forest::ForestLayer::default())
             .try_init();
 
+        let mut shared = TestShared;
+
         let behavior =
             Behavior::Invert(Behavior::Action(TestAction::SuccessAfter { times: 2 }).into());
         let mut invert = AsyncChild::from_behavior(behavior);
@@ -107,10 +109,10 @@ mod tests {
         let delta = executor.tick_channel();
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta.clone(), &mut ()).await;
+                let status = invert.run(delta.clone(), &mut shared).await;
                 assert!(!status);
-                invert.reset(&mut ());
-                let status = invert.run(delta, &mut ()).await;
+                invert.reset(&mut shared);
+                let status = invert.run(delta, &mut shared).await;
                 assert!(!status);
             })
             .detach();
