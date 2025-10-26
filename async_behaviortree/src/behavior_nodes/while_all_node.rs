@@ -1,7 +1,9 @@
+use std::rc::Rc;
+
 use tokio_util::sync::CancellationToken;
 
-use crate::AsyncAction;
 use crate::async_child::AsyncChild;
+use crate::behavior_nodes::AsyncAction;
 use crate::util::yield_now;
 
 pub struct AsyncWhileAll<R> {
@@ -17,19 +19,27 @@ impl<R> AsyncWhileAll<R> {
     async fn handle_child(
         child: &mut AsyncChild<R>,
         delta: tokio::sync::watch::Receiver<f64>,
-        runner: &R,
+        runner: Rc<tokio::sync::Mutex<&mut R>>,
         failure_token: CancellationToken,
         allow_failure: bool,
     ) {
         let future = async {
             loop {
-                let status = child.run(delta.clone(), runner).await;
-                // If we allow failure and the child returns a filure, then we exit
+                let status = {
+                    let mut runner_lock = runner.lock().await;
+                    child.run(delta.clone(), *runner_lock).await
+                };
+
+                // If we allow failure + the child returns failure, then we exit
                 if allow_failure && !status {
                     break;
                 }
                 yield_now().await;
-                child.reset(runner);
+
+                {
+                    let mut runner_lock = runner.lock().await;
+                    child.reset(*runner_lock);
+                }
             }
             failure_token.cancel();
         };
@@ -40,14 +50,22 @@ impl<R> AsyncWhileAll<R> {
 #[async_trait::async_trait(?Send)]
 impl<R> AsyncAction<R> for AsyncWhileAll<R> {
     #[tracing::instrument(level = "trace", name = "WhileAll::run", skip_all, ret)]
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &R) -> bool {
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         let failure_token = tokio_util::sync::CancellationToken::new();
+
+        let runner = Rc::new(tokio::sync::Mutex::new(runner));
 
         let mut futures = self
             .conditions
             .iter_mut()
             .map(|child| {
-                Self::handle_child(child, delta.clone(), runner, failure_token.clone(), true)
+                Self::handle_child(
+                    child,
+                    delta.clone(),
+                    runner.clone(),
+                    failure_token.clone(),
+                    true,
+                )
             })
             .collect::<Vec<_>>();
         // NOTE: child should not be able to mark failure even if it fails
@@ -59,18 +77,11 @@ impl<R> AsyncAction<R> for AsyncWhileAll<R> {
             false,
         ));
         futures::future::join_all(futures).await;
-
-        // Reset
-        self.conditions.iter_mut().for_each(|condition| {
-            condition.reset(runner);
-        });
-        self.child.reset(runner);
-
         false
     }
 
     #[tracing::instrument(level = "trace", name = "WhileAll::reset", skip_all, ret)]
-    fn reset(&mut self, runner: &R) {
+    fn reset(&mut self, runner: &mut R) {
         self.conditions.iter_mut().for_each(|condition| {
             condition.reset(runner);
         });
@@ -115,11 +126,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let runner = TestRunner;
+        let mut runner = TestRunner;
 
         executor
             .spawn_local("", async move {
-                let status = child.run(delta, &runner).await;
+                let status = child.run(delta, &mut runner).await;
                 assert!(!status);
             })
             .detach();
