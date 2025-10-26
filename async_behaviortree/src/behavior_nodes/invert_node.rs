@@ -2,13 +2,13 @@ use async_trait::async_trait;
 
 use crate::{async_child::AsyncChild, behavior_nodes::AsyncAction};
 
-pub struct AsyncInvertState<S> {
-    child: AsyncChild<S>,
+pub struct AsyncInvertState<R> {
+    child: AsyncChild<R>,
     completed: bool,
 }
 
-impl<S> AsyncInvertState<S> {
-    pub fn new(child: AsyncChild<S>) -> Self {
+impl<R> AsyncInvertState<R> {
+    pub fn new(child: AsyncChild<R>) -> Self {
         Self {
             child,
             completed: false,
@@ -17,21 +17,21 @@ impl<S> AsyncInvertState<S> {
 }
 
 #[async_trait(?Send)]
-impl<S> AsyncAction<S> for AsyncInvertState<S> {
+impl<R> AsyncAction<R> for AsyncInvertState<R> {
     #[tracing::instrument(level = "trace", name = "Invert::run", skip_all, ret)]
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         match self.completed {
             true => unreachable!(),
             false => {}
         }
-        let status = !self.child.run(delta, shared).await;
+        let status = !self.child.run(delta, runner).await;
         self.completed = true;
         status
     }
 
     #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all, ret)]
-    fn reset(&mut self, shared: &mut S) {
-        self.child.reset(shared);
+    fn reset(&mut self, runner: &mut R) {
+        self.child.reset(runner);
         self.completed = false;
     }
 
@@ -56,11 +56,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestRunner;
+        let mut runner = TestRunner;
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta, &mut shared).await;
+                let status = invert.run(delta, &mut runner).await;
                 assert!(!status);
             })
             .detach();
@@ -78,11 +78,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestRunner;
+        let mut runner = TestRunner;
 
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta, &mut shared).await;
+                let status = invert.run(delta, &mut runner).await;
                 assert!(status);
             })
             .detach();
@@ -98,7 +98,7 @@ mod tests {
             .with(tracing_forest::ForestLayer::default())
             .try_init();
 
-        let mut shared = TestRunner;
+        let mut runner = TestRunner;
 
         let behavior =
             Behavior::Invert(Behavior::Action(TestAction::SuccessAfter { times: 2 }).into());
@@ -109,10 +109,10 @@ mod tests {
         let delta = executor.tick_channel();
         executor
             .spawn_local("InvertFuture", async move {
-                let status = invert.run(delta.clone(), &mut shared).await;
+                let status = invert.run(delta.clone(), &mut runner).await;
                 assert!(!status);
-                invert.reset(&mut shared);
-                let status = invert.run(delta, &mut shared).await;
+                invert.reset(&mut runner);
+                let status = invert.run(delta, &mut runner).await;
                 assert!(!status);
             })
             .detach();

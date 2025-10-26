@@ -6,14 +6,14 @@ use crate::behavior_nodes::{
 };
 use crate::{AsyncActionName, AsyncBehaviorRunner};
 
-pub struct AsyncChild<S> {
-    action_type: Box<dyn AsyncAction<S>>,
+pub struct AsyncChild<R> {
+    action_type: Box<dyn AsyncAction<R>>,
     status: tokio::sync::watch::Sender<Option<Status>>,
 }
 
-impl<S> AsyncChild<S> {
+impl<R> AsyncChild<R> {
     pub fn new(
-        action_type: Box<dyn AsyncAction<S>>,
+        action_type: Box<dyn AsyncAction<R>>,
         status: tokio::sync::watch::Sender<Option<Status>>,
     ) -> Self {
         Self {
@@ -26,7 +26,7 @@ impl<S> AsyncChild<S> {
     pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
     where
         A: AsyncActionName + 'static,
-        S: AsyncBehaviorRunner<A> + 'static,
+        R: AsyncBehaviorRunner<A> + 'static,
     {
         let (child, _state) = Self::from_behavior_with_state(behavior);
         child
@@ -35,11 +35,11 @@ impl<S> AsyncChild<S> {
     pub fn from_behavior_with_state<A>(behavior: Behavior<A>) -> (Self, State)
     where
         A: AsyncActionName + 'static,
-        S: AsyncBehaviorRunner<A> + 'static,
+        R: AsyncBehaviorRunner<A> + 'static,
     {
         match behavior {
             Behavior::Action(action) => {
-                let action: Box<dyn AsyncAction<S>> = Box::new(AsyncActionState::new(action));
+                let action: Box<dyn AsyncAction<R>> = Box::new(AsyncActionState::new(action));
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
 
@@ -47,7 +47,7 @@ impl<S> AsyncChild<S> {
                 (Self::new(action, tx), state)
             }
             Behavior::Wait(target) => {
-                let action: Box<dyn AsyncAction<S>> = Box::new(AsyncWaitState::new(target));
+                let action: Box<dyn AsyncAction<R>> = Box::new(AsyncWaitState::new(target));
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
 
@@ -118,9 +118,9 @@ impl<S> AsyncChild<S> {
         }
     }
 
-    pub async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool {
+    pub async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         self.status.send_replace(Some(Status::Running));
-        let success = self.action_type.run(delta, shared).await;
+        let success = self.action_type.run(delta, runner).await;
         let status = if success {
             Status::Success
         } else {
@@ -130,9 +130,9 @@ impl<S> AsyncChild<S> {
         success
     }
 
-    pub fn reset(&mut self, shared: &mut S) {
+    pub fn reset(&mut self, runner: &mut R) {
         self.status.send_replace(None);
-        self.action_type.reset(shared);
+        self.action_type.reset(runner);
     }
 }
 
@@ -157,11 +157,11 @@ mod tests {
         let mut child = AsyncChild::from_behavior(behavior);
         let mut executor = TickedAsyncExecutor::default();
 
-        let mut shared = TestRunner;
+        let mut runner = TestRunner;
         let delta = executor.tick_channel();
         executor
             .spawn_local("WaitFuture", async move {
-                child.run(delta, &mut shared).await;
+                child.run(delta, &mut runner).await;
             })
             .detach();
 

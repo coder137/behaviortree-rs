@@ -1,5 +1,5 @@
 #[async_trait::async_trait(?Send)]
-pub trait AsyncAction<S> {
+pub trait AsyncAction<R> {
     /// Asynchronously runs the action till completion
     ///
     /// User implementation must ensure that `run` is non-blocking.
@@ -9,10 +9,10 @@ pub trait AsyncAction<S> {
     ///
     /// Once `run` has completed i.e returns `true`/`false`,
     /// clients should `reset` before `run`ning.
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &mut S) -> bool;
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool;
 
     /// Resets the current action to its initial/newly created state
-    fn reset(&mut self, shared: &mut S);
+    fn reset(&mut self, runner: &mut R);
 
     /// Identify your action
     fn name(&self) -> &'static str;
