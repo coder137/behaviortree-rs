@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use async_behaviortree::{AsyncActionType, AsyncBehaviorTree, ImmediateAction};
+use async_behaviortree::{AsyncActionName, AsyncBehaviorRunner, AsyncBehaviorTree};
 use behaviortree_common::Behavior;
 use ticked_async_executor::TickedAsyncExecutor;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -18,107 +18,90 @@ enum Output {
 
 pub type TypedBlackboard<T> = HashMap<String, T>;
 
-/// Shared data structure for Operations
-#[derive(Default)]
-struct OperationShared {
-    blackboard: Rc<RwLock<TypedBlackboard<usize>>>,
-}
-
 #[derive(Debug, serde::Serialize)]
 enum Operation {
     Add(Input<usize>, Input<usize>, Output),
     Subtract(Input<usize>, Input<usize>, Output),
 }
 
-impl Into<AsyncActionType<OperationShared>> for Operation {
-    fn into(self) -> AsyncActionType<OperationShared> {
+impl AsyncActionName for Operation {
+    fn name(&self) -> &'static str {
         match self {
-            Operation::Add(a, b, c) => {
-                let action = Box::new(AddState(a, b, c));
-                AsyncActionType::Immediate(action)
-            }
-            Operation::Subtract(a, b, c) => {
-                let action = Box::new(SubState(a, b, c));
-                AsyncActionType::Immediate(action)
-            }
+            Operation::Add(_, _, _) => "Add",
+            Operation::Subtract(_, _, _) => "Subtract",
         }
     }
 }
 
-#[derive(Debug)]
-struct AddState(Input<usize>, Input<usize>, Output);
-impl ImmediateAction<OperationShared> for AddState {
-    #[tracing::instrument(level = "trace", name = "Add::run", skip(shared), ret)]
-    fn run(&mut self, _dt: f64, shared: &OperationShared) -> bool {
-        let mut blackboard = shared.blackboard.write().unwrap();
+#[derive(Default)]
+struct CalculatorBot {
+    blackboard: Rc<RwLock<TypedBlackboard<usize>>>,
+}
 
-        let a = match &self.0 {
+impl CalculatorBot {
+    pub fn add(&mut self, a: &Input<usize>, b: &Input<usize>, c: &Output) -> bool {
+        let mut blackboard = self.blackboard.write().unwrap();
+
+        let a_data = match a {
             Input::Literal(data) => Some(data),
             Input::Blackboard(key) => blackboard.get(*key),
         };
 
-        let b = match &self.1 {
+        let b_data = match b {
             Input::Literal(data) => Some(data),
             Input::Blackboard(key) => blackboard.get(*key),
         };
 
-        if a.is_none() || b.is_none() {
+        if a_data.is_none() || b_data.is_none() {
             return false;
         }
 
-        let c = a.unwrap() + b.unwrap();
-        match &self.2 {
+        let c_data = a_data.unwrap() + b_data.unwrap();
+        match c {
             Output::Blackboard(key) => {
-                blackboard.insert(key.clone(), c);
+                blackboard.insert(key.clone(), c_data);
             }
         }
         true
     }
 
-    #[tracing::instrument(level = "trace", name = "Add::reset", skip_all)]
-    fn reset(&mut self, _shared: &OperationShared) {}
+    pub fn sub(&mut self, a: &Input<usize>, b: &Input<usize>, c: &Output) -> bool {
+        let mut blackboard = self.blackboard.write().unwrap();
 
-    fn name(&self) -> &'static str {
-        "Add"
-    }
-}
-
-#[derive(Debug)]
-struct SubState(Input<usize>, Input<usize>, Output);
-impl ImmediateAction<OperationShared> for SubState {
-    #[tracing::instrument(level = "trace", name = "Sub::run", skip(shared), ret)]
-    fn run(&mut self, _dt: f64, shared: &OperationShared) -> bool {
-        let mut blackboard = shared.blackboard.write().unwrap();
-
-        let a = match &self.0 {
+        let a_data = match a {
             Input::Literal(data) => Some(data),
             Input::Blackboard(key) => blackboard.get(*key),
         };
 
-        let b = match &self.1 {
+        let b_data = match b {
             Input::Literal(data) => Some(data),
             Input::Blackboard(key) => blackboard.get(*key),
         };
 
-        if a.is_none() || b.is_none() {
+        if a_data.is_none() || b_data.is_none() {
             return false;
         }
 
-        let c = a.unwrap() - b.unwrap();
-        match &self.2 {
+        let c_data = a_data.unwrap() - b_data.unwrap();
+        match c {
             Output::Blackboard(key) => {
-                blackboard.insert(key.clone(), c);
+                blackboard.insert(key.clone(), c_data);
             }
         }
         true
     }
+}
 
-    #[tracing::instrument(level = "trace", name = "Sub::reset", skip_all)]
-    fn reset(&mut self, _shared: &OperationShared) {}
-
-    fn name(&self) -> &'static str {
-        "Sub"
+#[async_trait::async_trait(?Send)]
+impl AsyncBehaviorRunner<Operation> for CalculatorBot {
+    async fn run(&mut self, _delta: tokio::sync::watch::Receiver<f64>, action: &Operation) -> bool {
+        match action {
+            Operation::Add(a, b, c) => self.add(a, b, c),
+            Operation::Subtract(a, b, c) => self.sub(a, b, c),
+        }
     }
+
+    fn reset(&mut self, _action: &Operation) {}
 }
 
 fn main() -> Result<(), String> {
@@ -142,13 +125,13 @@ fn main() -> Result<(), String> {
     let output = serde_json::to_string_pretty(&behavior).unwrap();
     tracing::info!("Behavior:\n{output}");
 
-    let operation_shared = OperationShared::default();
-    let blackboard = operation_shared.blackboard.clone();
+    let bot = CalculatorBot::default();
+    let blackboard = bot.blackboard.clone();
 
     let mut executor = TickedAsyncExecutor::default();
     let delta_rx = executor.tick_channel();
 
-    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, operation_shared);
+    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, bot);
 
     executor
         .spawn_local("AsyncBehaviorTree::future", future)

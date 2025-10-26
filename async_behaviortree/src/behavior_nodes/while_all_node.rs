@@ -1,35 +1,45 @@
+use std::rc::Rc;
+
 use tokio_util::sync::CancellationToken;
 
-use crate::AsyncAction;
 use crate::async_child::AsyncChild;
+use crate::behavior_nodes::AsyncAction;
 use crate::util::yield_now;
 
-pub struct AsyncWhileAll<S> {
-    conditions: Vec<AsyncChild<S>>,
-    child: AsyncChild<S>,
+pub struct AsyncWhileAll<R> {
+    conditions: Vec<AsyncChild<R>>,
+    child: AsyncChild<R>,
 }
 
-impl<S> AsyncWhileAll<S> {
-    pub fn new(conditions: Vec<AsyncChild<S>>, child: AsyncChild<S>) -> Self {
+impl<R> AsyncWhileAll<R> {
+    pub fn new(conditions: Vec<AsyncChild<R>>, child: AsyncChild<R>) -> Self {
         Self { conditions, child }
     }
 
     async fn handle_child(
-        child: &mut AsyncChild<S>,
+        child: &mut AsyncChild<R>,
         delta: tokio::sync::watch::Receiver<f64>,
-        shared: &S,
+        runner: Rc<tokio::sync::Mutex<&mut R>>,
         failure_token: CancellationToken,
         allow_failure: bool,
     ) {
         let future = async {
             loop {
-                let status = child.run(delta.clone(), shared).await;
-                // If we allow failure and the child returns a filure, then we exit
+                let status = {
+                    let mut runner_lock = runner.lock().await;
+                    child.run(delta.clone(), *runner_lock).await
+                };
+
+                // If we allow failure + the child returns failure, then we exit
                 if allow_failure && !status {
                     break;
                 }
                 yield_now().await;
-                child.reset(shared);
+
+                {
+                    let mut runner_lock = runner.lock().await;
+                    child.reset(*runner_lock);
+                }
             }
             failure_token.cancel();
         };
@@ -38,43 +48,44 @@ impl<S> AsyncWhileAll<S> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl<S> AsyncAction<S> for AsyncWhileAll<S> {
+impl<R> AsyncAction<R> for AsyncWhileAll<R> {
     #[tracing::instrument(level = "trace", name = "WhileAll::run", skip_all, ret)]
-    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, shared: &S) -> bool {
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         let failure_token = tokio_util::sync::CancellationToken::new();
+
+        let runner = Rc::new(tokio::sync::Mutex::new(runner));
 
         let mut futures = self
             .conditions
             .iter_mut()
             .map(|child| {
-                Self::handle_child(child, delta.clone(), shared, failure_token.clone(), true)
+                Self::handle_child(
+                    child,
+                    delta.clone(),
+                    runner.clone(),
+                    failure_token.clone(),
+                    true,
+                )
             })
             .collect::<Vec<_>>();
         // NOTE: child should not be able to mark failure even if it fails
         futures.push(Self::handle_child(
             &mut self.child,
             delta,
-            shared,
+            runner,
             failure_token,
             false,
         ));
         futures::future::join_all(futures).await;
-
-        // Reset
-        self.conditions.iter_mut().for_each(|condition| {
-            condition.reset(shared);
-        });
-        self.child.reset(shared);
-
         false
     }
 
     #[tracing::instrument(level = "trace", name = "WhileAll::reset", skip_all, ret)]
-    fn reset(&mut self, shared: &S) {
+    fn reset(&mut self, runner: &mut R) {
         self.conditions.iter_mut().for_each(|condition| {
-            condition.reset(shared);
+            condition.reset(runner);
         });
-        self.child.reset(shared);
+        self.child.reset(runner);
     }
 
     fn name(&self) -> &'static str {
@@ -88,7 +99,7 @@ mod tests {
     use ticked_async_executor::TickedAsyncExecutor;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
 
     use super::*;
 
@@ -115,11 +126,11 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let shared = TestShared;
+        let mut runner = TestRunner;
 
         executor
             .spawn_local("", async move {
-                let status = child.run(delta, &shared).await;
+                let status = child.run(delta, &mut runner).await;
                 assert!(!status);
             })
             .detach();

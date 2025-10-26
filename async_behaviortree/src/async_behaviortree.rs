@@ -2,7 +2,8 @@ use behaviortree_common::Behavior;
 use behaviortree_common::State;
 use tokio_util::sync::CancellationToken;
 
-use crate::async_action_type::AsyncActionType;
+use crate::AsyncActionName;
+use crate::AsyncBehaviorRunner;
 use crate::async_child::AsyncChild;
 use crate::util::yield_now;
 
@@ -30,49 +31,43 @@ impl Drop for AsyncBehaviorController {
 pub struct AsyncBehaviorTree;
 
 impl AsyncBehaviorTree {
-    pub fn new<A, S>(
+    pub fn new<A, R>(
         behavior: Behavior<A>,
         should_loop: bool,
         delta: tokio::sync::watch::Receiver<f64>,
-        shared: S,
+        mut runner: R,
     ) -> (
         impl std::future::Future<Output = ()>,
         AsyncBehaviorController,
     )
     where
-        A: Into<AsyncActionType<S>>,
-        S: 'static,
+        A: AsyncActionName + 'static,
+        R: AsyncBehaviorRunner<A> + 'static,
     {
         let cancellation = tokio_util::sync::CancellationToken::new();
         let cancellation_clone = cancellation.clone();
 
-        let mut statuses = vec![];
-        let (mut child, state) =
-            AsyncChild::from_behavior_with_state_and_status(behavior, &mut statuses);
-
+        let (mut child, state) = AsyncChild::from_behavior_with_state(behavior);
         let future = async move {
             if should_loop {
                 cancellation_clone
                     .run_until_cancelled_owned(async {
                         loop {
-                            let _status = child.run(delta.clone(), &shared).await;
+                            let _status = child.run(delta.clone(), &mut runner).await;
                             yield_now().await;
-                            statuses.iter().for_each(|status| {
-                                status.send_replace(None);
-                            });
-                            child.reset(&shared);
+                            child.reset(&mut runner);
                         }
                     })
                     .await;
             } else {
                 cancellation_clone
                     .run_until_cancelled_owned(async {
-                        let _status = child.run(delta, &shared).await;
+                        let _status = child.run(delta, &mut runner).await;
                         yield_now().await;
                     })
                     .await;
             }
-            child.reset(&shared);
+            child.reset(&mut runner);
         };
         (
             future,
@@ -94,7 +89,7 @@ mod tests {
     use tokio_stream::StreamExt;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
 
     #[test]
     fn test_async_behaviortree() {
@@ -108,10 +103,10 @@ mod tests {
         ]);
 
         let mut executor = TickedAsyncExecutor::default();
-        let shared = TestShared;
+        let runner = TestRunner;
 
         let (behaviortree_future, controller) =
-            AsyncBehaviorTree::new(behavior, false, executor.tick_channel(), shared);
+            AsyncBehaviorTree::new(behavior, false, executor.tick_channel(), runner);
 
         let state = controller.state();
         let cancel = controller.cancel_token();
@@ -199,10 +194,10 @@ mod tests {
         // let behavior = Behavior::Loop(Box::new(behavior));
 
         let mut executor = TickedAsyncExecutor::default();
-        let shared = TestShared;
+        let runner = TestRunner;
 
         let (behaviortree_future, controller) =
-            AsyncBehaviorTree::new(behavior, true, executor.tick_channel(), shared);
+            AsyncBehaviorTree::new(behavior, true, executor.tick_channel(), runner);
 
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
