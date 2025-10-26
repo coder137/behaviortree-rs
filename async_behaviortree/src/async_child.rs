@@ -32,7 +32,6 @@ impl<S> AsyncChild<S> {
         child
     }
 
-    #[cfg(test)]
     pub fn from_behavior_with_state<A>(behavior: Behavior<A>) -> (Self, State)
     where
         A: AsyncActionName + 'static,
@@ -111,7 +110,7 @@ impl<S> AsyncChild<S> {
                 let state = State::MultipleChildren(action.name(), rx, children_states);
                 (Self::new(action, tx), state)
             }
-            Behavior::WhileAll(conditions, child) => {
+            Behavior::WhileAll(_conditions, _child) => {
                 // let (conditions, mut children_states): (Vec<_>, Vec<_>) = conditions
                 //     .into_iter()
                 //     .map(|condition| Self::from_behavior_with_state_and_status(condition, statuses))
@@ -149,8 +148,8 @@ impl<S> AsyncChild<S> {
         success
     }
 
-    // Reset action and status
     pub fn reset(&mut self, shared: &mut S) {
+        self.status.send_replace(None);
         self.action_type.reset(shared);
     }
 }

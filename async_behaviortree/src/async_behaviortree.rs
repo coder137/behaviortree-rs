@@ -47,10 +47,7 @@ impl AsyncBehaviorTree {
         let cancellation = tokio_util::sync::CancellationToken::new();
         let cancellation_clone = cancellation.clone();
 
-        let mut statuses = vec![];
-        let (mut child, state) =
-            AsyncChild::from_behavior_with_state_and_status(behavior, &mut statuses);
-
+        let (mut child, state) = AsyncChild::from_behavior_with_state(behavior);
         let future = async move {
             if should_loop {
                 cancellation_clone
@@ -58,9 +55,6 @@ impl AsyncBehaviorTree {
                         loop {
                             let _status = child.run(delta.clone(), &mut shared).await;
                             yield_now().await;
-                            statuses.iter().for_each(|status| {
-                                status.send_replace(None);
-                            });
                             child.reset(&mut shared);
                         }
                     })
