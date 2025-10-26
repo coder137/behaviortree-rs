@@ -140,7 +140,7 @@ impl<S> AsyncChild<S> {
 mod tests {
     use ticked_async_executor::TickedAsyncExecutor;
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
 
     use super::*;
 
@@ -157,7 +157,7 @@ mod tests {
         let mut child = AsyncChild::from_behavior(behavior);
         let mut executor = TickedAsyncExecutor::default();
 
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
         let delta = executor.tick_channel();
         executor
             .spawn_local("WaitFuture", async move {

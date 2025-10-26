@@ -40,10 +40,10 @@ pub mod test_async_behavior_interface {
     }
 
     #[derive(Debug, Default)]
-    pub struct TestShared;
+    pub struct TestRunner;
 
     #[async_trait::async_trait(?Send)]
-    impl AsyncBehaviorRunner<TestAction> for TestShared {
+    impl AsyncBehaviorRunner<TestAction> for TestRunner {
         async fn run(
             &mut self,
             mut delta: tokio::sync::watch::Receiver<f64>,

@@ -43,7 +43,7 @@ impl<S> AsyncAction<S> for AsyncInvertState<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -56,7 +56,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("InvertFuture", async move {
@@ -78,7 +78,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("InvertFuture", async move {
@@ -98,7 +98,7 @@ mod tests {
             .with(tracing_forest::ForestLayer::default())
             .try_init();
 
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         let behavior =
             Behavior::Invert(Behavior::Action(TestAction::SuccessAfter { times: 2 }).into());

@@ -33,7 +33,6 @@ impl AsyncActionName for Operation {
     }
 }
 
-/// Shared data structure for Operations
 #[derive(Default)]
 struct CalculatorBot {
     blackboard: Rc<RwLock<TypedBlackboard<usize>>>,
@@ -126,13 +125,13 @@ fn main() -> Result<(), String> {
     let output = serde_json::to_string_pretty(&behavior).unwrap();
     tracing::info!("Behavior:\n{output}");
 
-    let operation_shared = CalculatorBot::default();
-    let blackboard = operation_shared.blackboard.clone();
+    let bot = CalculatorBot::default();
+    let blackboard = bot.blackboard.clone();
 
     let mut executor = TickedAsyncExecutor::default();
     let delta_rx = executor.tick_channel();
 
-    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, operation_shared);
+    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, bot);
 
     executor
         .spawn_local("AsyncBehaviorTree::future", future)

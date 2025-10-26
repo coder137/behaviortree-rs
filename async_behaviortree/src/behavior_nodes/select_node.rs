@@ -61,7 +61,7 @@ mod tests {
     use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
 
     use super::*;
 
@@ -73,7 +73,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("SelectFuture", async move {
@@ -95,7 +95,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("SelectFuture", async move {
@@ -119,7 +119,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("SelectFuture", async move {
@@ -145,7 +145,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("SelectFuture", async move {
@@ -173,7 +173,7 @@ mod tests {
         let mut executor = TickedAsyncExecutor::default();
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("SelectFuture", async move {

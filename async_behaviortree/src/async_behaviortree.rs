@@ -31,18 +31,18 @@ impl Drop for AsyncBehaviorController {
 pub struct AsyncBehaviorTree;
 
 impl AsyncBehaviorTree {
-    pub fn new<A, S>(
+    pub fn new<A, R>(
         behavior: Behavior<A>,
         should_loop: bool,
         delta: tokio::sync::watch::Receiver<f64>,
-        mut shared: S,
+        mut runner: R,
     ) -> (
         impl std::future::Future<Output = ()>,
         AsyncBehaviorController,
     )
     where
         A: AsyncActionName + 'static,
-        S: AsyncBehaviorRunner<A> + 'static,
+        R: AsyncBehaviorRunner<A> + 'static,
     {
         let cancellation = tokio_util::sync::CancellationToken::new();
         let cancellation_clone = cancellation.clone();
@@ -53,21 +53,21 @@ impl AsyncBehaviorTree {
                 cancellation_clone
                     .run_until_cancelled_owned(async {
                         loop {
-                            let _status = child.run(delta.clone(), &mut shared).await;
+                            let _status = child.run(delta.clone(), &mut runner).await;
                             yield_now().await;
-                            child.reset(&mut shared);
+                            child.reset(&mut runner);
                         }
                     })
                     .await;
             } else {
                 cancellation_clone
                     .run_until_cancelled_owned(async {
-                        let _status = child.run(delta, &mut shared).await;
+                        let _status = child.run(delta, &mut runner).await;
                         yield_now().await;
                     })
                     .await;
             }
-            child.reset(&mut shared);
+            child.reset(&mut runner);
         };
         (
             future,
@@ -89,7 +89,7 @@ mod tests {
     use tokio_stream::StreamExt;
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
 
     #[test]
     fn test_async_behaviortree() {
@@ -103,10 +103,10 @@ mod tests {
         ]);
 
         let mut executor = TickedAsyncExecutor::default();
-        let shared = TestShared;
+        let runner = TestRunner;
 
         let (behaviortree_future, controller) =
-            AsyncBehaviorTree::new(behavior, false, executor.tick_channel(), shared);
+            AsyncBehaviorTree::new(behavior, false, executor.tick_channel(), runner);
 
         let state = controller.state();
         let cancel = controller.cancel_token();
@@ -194,10 +194,10 @@ mod tests {
         // let behavior = Behavior::Loop(Box::new(behavior));
 
         let mut executor = TickedAsyncExecutor::default();
-        let shared = TestShared;
+        let runner = TestRunner;
 
         let (behaviortree_future, controller) =
-            AsyncBehaviorTree::new(behavior, true, executor.tick_channel(), shared);
+            AsyncBehaviorTree::new(behavior, true, executor.tick_channel(), runner);
 
         executor
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)

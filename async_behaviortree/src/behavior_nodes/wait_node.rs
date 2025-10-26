@@ -51,7 +51,7 @@ mod tests {
     use ticked_async_executor::TickedAsyncExecutor;
 
     use super::*;
-    use crate::test_async_behavior_interface::{DELTA, TestShared};
+    use crate::test_async_behavior_interface::{DELTA, TestRunner};
 
     #[test]
     fn test_wait_success() {
@@ -60,7 +60,7 @@ mod tests {
         let mut wait = AsyncWaitState::new(0.0);
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("WaitFuture", async move {
@@ -80,7 +80,7 @@ mod tests {
         let mut wait = AsyncWaitState::new(1.0);
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("WaitFuture", async move {
@@ -101,10 +101,10 @@ mod tests {
     fn test_wait_running() {
         let mut executor = TickedAsyncExecutor::default();
 
-        let mut wait: Box<dyn AsyncAction<TestShared>> = Box::new(AsyncWaitState::new(49.0));
+        let mut wait: Box<dyn AsyncAction<TestRunner>> = Box::new(AsyncWaitState::new(49.0));
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("WaitFuture", async move {
@@ -133,7 +133,7 @@ mod tests {
         let mut wait = AsyncWaitState::new(50.0);
 
         let delta = executor.tick_channel();
-        let mut shared = TestShared;
+        let mut shared = TestRunner;
 
         executor
             .spawn_local("WaitFuture", async move {
