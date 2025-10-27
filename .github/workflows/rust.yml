@@ -33,6 +33,7 @@ jobs:
         run: |
           cargo run --package behaviortree --example simple_immediate_sync
           cargo run --package async_behaviortree --example simple_async
+          cargo run --package async_behaviortree --example custom_wait
     
       - name: Build
         run: |

@@ -1,4 +1,9 @@
-use std::{collections::HashMap, rc::Rc, sync::RwLock};
+use std::{
+    collections::HashMap,
+    rc::Rc,
+    sync::RwLock,
+    time::{Duration, Instant},
+};
 
 use async_behaviortree::{AsyncActionName, AsyncActionRunner, AsyncBehaviorTree};
 use behaviortree_common::Behavior;
@@ -33,8 +38,8 @@ impl AsyncActionName for Operation {
     }
 }
 
-#[derive(Default)]
 struct CalculatorBot {
+    timer: ticked_async_executor::TickedTimerFromTimerRegistration,
     blackboard: Rc<RwLock<TypedBlackboard<usize>>>,
 }
 
@@ -101,6 +106,16 @@ impl AsyncActionRunner<Operation> for CalculatorBot {
         }
     }
 
+    // NOTE: TickedAsyncExecutor specific implementation for efficient waiting
+    // Users can use other executor specific wait strategies (i.e tokio/smol etc)
+    async fn wait(&mut self, _delta: tokio::sync::watch::Receiver<f64>, target: f64) -> bool {
+        let instant = Instant::now();
+        self.timer.sleep_for(target).await;
+        let elapsed = instant.elapsed();
+        tracing::info!("Elapsed: {:?}", elapsed);
+        true
+    }
+
     fn reset(&mut self, _action: &Operation) {}
 }
 
@@ -116,6 +131,7 @@ fn main() -> Result<(), String> {
             Input::Literal(20),
             Output::Blackboard("add".into()),
         )),
+        Behavior::Wait(1000.0),
         Behavior::Action(Operation::Subtract(
             Input::Blackboard("add".into()),
             Input::Literal(20),
@@ -125,31 +141,29 @@ fn main() -> Result<(), String> {
     let output = serde_json::to_string_pretty(&behavior).unwrap();
     tracing::info!("Behavior:\n{output}");
 
-    let bot = CalculatorBot::default();
+    let mut executor = TickedAsyncExecutor::default();
+
+    let bot = CalculatorBot {
+        timer: executor.create_timer_from_timer_registration(),
+        blackboard: Rc::default(),
+    };
     let blackboard = bot.blackboard.clone();
 
-    let mut executor = TickedAsyncExecutor::default();
     let delta_rx = executor.tick_channel();
 
-    let (future, controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, bot);
+    let (future, _controller) = AsyncBehaviorTree::new(behavior, false, delta_rx, bot);
 
     executor
         .spawn_local("AsyncBehaviorTree::future", future)
         .detach();
 
-    let state = controller.state();
-
-    executor.tick(0.1, None);
-    assert_eq!(executor.num_tasks(), 1);
-    tracing::info!("State: {:?}", state);
-
-    executor.tick(0.1, None);
-    assert_eq!(executor.num_tasks(), 1);
-    tracing::info!("State: {:?}", state);
-
-    executor.tick(0.1, None);
-    assert_eq!(executor.num_tasks(), 0);
-    tracing::info!("State: {:?}", state);
+    loop {
+        executor.tick(16.00, None);
+        if executor.num_tasks() == 0 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(16));
+    }
 
     let blackboard = blackboard.read().unwrap();
     let sub = blackboard.get(&"sub".to_string()).unwrap();

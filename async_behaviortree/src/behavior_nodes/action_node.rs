@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{AsyncActionName, AsyncBehaviorRunner, behavior_nodes::AsyncAction};
+use crate::{AsyncActionName, AsyncActionRunner, behavior_nodes::AsyncAction};
 
 pub struct AsyncActionState<A> {
     action: A,
@@ -16,7 +16,7 @@ impl<A> AsyncActionState<A> {
 impl<A, R> AsyncAction<R> for AsyncActionState<A>
 where
     A: AsyncActionName,
-    R: AsyncBehaviorRunner<A>,
+    R: AsyncActionRunner<A>,
 {
     #[tracing::instrument(level = "trace", name = "Action::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {

@@ -3,7 +3,7 @@ use behaviortree_common::State;
 use tokio_util::sync::CancellationToken;
 
 use crate::AsyncActionName;
-use crate::AsyncBehaviorRunner;
+use crate::AsyncActionRunner;
 use crate::async_child::AsyncChild;
 use crate::util::yield_now;
 
@@ -42,7 +42,7 @@ impl AsyncBehaviorTree {
     )
     where
         A: AsyncActionName + 'static,
-        R: AsyncBehaviorRunner<A> + 'static,
+        R: AsyncActionRunner<A> + 'static,
     {
         let cancellation = tokio_util::sync::CancellationToken::new();
         let cancellation_clone = cancellation.clone();
