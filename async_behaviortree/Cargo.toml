@@ -20,5 +20,8 @@ serde_json = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-forest = { workspace = true }
 
-ticked_async_executor = { version = "0.3", features = ["tick_event"] }
+ticked_async_executor = { version = "0.3", features = [
+    "tick_event",
+    "timer_registration",
+] }
 tokio-stream = { version = "0.1.15", features = ["full"] }
