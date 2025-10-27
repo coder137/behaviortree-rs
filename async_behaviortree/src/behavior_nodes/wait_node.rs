@@ -1,45 +1,35 @@
+use std::marker::PhantomData;
+
 use async_trait::async_trait;
 
-use crate::{behavior_nodes::AsyncAction, util::yield_now};
+use crate::{AsyncActionRunner, behavior_nodes::AsyncAction};
 
-pub struct AsyncWaitState {
+pub struct AsyncWaitState<A> {
     target: f64,
-    elapsed: f64,
+    inner: PhantomData<A>,
 }
 
-impl AsyncWaitState {
+impl<A> AsyncWaitState<A> {
     pub fn new(target: f64) -> Self {
         Self {
             target,
-            elapsed: 0.0,
+            inner: PhantomData::default(),
         }
     }
 }
 
 #[async_trait(?Send)]
-impl<R> AsyncAction<R> for AsyncWaitState {
+impl<A, R> AsyncAction<R> for AsyncWaitState<A>
+where
+    R: AsyncActionRunner<A>,
+{
     #[tracing::instrument(level = "trace", name = "Wait::run", skip_all, ret)]
-    async fn run(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, _runner: &mut R) -> bool {
-        loop {
-            let _r = delta.changed().await;
-            if _r.is_err() {
-                // This means that the executor supplying the delta channel has shutdown
-                // We must stop waiting gracefully
-                break;
-            }
-            self.elapsed += *(delta.borrow_and_update());
-            if self.elapsed >= self.target {
-                break;
-            }
-            yield_now().await;
-        }
-        true
+    async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
+        runner.wait(delta, self.target).await
     }
 
     #[tracing::instrument(level = "trace", name = "Wait::reset", skip_all, ret)]
-    fn reset(&mut self, _runner: &mut R) {
-        self.elapsed = 0.0;
-    }
+    fn reset(&mut self, _runner: &mut R) {}
 
     fn name(&self) -> &'static str {
         "Wait"

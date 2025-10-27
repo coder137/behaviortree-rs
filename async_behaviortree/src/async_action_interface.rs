@@ -7,6 +7,24 @@ pub trait AsyncActionRunner<A> {
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, action: &A) -> bool;
 
     fn reset(&mut self, action: &A);
+
+    async fn wait(&mut self, mut delta: tokio::sync::watch::Receiver<f64>, target: f64) -> bool {
+        let mut elapsed = 0.0;
+        loop {
+            let _r = delta.changed().await;
+            if _r.is_err() {
+                // This means that the executor supplying the delta channel has shutdown
+                // We must stop waiting gracefully
+                break;
+            }
+            elapsed += *(delta.borrow_and_update());
+            if elapsed >= target {
+                break;
+            }
+            crate::util::yield_now().await;
+        }
+        true
+    }
 }
 
 #[cfg(test)]
