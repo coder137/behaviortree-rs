@@ -3,7 +3,7 @@ pub trait AsyncActionName {
 }
 
 #[async_trait::async_trait(?Send)]
-pub trait AsyncBehaviorRunner<A> {
+pub trait AsyncActionRunner<A> {
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, action: &A) -> bool;
 
     fn reset(&mut self, action: &A);
@@ -43,7 +43,7 @@ pub mod test_async_behavior_interface {
     pub struct TestRunner;
 
     #[async_trait::async_trait(?Send)]
-    impl AsyncBehaviorRunner<TestAction> for TestRunner {
+    impl AsyncActionRunner<TestAction> for TestRunner {
         async fn run(
             &mut self,
             mut delta: tokio::sync::watch::Receiver<f64>,

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use async_behaviortree::{AsyncActionName, AsyncBehaviorRunner, AsyncBehaviorTree};
+use async_behaviortree::{AsyncActionName, AsyncActionRunner, AsyncBehaviorTree};
 use behaviortree_common::Behavior;
 use ticked_async_executor::TickedAsyncExecutor;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -93,7 +93,7 @@ impl CalculatorBot {
 }
 
 #[async_trait::async_trait(?Send)]
-impl AsyncBehaviorRunner<Operation> for CalculatorBot {
+impl AsyncActionRunner<Operation> for CalculatorBot {
     async fn run(&mut self, _delta: tokio::sync::watch::Receiver<f64>, action: &Operation) -> bool {
         match action {
             Operation::Add(a, b, c) => self.add(a, b, c),

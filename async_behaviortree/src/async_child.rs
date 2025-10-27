@@ -4,7 +4,7 @@ use crate::behavior_nodes::{
     AsyncAction, AsyncActionState, AsyncInvertState, AsyncSelectState, AsyncSequenceState,
     AsyncWaitState, AsyncWhileAll,
 };
-use crate::{AsyncActionName, AsyncBehaviorRunner};
+use crate::{AsyncActionName, AsyncActionRunner};
 
 pub struct AsyncChild<R> {
     action_type: Box<dyn AsyncAction<R>>,
@@ -26,7 +26,7 @@ impl<R> AsyncChild<R> {
     pub fn from_behavior<A>(behavior: Behavior<A>) -> Self
     where
         A: AsyncActionName + 'static,
-        R: AsyncBehaviorRunner<A> + 'static,
+        R: AsyncActionRunner<A> + 'static,
     {
         let (child, _state) = Self::from_behavior_with_state(behavior);
         child
@@ -35,7 +35,7 @@ impl<R> AsyncChild<R> {
     pub fn from_behavior_with_state<A>(behavior: Behavior<A>) -> (Self, State)
     where
         A: AsyncActionName + 'static,
-        R: AsyncBehaviorRunner<A> + 'static,
+        R: AsyncActionRunner<A> + 'static,
     {
         match behavior {
             Behavior::Action(action) => {
