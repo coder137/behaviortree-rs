@@ -9,7 +9,6 @@ pub trait AsyncActionRunner<A> {
     fn reset(&mut self, action: &A);
 }
 
-// TODO, Shift this also
 #[cfg(test)]
 pub mod test_async_behavior_interface {
     use super::*;
