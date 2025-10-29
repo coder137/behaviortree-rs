@@ -29,7 +29,7 @@ impl<R> AsyncAction<R> for AsyncInvertState<R> {
         status
     }
 
-    #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.child.reset(runner);
         self.completed = false;

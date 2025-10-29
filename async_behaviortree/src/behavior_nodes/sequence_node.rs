@@ -45,7 +45,7 @@ impl<R> AsyncAction<R> for AsyncSequenceState<R> {
         status
     }
 
-    #[tracing::instrument(level = "trace", name = "Sequence::reset", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "Sequence::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.children
             .iter_mut()

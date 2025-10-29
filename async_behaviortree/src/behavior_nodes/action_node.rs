@@ -23,7 +23,7 @@ where
         runner.run(delta, &self.action).await
     }
 
-    #[tracing::instrument(level = "trace", name = "Action::reset", skip_all, ret, fields(action = self.action.name()))]
+    #[tracing::instrument(level = "trace", name = "Action::reset", skip_all, fields(action = self.action.name()))]
     fn reset(&mut self, runner: &mut R) {
         runner.reset(&self.action);
     }

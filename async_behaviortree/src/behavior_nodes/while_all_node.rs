@@ -80,7 +80,7 @@ impl<R> AsyncAction<R> for AsyncWhileAll<R> {
         false
     }
 
-    #[tracing::instrument(level = "trace", name = "WhileAll::reset", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "WhileAll::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.conditions.iter_mut().for_each(|condition| {
             condition.reset(runner);
