@@ -43,7 +43,7 @@ impl<R> AsyncAction<R> for AsyncSelectState<R> {
         status
     }
 
-    #[tracing::instrument(level = "trace", name = "Select::reset", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "Select::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.children.iter_mut().for_each(|child| {
             child.reset(runner);

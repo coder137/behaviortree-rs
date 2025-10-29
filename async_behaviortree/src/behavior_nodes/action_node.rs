@@ -18,12 +18,12 @@ where
     A: AsyncActionName,
     R: AsyncActionRunner<A>,
 {
-    #[tracing::instrument(level = "trace", name = "Action::run", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "Action::run", skip_all, ret, fields(action = self.action.name()))]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         runner.run(delta, &self.action).await
     }
 
-    #[tracing::instrument(level = "trace", name = "Action::reset", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "Action::reset", skip_all, fields(action = self.action.name()))]
     fn reset(&mut self, runner: &mut R) {
         runner.reset(&self.action);
     }
