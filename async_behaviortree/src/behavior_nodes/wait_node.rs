@@ -23,12 +23,11 @@ impl<A, R> AsyncAction<R> for AsyncWaitState<A>
 where
     R: AsyncActionRunner<A>,
 {
-    #[tracing::instrument(level = "trace", name = "Wait::run", skip_all, ret)]
+    #[tracing::instrument(level = "trace", name = "Wait::run", skip_all, ret, fields(target = self.target))]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         runner.wait(delta, self.target).await
     }
 
-    #[tracing::instrument(level = "trace", name = "Wait::reset", skip_all, ret)]
     fn reset(&mut self, _runner: &mut R) {}
 
     fn name(&self) -> &'static str {
