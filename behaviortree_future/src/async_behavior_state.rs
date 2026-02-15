@@ -5,13 +5,13 @@ use crate::{
     behavior_nodes::{AsyncAction, AsyncInvert, AsyncSequence},
 };
 
-pub enum AsyncActionType<A> {
+pub enum AsyncBehaviorState<A> {
     Action(AsyncAction<A>),
     Invert(AsyncInvert<A>),
     Sequence(AsyncSequence<A>),
 }
 
-impl<A> AsyncActionType<A> {
+impl<A> AsyncBehaviorState<A> {
     pub fn from_behavior<R>(behavior: Behavior<A>, runner: R, delta: SafeDeltaType) -> Self
     where
         R: BehaviorTreeAsyncRunner<A> + 'static,
@@ -44,14 +44,14 @@ impl<A> AsyncActionType<A> {
         A: Clone + 'static,
     {
         match self {
-            AsyncActionType::Action(async_action) => async_action.reset(runner, delta),
-            AsyncActionType::Invert(async_invert) => async_invert.reset(runner, delta),
-            AsyncActionType::Sequence(async_sequence) => async_sequence.reset(runner, delta),
+            AsyncBehaviorState::Action(async_action) => async_action.reset(runner, delta),
+            AsyncBehaviorState::Invert(async_invert) => async_invert.reset(runner, delta),
+            AsyncBehaviorState::Sequence(async_sequence) => async_sequence.reset(runner, delta),
         }
     }
 }
 
-impl<A> std::future::Future for AsyncActionType<A>
+impl<A> std::future::Future for AsyncBehaviorState<A>
 where
     A: Unpin,
 {
@@ -61,9 +61,9 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         match self.as_mut().get_mut() {
-            AsyncActionType::Action(async_action) => std::pin::pin!(async_action).poll(cx),
-            AsyncActionType::Invert(async_invert) => std::pin::pin!(async_invert).poll(cx),
-            AsyncActionType::Sequence(async_sequence) => std::pin::pin!(async_sequence).poll(cx),
+            AsyncBehaviorState::Action(async_action) => std::pin::pin!(async_action).poll(cx),
+            AsyncBehaviorState::Invert(async_invert) => std::pin::pin!(async_invert).poll(cx),
+            AsyncBehaviorState::Sequence(async_sequence) => std::pin::pin!(async_sequence).poll(cx),
         }
     }
 }

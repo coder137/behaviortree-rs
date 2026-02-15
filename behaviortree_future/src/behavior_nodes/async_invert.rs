@@ -1,11 +1,11 @@
-use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_nodes::AsyncActionType};
+use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_behavior_state::AsyncBehaviorState};
 
 pub struct AsyncInvert<A> {
-    child: Box<AsyncActionType<A>>,
+    child: Box<AsyncBehaviorState<A>>,
 }
 
 impl<A> AsyncInvert<A> {
-    pub fn new(child: AsyncActionType<A>) -> Self {
+    pub fn new(child: AsyncBehaviorState<A>) -> Self {
         Self {
             child: Box::new(child),
         }
@@ -55,7 +55,7 @@ mod tests {
             let _profiler = DhatTester::new("test_invert_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
             let action = AsyncAction::new(runner.clone(), action, executor.delta().inner().into());
-            let action = AsyncInvert::new(AsyncActionType::Action(action));
+            let action = AsyncInvert::new(AsyncBehaviorState::Action(action));
             action
         };
 

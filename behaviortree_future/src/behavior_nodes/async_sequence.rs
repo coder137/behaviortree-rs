@@ -1,12 +1,12 @@
-use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_nodes::AsyncActionType};
+use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_behavior_state::AsyncBehaviorState};
 
 pub struct AsyncSequence<A> {
-    children: Vec<AsyncActionType<A>>,
+    children: Vec<AsyncBehaviorState<A>>,
     current_index: usize,
 }
 
 impl<A> AsyncSequence<A> {
-    pub fn new(children: Vec<AsyncActionType<A>>) -> Self {
+    pub fn new(children: Vec<AsyncBehaviorState<A>>) -> Self {
         Self {
             children,
             current_index: 0,
@@ -85,8 +85,8 @@ mod tests {
             let action2 =
                 AsyncAction::new(runner.clone(), action2, executor.delta().inner().into());
             let action = AsyncSequence::new(vec![
-                AsyncActionType::Action(action1),
-                AsyncActionType::Action(action2),
+                AsyncBehaviorState::Action(action1),
+                AsyncBehaviorState::Action(action2),
             ]);
             action
         };

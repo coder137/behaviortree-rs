@@ -1,7 +1,7 @@
 use crate::Behavior;
 use crate::BehaviorTreeAsyncRunner;
 use crate::SafeDeltaType;
-use crate::async_nodes::AsyncActionType;
+use crate::async_behavior_state::AsyncBehaviorState;
 
 pub struct AsyncBehaviorTree<A, R> {
     runner: R,
@@ -9,7 +9,7 @@ pub struct AsyncBehaviorTree<A, R> {
     should_loop: bool,
 
     // state
-    child: AsyncActionType<A>,
+    child: AsyncBehaviorState<A>,
     result: Option<bool>,
 }
 
@@ -24,12 +24,12 @@ impl<A, R> AsyncBehaviorTree<A, R> {
         R: BehaviorTreeAsyncRunner<A> + 'static,
         A: Clone + 'static,
     {
-        let child = AsyncActionType::from_behavior(behavior, runner.clone(), delta.clone());
+        let child = AsyncBehaviorState::from_behavior(behavior, runner.clone(), delta.clone());
         Self::new(child, runner, delta, should_loop)
     }
 
     pub(crate) fn new(
-        child: AsyncActionType<A>,
+        child: AsyncBehaviorState<A>,
         runner: R,
         delta: SafeDeltaType,
         should_loop: bool,

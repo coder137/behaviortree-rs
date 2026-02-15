@@ -7,7 +7,7 @@ mod async_behavior_tree;
 pub use async_behavior_tree::*;
 
 //
-mod async_nodes;
+mod async_behavior_state;
 mod behavior_nodes;
 
 #[cfg(test)]
