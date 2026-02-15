@@ -10,7 +10,7 @@ pub struct AsyncAction<A> {
 impl<A> AsyncAction<A> {
     pub fn new<R>(runner: R, action: A, delta: SafeDeltaType) -> Self
     where
-        R: BehaviorTreeAsyncRunner<A> + Clone + 'static,
+        R: BehaviorTreeAsyncRunner<A> + 'static,
         A: Clone + 'static,
     {
         let future = runner.create_future(action.clone(), delta);
@@ -24,7 +24,7 @@ impl<A> AsyncAction<A> {
 
     pub fn reset<R>(&mut self, mut runner: R, delta: SafeDeltaType)
     where
-        R: BehaviorTreeAsyncRunner<A> + Clone + 'static,
+        R: BehaviorTreeAsyncRunner<A> + 'static,
         A: Clone + 'static,
     {
         runner.reset(&self.action);
@@ -86,6 +86,8 @@ mod tests {
                 let _profiler = DhatTester::new("test_action_operation_add_with_dhat_post");
                 let status = action.await;
                 assert!(status);
+                let stats = dhat::HeapStats::get();
+                println!("Stats: {stats:?}");
             })
             .detach();
 
