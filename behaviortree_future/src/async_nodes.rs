@@ -19,7 +19,6 @@ impl<A> AsyncActionType<A> {
     {
         match behavior {
             Behavior::Action(action) => {
-                //
                 Self::Action(AsyncAction::new(runner.clone(), action, delta.clone()))
             }
             Behavior::Wait(_) => todo!(),

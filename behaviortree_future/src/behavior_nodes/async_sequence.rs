@@ -39,9 +39,8 @@ where
 
         let current_child = &mut bt.children[bt.current_index];
         let child_status = std::pin::pin!(current_child).poll(cx);
-        let status = match child_status {
+        match child_status {
             std::task::Poll::Ready(result) => {
-                //
                 match result {
                     true => {
                         bt.current_index += 1;
@@ -57,16 +56,13 @@ where
                 }
             }
             std::task::Poll::Pending => std::task::Poll::Pending,
-        };
-        status
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::time::Duration;
 
     use crate::{
         behavior_nodes::AsyncAction,
@@ -79,7 +75,6 @@ mod tests {
 
         let runner = TestOperationRunner::new();
         let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
-        std::thread::sleep(Duration::from_millis(50));
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_with_dhat_pre");
@@ -109,6 +104,6 @@ mod tests {
         executor.tick(16.67, None);
         executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 3);
+        assert_eq!(runner.borrow().num, 6);
     }
 }

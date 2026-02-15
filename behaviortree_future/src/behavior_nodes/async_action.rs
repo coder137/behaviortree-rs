@@ -44,23 +44,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::{
         behavior_nodes::AsyncAction,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
     #[test]
-    fn test_action_operation_add_with_dhat() {
+    fn test_action_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let runner = TestOperationRunner::new();
         let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
-        std::thread::sleep(Duration::from_millis(50));
 
         let action = {
-            let _profiler = DhatTester::new("test_action_operation_add_with_dhat_pre");
+            let _profiler = DhatTester::new("test_action_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
             let action = AsyncAction::new(runner.clone(), action, executor.delta().inner().into());
             action
@@ -68,7 +65,7 @@ mod tests {
 
         executor
             .spawn_local("_", async move {
-                let _profiler = DhatTester::new("test_action_operation_add_with_dhat_post");
+                let _profiler = DhatTester::new("test_action_with_dhat_post");
                 let status = action.await;
                 assert!(status);
             })

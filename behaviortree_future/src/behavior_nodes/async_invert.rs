@@ -37,8 +37,6 @@ where
 mod tests {
     use super::*;
 
-    use std::time::Duration;
-
     use crate::{
         behavior_nodes::AsyncAction,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
@@ -50,7 +48,6 @@ mod tests {
 
         let runner = TestOperationRunner::new();
         let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
-        std::thread::sleep(Duration::from_millis(50));
 
         let action = {
             let _profiler = DhatTester::new("test_invert_with_dhat_pre");

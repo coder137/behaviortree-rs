@@ -20,7 +20,7 @@ impl TestOperationRunner {
     }
 
     pub fn set_num(&mut self, num: u32, _delta: f64) {
-        self.num = num;
+        self.num += num;
     }
 }
 

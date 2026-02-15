@@ -55,18 +55,17 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let bt = self.as_mut().get_mut();
-
-        println!("AsyncBehaviorTree::poll -> Start: {:?}", bt.result);
         if bt.result.is_some() && bt.should_loop {
             bt.result = None;
             bt.child.reset(bt.runner.clone(), bt.delta.clone());
         }
 
-        let status = std::pin::pin!(&mut bt.child).poll(cx);
-        let status = match status {
+        let child_status = std::pin::pin!(&mut bt.child).poll(cx);
+        let status = match child_status {
             std::task::Poll::Ready(result) => {
                 bt.result = Some(result);
                 if bt.should_loop {
+                    cx.waker().wake_by_ref();
                     std::task::Poll::Pending
                 } else {
                     std::task::Poll::Ready(result)
@@ -74,29 +73,25 @@ where
             }
             std::task::Poll::Pending => std::task::Poll::Pending,
         };
-        println!("AsyncBehaviorTree::poll -> End: {:?}", status);
-        println!("------");
         status
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use crate::test_nodes::{TestOperation, TestOperationRunner};
+    use crate::test_nodes::{DhatTester, TestOperation, TestOperationRunner};
 
     use super::*;
 
     #[test]
-    fn test_behaviortree_operation_async() {
+    fn test_behaviortree_no_loop_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let runner = TestOperationRunner::new();
         let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
-        std::thread::sleep(Duration::from_millis(50));
 
         let action = {
+            let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
             let action = AsyncBehaviorTree::from_behavior(
                 Behavior::Action(action),
@@ -104,23 +99,58 @@ mod tests {
                 executor.delta().inner().into(),
                 false,
             );
-            // let stats = dhat::HeapStats::get();
-            // println!("Stats: {stats:?}");
             action
         };
 
         executor
             .spawn_local("_", async move {
-                // let _profiler = dhat::Profiler::builder()
-                //     .file_name(format!("heap-post-action-operation-async.json"))
-                //     .build();
+                let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_post");
                 let status = action.await;
                 assert!(status);
-                // let stats = dhat::HeapStats::get();
-                // println!("Stats: {stats:?}");
             })
             .detach();
 
         executor.wait_till_completed(16.67);
+    }
+
+    #[test]
+    fn test_behaviortree_loop_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::new();
+        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+
+        let action = {
+            let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_pre");
+            let action = TestOperation::Add(1, 2, true, 1);
+            let action = AsyncBehaviorTree::from_behavior(
+                Behavior::Action(action),
+                runner.clone(),
+                executor.delta().inner().into(),
+                true,
+            );
+            action
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_post");
+                let status = action.await;
+                assert!(status);
+            })
+            .detach();
+
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        assert_eq!(runner.borrow().num, 3);
+        // Reset takes place
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        assert_eq!(runner.borrow().num, 6);
+        //Reset takes place
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        assert_eq!(runner.borrow().num, 9);
+        drop(executor);
     }
 }
