@@ -7,7 +7,7 @@ use crate::{
 
 pub enum AsyncActionType<A> {
     Action(AsyncAction<A>),
-    Invert(Box<AsyncInvert<A>>),
+    Invert(AsyncInvert<A>),
     Sequence(AsyncSequence<A>),
 }
 
@@ -24,7 +24,7 @@ impl<A> AsyncActionType<A> {
             Behavior::Wait(_) => todo!(),
             Behavior::Invert(behavior) => {
                 let child = Self::from_behavior(*behavior, runner.clone(), delta.clone());
-                Self::Invert(AsyncInvert::new(child).into())
+                Self::Invert(AsyncInvert::new(child))
             }
             Behavior::Sequence(behaviors) => {
                 let children = behaviors

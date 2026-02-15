@@ -1,12 +1,14 @@
 use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_nodes::AsyncActionType};
 
 pub struct AsyncInvert<A> {
-    child: AsyncActionType<A>,
+    child: Box<AsyncActionType<A>>,
 }
 
 impl<A> AsyncInvert<A> {
     pub fn new(child: AsyncActionType<A>) -> Self {
-        Self { child }
+        Self {
+            child: Box::new(child),
+        }
     }
 
     pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
