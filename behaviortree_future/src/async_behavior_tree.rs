@@ -61,7 +61,7 @@ where
         }
 
         let child_status = std::pin::pin!(&mut bt.child).poll(cx);
-        let status = match child_status {
+        match child_status {
             std::task::Poll::Ready(result) => {
                 bt.result = Some(result);
                 if bt.should_loop {
@@ -72,8 +72,7 @@ where
                 }
             }
             std::task::Poll::Pending => std::task::Poll::Pending,
-        };
-        status
+        }
     }
 }
 
