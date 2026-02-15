@@ -3,7 +3,6 @@ use crate::{BehaviorTreeAsyncRunner, SafeDeltaType};
 pub struct AsyncAction<A> {
     action: A,
     // state
-    result: Option<bool>,
     future: reusable_box_future::ReusableLocalBoxFuture<bool>,
 }
 
@@ -15,11 +14,7 @@ impl<A> AsyncAction<A> {
     {
         let future = runner.create_future(action.clone(), delta);
         let future = reusable_box_future::ReusableLocalBoxFuture::new(future);
-        Self {
-            action,
-            result: None,
-            future,
-        }
+        Self { action, future }
     }
 
     pub fn reset<R>(&mut self, mut runner: R, delta: SafeDeltaType)
@@ -43,17 +38,7 @@ where
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        if let Some(result) = self.result {
-            return std::task::Poll::Ready(result);
-        }
-        let status = self.as_mut().get_mut().future.poll(cx);
-        match status {
-            std::task::Poll::Ready(result) => {
-                self.get_mut().result = Some(result);
-            }
-            std::task::Poll::Pending => {}
-        }
-        status
+        self.as_mut().get_mut().future.poll(cx)
     }
 }
 
@@ -76,7 +61,7 @@ mod tests {
 
         let action = {
             let _profiler = DhatTester::new("test_action_operation_add_with_dhat_pre");
-            let action = TestOperation::Add(1, 2, true, 10);
+            let action = TestOperation::Add(1, 2, true, 1);
             let action = AsyncAction::new(runner.clone(), action, executor.delta().inner().into());
             action
         };
@@ -86,12 +71,11 @@ mod tests {
                 let _profiler = DhatTester::new("test_action_operation_add_with_dhat_post");
                 let status = action.await;
                 assert!(status);
-                let stats = dhat::HeapStats::get();
-                println!("Stats: {stats:?}");
             })
             .detach();
 
-        executor.wait_till_completed(16.67);
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
         assert_eq!(runner.borrow().num, 3);
     }

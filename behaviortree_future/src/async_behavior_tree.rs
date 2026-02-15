@@ -21,7 +21,7 @@ impl<A, R> AsyncBehaviorTree<A, R> {
         should_loop: bool,
     ) -> Self
     where
-        R: BehaviorTreeAsyncRunner<A> + Clone + 'static,
+        R: BehaviorTreeAsyncRunner<A> + 'static,
         A: Clone + 'static,
     {
         let child = AsyncActionType::from_behavior(behavior, runner.clone(), delta.clone());
@@ -46,7 +46,7 @@ impl<A, R> AsyncBehaviorTree<A, R> {
 
 impl<A, R> std::future::Future for AsyncBehaviorTree<A, R>
 where
-    R: BehaviorTreeAsyncRunner<A> + Clone + Unpin + 'static,
+    R: BehaviorTreeAsyncRunner<A> + Unpin + 'static,
     A: Clone + Unpin + 'static,
 {
     type Output = bool;

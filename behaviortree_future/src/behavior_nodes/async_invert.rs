@@ -2,25 +2,18 @@ use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_nodes::AsyncActionType
 
 pub struct AsyncInvert<A> {
     child: AsyncActionType<A>,
-
-    // state
-    result: Option<bool>,
 }
 
 impl<A> AsyncInvert<A> {
     pub fn new(child: AsyncActionType<A>) -> Self {
-        Self {
-            child,
-            result: None,
-        }
+        Self { child }
     }
 
     pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
     where
-        R: BehaviorTreeAsyncRunner<A> + Clone + 'static,
+        R: BehaviorTreeAsyncRunner<A> + 'static,
         A: Clone + 'static,
     {
-        self.result = None;
         self.child.reset(runner, delta);
     }
 }
@@ -35,21 +28,8 @@ where
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        println!("AsyncInvert::poll -> Start: {:?}", self.result);
-        if let Some(result) = self.result {
-            return std::task::Poll::Ready(result);
-        }
-
         let child = &mut self.as_mut().get_mut().child;
-        let status = std::pin::pin!(child).poll(cx).map(|s| !s);
-        match status {
-            std::task::Poll::Ready(result) => {
-                self.get_mut().result = Some(result);
-            }
-            std::task::Poll::Pending => {}
-        }
-        println!("AsyncInvert::poll -> End: {:?}", status);
-        status
+        std::pin::pin!(child).poll(cx).map(|s| !s)
     }
 }
 
@@ -90,7 +70,7 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(executor.num_tasks(), 0);
         assert_eq!(runner.borrow().num, 3);
-        drop(runner);
     }
 }
