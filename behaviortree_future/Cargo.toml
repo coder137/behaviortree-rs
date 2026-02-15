@@ -3,15 +3,21 @@ name = "behaviortree_future"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["test-dhat"]
+
+# Memory usage
+test-dhat = []
+
 [dependencies]
 behaviortree_common = { path = "../behaviortree_common" }
 
 reusable-box-future = "0.2.0"
 
 [dev-dependencies]
-tracing-subscriber = { workspace = true }
-tracing-forest = { workspace = true }
+ticked_async_executor = { git = "https://github.com/coder137/ticked-async-executor.git", rev = "cf174a5b02744db876321d3e0451d7e680e690cc" }
 
-tokio = { version = "*", features = ["full"] }
+# Memory profiling
+dhat = { version = "0.3.3" }
 
-dhat = "0.3.3"
+# TODO, Performance profiling (criterion)
