@@ -19,35 +19,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cargo install cargo-tarpaulin
-
-      - name: Test
+      - name: behaviortree package
+        working-directory: ${{github.workspace}}/behaviortree
         run: |
           cargo clippy
           cargo test
-      
-      - name: Examples
-        run: |
-          cargo run --package behaviortree --example simple_immediate_sync
-          cargo run --package async_behaviortree --example simple_async
-          cargo run --package async_behaviortree --example custom_wait
-    
-      - name: Build
-        run: |
           cargo build
-          cargo build --release
+          cargo run --example simple_immediate_sync
       
-      - name: Generate Coverage Report
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: async_behaviortree package
+        working-directory: ${{github.workspace}}/async_behaviortree
         run: |
-          cargo tarpaulin --engine llvm --out xml --output-dir tarpaulin --target-dir tarpaulin --examples --tests --count
-
-      - name: Upload coverage reports to Codecov
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: codecov/codecov-action@v3
-        with:
-            token: ${{ secrets.CODECOV_TOKEN }}
-            files: target/cobertura.xml
+          cargo clippy
+          cargo test
+          cargo build
+          cargo run --example simple_async
+          cargo run --example custom_wait

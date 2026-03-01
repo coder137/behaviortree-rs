@@ -5,10 +5,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use async_behaviortree::{AsyncActionName, AsyncActionRunner, AsyncBehaviorTree};
-use behaviortree_common::Behavior;
+use async_behaviortree::{AsyncActionName, AsyncActionRunner, AsyncBehaviorTree, Behavior};
 use ticked_async_executor::TickedAsyncExecutor;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 enum Input<T> {
@@ -112,7 +110,6 @@ impl AsyncActionRunner<Operation> for CalculatorBot {
         let instant = Instant::now();
         self.timer.sleep_for(target).await;
         let elapsed = instant.elapsed();
-        tracing::info!("Elapsed: {:?}", elapsed);
         true
     }
 
@@ -120,11 +117,6 @@ impl AsyncActionRunner<Operation> for CalculatorBot {
 }
 
 fn main() -> Result<(), String> {
-    tracing_subscriber::Registry::default()
-        .with(tracing_forest::ForestLayer::default())
-        .try_init()
-        .map_err(|e| e.to_string())?;
-
     let behavior = Behavior::Sequence(vec![
         Behavior::Action(Operation::Add(
             Input::Literal(10),
@@ -138,8 +130,6 @@ fn main() -> Result<(), String> {
             Output::Blackboard("sub".into()),
         )),
     ]);
-    let output = serde_json::to_string_pretty(&behavior).unwrap();
-    tracing::info!("Behavior:\n{output}");
 
     let mut executor = TickedAsyncExecutor::default();
 
@@ -168,6 +158,5 @@ fn main() -> Result<(), String> {
     let blackboard = blackboard.read().unwrap();
     let sub = blackboard.get(&"sub".to_string()).unwrap();
     assert_eq!(*sub, 10);
-    tracing::info!("Blackboard: {:?}", &(*blackboard));
     Ok(())
 }

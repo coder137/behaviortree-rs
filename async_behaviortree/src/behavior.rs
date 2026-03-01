@@ -26,10 +26,4 @@ pub enum Behavior<A> {
     /// Fails if the last behavior fails.
     /// Can be thought of as a short-circuited logical OR gate.
     Select(Vec<Behavior<A>>),
-    /// Run this behavior while all conditional actions are running / success
-    /// Fails if any conditional action fails
-    ///
-    /// If the child behavior fails / succeeds, reset and restart the behavior
-    /// If conditional action succeeds, reset and restart the behavior
-    WhileAll(Vec<Behavior<A>>, Box<Behavior<A>>),
 }

@@ -1,6 +1,4 @@
-use behaviortree_common::{Behavior, State, Status};
-
-use crate::{action_type::ActionType, child::Child};
+use crate::{Behavior, State, Status, action_type::ActionType, child::Child};
 
 pub struct BehaviorTree<S> {
     child: Child<S>,
@@ -27,7 +25,6 @@ impl<S> BehaviorTree<S> {
         }
     }
 
-    #[tracing::instrument(level = "trace", name = "BehaviorTree::tick", skip(self), ret)]
     pub fn tick(&mut self, dt: f64) -> Status {
         if let Some(status) = self.child.status() {
             let completed = status != Status::Running;
@@ -47,7 +44,6 @@ impl<S> BehaviorTree<S> {
         self.state.clone()
     }
 
-    #[tracing::instrument(level = "trace", name = "BehaviorTree::reset", skip(self))]
     pub fn reset(&mut self) {
         self.statuses.iter_mut().for_each(|status| {
             status.send_replace(None);
@@ -62,41 +58,32 @@ impl<S> BehaviorTree<S> {
 
 #[cfg(test)]
 mod tests {
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     use super::*;
     use crate::test_behavior_interface::{TestAction, TestShared};
 
     #[test]
     fn behavior_tree_with_reset() {
-        let _ignore = tracing_subscriber::Registry::default()
-            .with(tracing_forest::ForestLayer::default())
-            .try_init();
-
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
         ]);
         let mut tree = BehaviorTree::new(behavior, false, TestShared);
-        let state = tree.state();
+        let _state = tree.state();
 
         // For unit tests
         let _state = tree.state();
         assert_eq!(tree.status(), None);
-        tracing::info!("State: {state:?}");
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Running);
-        tracing::info!("State: {state:?}");
 
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
-        tracing::info!("State: {state:?}");
 
         // Ticking again returns the same status
         let status = tree.tick(0.1);
         assert_eq!(status, Status::Success);
-        tracing::info!("State: {state:?}");
 
         tree.reset();
 

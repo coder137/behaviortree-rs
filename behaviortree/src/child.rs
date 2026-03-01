@@ -1,6 +1,5 @@
-use behaviortree_common::{Behavior, State, Status};
-
-use crate::{action_type::ActionType, behavior_nodes::*};
+use crate::{Behavior, State};
+use crate::{Status, action_type::ActionType, behavior_nodes::*};
 
 pub struct Child<S> {
     action: ActionType<S>,
@@ -105,9 +104,6 @@ impl<S> Child<S> {
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
-            Behavior::WhileAll(_conditions, _child) => {
-                todo!()
-            }
         }
     }
 
@@ -129,17 +125,10 @@ impl<S> Child<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use behaviortree_common::Behavior;
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
     use crate::test_behavior_interface::{TestAction, TestShared};
 
     #[test]
     fn test_basic_behavior() {
-        let _ignore = tracing_subscriber::Registry::default()
-            .with(tracing_forest::ForestLayer::default())
-            .try_init();
-
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Wait(10.0),
@@ -148,12 +137,11 @@ mod tests {
             Behavior::Action(TestAction::Success),
         ]);
 
-        let (mut child, state) = Child::from_behavior_with_state(behavior);
+        let (mut child, _state) = Child::from_behavior_with_state(behavior);
         let mut shared = TestShared;
 
         loop {
             let status = child.tick(1.0, &mut shared);
-            tracing::info!("State:\n{:#?}", state);
             if status != Status::Running {
                 break;
             }

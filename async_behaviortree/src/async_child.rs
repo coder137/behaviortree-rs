@@ -1,10 +1,9 @@
-use behaviortree_common::{Behavior, State, Status};
-
 use crate::behavior_nodes::{
     AsyncAction, AsyncActionState, AsyncInvertState, AsyncSelectState, AsyncSequenceState,
-    AsyncWaitState, AsyncWhileAll,
+    AsyncWaitState,
 };
-use crate::{AsyncActionName, AsyncActionRunner};
+use crate::{AsyncActionName, AsyncActionRunner, State};
+use crate::{Behavior, Status};
 
 pub struct AsyncChild<R> {
     action_type: Box<dyn AsyncAction<R>>,
@@ -86,25 +85,6 @@ impl<R> AsyncChild<R> {
                 let children_states = std::rc::Rc::from_iter(children_states);
 
                 let action = Box::new(AsyncSelectState::new(children));
-
-                let (tx, rx) = tokio::sync::watch::channel(None);
-
-                let state = State::MultipleChildren(action.name(), rx, children_states);
-                (Self::new(action, tx), state)
-            }
-            Behavior::WhileAll(conditions, child) => {
-                let (conditions, mut children_states): (Vec<_>, Vec<_>) = conditions
-                    .into_iter()
-                    .map(|condition| Self::from_behavior_with_state(condition))
-                    .unzip();
-
-                //
-                let (child, child_state) = Self::from_behavior_with_state(*child);
-                children_states.push(child_state);
-
-                let children_states = std::rc::Rc::from_iter(children_states);
-
-                let action = Box::new(AsyncWhileAll::new(conditions, child));
 
                 let (tx, rx) = tokio::sync::watch::channel(None);
 

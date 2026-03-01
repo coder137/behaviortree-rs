@@ -1,6 +1,4 @@
-use behaviortree_common::Status;
-
-use crate::SyncAction;
+use crate::{Status, SyncAction};
 
 pub struct WaitState {
     target: f64,
@@ -8,7 +6,6 @@ pub struct WaitState {
 }
 
 impl<S> SyncAction<S> for WaitState {
-    #[tracing::instrument(level = "trace", name = "Wait", skip_all, ret)]
     fn tick(&mut self, dt: f64, _shared: &mut S) -> Status {
         match self.elapsed >= self.target {
             true => unreachable!(),
@@ -43,10 +40,9 @@ impl WaitState {
 
 #[cfg(test)]
 mod tests {
-    use behaviortree_common::Behavior;
-
     use super::*;
     use crate::{
+        Behavior,
         child::Child,
         test_behavior_interface::{TestAction, TestShared},
     };

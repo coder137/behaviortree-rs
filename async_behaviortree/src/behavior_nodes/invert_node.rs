@@ -18,7 +18,6 @@ impl<R> AsyncInvertState<R> {
 
 #[async_trait(?Send)]
 impl<R> AsyncAction<R> for AsyncInvertState<R> {
-    #[tracing::instrument(level = "trace", name = "Invert::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         match self.completed {
             true => unreachable!(),
@@ -29,7 +28,6 @@ impl<R> AsyncAction<R> for AsyncInvertState<R> {
         status
     }
 
-    #[tracing::instrument(level = "trace", name = "Invert::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.child.reset(runner);
         self.completed = false;
@@ -43,10 +41,11 @@ impl<R> AsyncAction<R> for AsyncInvertState<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
-    use behaviortree_common::Behavior;
+    use crate::{
+        Behavior,
+        test_async_behavior_interface::{DELTA, TestAction, TestRunner},
+    };
     use ticked_async_executor::TickedAsyncExecutor;
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     #[test]
     fn test_invert_success() {
@@ -94,10 +93,6 @@ mod tests {
 
     #[test]
     fn test_invert_running_with_reset() {
-        let _ignore = tracing_subscriber::Registry::default()
-            .with(tracing_forest::ForestLayer::default())
-            .try_init();
-
         let mut runner = TestRunner;
 
         let behavior =

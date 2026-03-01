@@ -18,7 +18,6 @@ impl<R> AsyncSequenceState<R> {
 
 #[async_trait(?Send)]
 impl<R> AsyncAction<R> for AsyncSequenceState<R> {
-    #[tracing::instrument(level = "trace", name = "Sequence::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         match self.completed {
             true => {
@@ -45,7 +44,6 @@ impl<R> AsyncAction<R> for AsyncSequenceState<R> {
         status
     }
 
-    #[tracing::instrument(level = "trace", name = "Sequence::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.children
             .iter_mut()
@@ -60,10 +58,12 @@ impl<R> AsyncAction<R> for AsyncSequenceState<R> {
 
 #[cfg(test)]
 mod tests {
-    use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
+    use crate::{
+        Behavior,
+        test_async_behavior_interface::{DELTA, TestAction, TestRunner},
+    };
 
     use super::*;
 

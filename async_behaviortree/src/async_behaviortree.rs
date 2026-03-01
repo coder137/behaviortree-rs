@@ -1,9 +1,9 @@
-use behaviortree_common::Behavior;
-use behaviortree_common::State;
 use tokio_util::sync::CancellationToken;
 
 use crate::AsyncActionName;
 use crate::AsyncActionRunner;
+use crate::Behavior;
+use crate::State;
 use crate::async_child::AsyncChild;
 use crate::util::yield_now;
 
@@ -84,19 +84,13 @@ mod tests {
     use std::collections::VecDeque;
 
     use super::*;
-    use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
     use tokio_stream::StreamExt;
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
 
     #[test]
     fn test_async_behaviortree() {
-        let _ignore = tracing_subscriber::Registry::default()
-            .with(tracing_forest::ForestLayer::default())
-            .try_init();
-
         let behavior = Behavior::Sequence(vec![
             Behavior::Action(TestAction::Success),
             Behavior::Action(TestAction::Success),
@@ -149,7 +143,6 @@ mod tests {
                                 break;
                             }
                         };
-                        tracing::info!("State: {:?}", data);
                     }
                 };
                 let _r = cancel.run_until_cancelled(fut).await;
@@ -161,31 +154,21 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        tracing::info!("Start 1");
         executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 2);
 
-        tracing::info!("2");
         executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 2);
 
-        tracing::info!("3");
         executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 1);
 
-        tracing::info!("4");
         executor.tick(DELTA, None);
         assert_eq!(executor.num_tasks(), 0);
-
-        tracing::info!("End 5");
     }
 
     #[test]
     fn test_async_behaviortree_shutdown() {
-        let _ignore = tracing_subscriber::Registry::default()
-            .with(tracing_forest::ForestLayer::default())
-            .try_init();
-
         let behavior = Behavior::Sequence(vec![
             Behavior::Invert(Box::new(Behavior::Action(TestAction::Failure))),
             Behavior::Action(TestAction::Success),
@@ -203,10 +186,9 @@ mod tests {
             .spawn_local("AsyncBehaviorTreeFuture", behaviortree_future)
             .detach();
 
-        let state = controller.state();
+        let _state = controller.state();
         for _ in 0..10 {
             executor.tick(DELTA, None);
-            tracing::info!("Observer: {state:?}");
         }
         drop(controller);
 
