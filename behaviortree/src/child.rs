@@ -104,9 +104,6 @@ impl<S> Child<S> {
                 let state = State::MultipleChildren(action.name(), rx, children_state);
                 (Self::new(action, tx), state)
             }
-            Behavior::WhileAll(_conditions, _child) => {
-                todo!()
-            }
         }
     }
 
