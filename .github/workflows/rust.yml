@@ -26,3 +26,12 @@ jobs:
           cargo test
           cargo build
           cargo run --example simple_immediate_sync
+      
+      - name: async_behaviortree package
+        working-directory: ${{github.workspace}}/async_behaviortree
+        run: |
+          cargo clippy
+          cargo test
+          cargo build
+          cargo run --example simple_async
+          cargo run --example custom_wait

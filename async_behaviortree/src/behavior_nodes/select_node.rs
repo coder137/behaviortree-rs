@@ -18,7 +18,6 @@ impl<R> AsyncSelectState<R> {
 
 #[async_trait(?Send)]
 impl<R> AsyncAction<R> for AsyncSelectState<R> {
-    #[tracing::instrument(level = "trace", name = "Select::run", skip_all, ret)]
     async fn run(&mut self, delta: tokio::sync::watch::Receiver<f64>, runner: &mut R) -> bool {
         match self.completed {
             true => unreachable!(),
@@ -43,7 +42,6 @@ impl<R> AsyncAction<R> for AsyncSelectState<R> {
         status
     }
 
-    #[tracing::instrument(level = "trace", name = "Select::reset", skip_all)]
     fn reset(&mut self, runner: &mut R) {
         self.children.iter_mut().for_each(|child| {
             child.reset(runner);
@@ -58,10 +56,12 @@ impl<R> AsyncAction<R> for AsyncSelectState<R> {
 
 #[cfg(test)]
 mod tests {
-    use behaviortree_common::Behavior;
     use ticked_async_executor::TickedAsyncExecutor;
 
-    use crate::test_async_behavior_interface::{DELTA, TestAction, TestRunner};
+    use crate::{
+        Behavior,
+        test_async_behavior_interface::{DELTA, TestAction, TestRunner},
+    };
 
     use super::*;
 

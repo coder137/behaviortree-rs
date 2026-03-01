@@ -1,9 +1,7 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use async_behaviortree::{AsyncActionName, AsyncActionRunner, AsyncBehaviorTree};
-use behaviortree_common::Behavior;
+use async_behaviortree::{AsyncActionName, AsyncActionRunner, AsyncBehaviorTree, Behavior};
 use ticked_async_executor::TickedAsyncExecutor;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 enum Input<T> {
@@ -105,11 +103,6 @@ impl AsyncActionRunner<Operation> for CalculatorBot {
 }
 
 fn main() -> Result<(), String> {
-    tracing_subscriber::Registry::default()
-        .with(tracing_forest::ForestLayer::default())
-        .try_init()
-        .map_err(|e| e.to_string())?;
-
     let behavior = Behavior::Sequence(vec![
         Behavior::Action(Operation::Add(
             Input::Literal(10),
@@ -122,8 +115,6 @@ fn main() -> Result<(), String> {
             Output::Blackboard("sub".into()),
         )),
     ]);
-    let output = serde_json::to_string_pretty(&behavior).unwrap();
-    tracing::info!("Behavior:\n{output}");
 
     let bot = CalculatorBot::default();
     let blackboard = bot.blackboard.clone();
@@ -137,23 +128,19 @@ fn main() -> Result<(), String> {
         .spawn_local("AsyncBehaviorTree::future", future)
         .detach();
 
-    let state = controller.state();
+    let _state = controller.state();
 
     executor.tick(0.1, None);
     assert_eq!(executor.num_tasks(), 1);
-    tracing::info!("State: {:?}", state);
 
     executor.tick(0.1, None);
     assert_eq!(executor.num_tasks(), 1);
-    tracing::info!("State: {:?}", state);
 
     executor.tick(0.1, None);
     assert_eq!(executor.num_tasks(), 0);
-    tracing::info!("State: {:?}", state);
 
     let blackboard = blackboard.read().unwrap();
     let sub = blackboard.get(&"sub".to_string()).unwrap();
     assert_eq!(*sub, 10);
-    tracing::info!("Blackboard: {:?}", &(*blackboard));
     Ok(())
 }
