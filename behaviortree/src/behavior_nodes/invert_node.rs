@@ -1,6 +1,4 @@
-use behaviortree_common::Status;
-
-use crate::{child::Child, SyncAction};
+use crate::{Status, SyncAction, child::Child};
 
 pub struct InvertState<S> {
     child: Child<S>,
@@ -17,7 +15,6 @@ impl<S> InvertState<S> {
 }
 
 impl<S> SyncAction<S> for InvertState<S> {
-    #[tracing::instrument(level = "trace", name = "Invert", skip_all, ret)]
     fn tick(&mut self, delta: f64, shared: &mut S) -> Status {
         match self.completed {
             true => unreachable!(),
@@ -49,9 +46,10 @@ impl<S> SyncAction<S> for InvertState<S> {
 
 #[cfg(test)]
 mod tests {
-    use behaviortree_common::Behavior;
-
-    use crate::test_behavior_interface::{TestAction, TestShared};
+    use crate::{
+        Behavior,
+        test_behavior_interface::{TestAction, TestShared},
+    };
 
     use super::*;
 

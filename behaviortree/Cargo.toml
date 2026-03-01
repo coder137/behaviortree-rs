@@ -4,13 +4,8 @@ version = "0.1.5"
 edition = "2024"
 
 [dependencies]
-serde = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-
-behaviortree_common = { path = "../behaviortree_common" }
-
-[dev-dependencies]
-serde_json = { workspace = true }
-tracing-subscriber = { workspace = true }
-tracing-forest = { workspace = true }
+serde = { version = "1.0", features = ["rc", "derive"] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "sync",
+] }

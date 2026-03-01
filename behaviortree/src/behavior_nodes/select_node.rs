@@ -1,6 +1,4 @@
-use behaviortree_common::Status;
-
-use crate::{child::Child, SyncAction};
+use crate::{Status, SyncAction, child::Child};
 
 pub struct SelectState<S> {
     children: Vec<Child<S>>,
@@ -20,7 +18,6 @@ impl<S> SelectState<S> {
 }
 
 impl<S> SyncAction<S> for SelectState<S> {
-    #[tracing::instrument(level = "trace", name = "Select", skip_all, ret)]
     fn tick(&mut self, dt: f64, shared: &mut S) -> Status {
         match self.completed {
             true => unreachable!(),
@@ -62,9 +59,10 @@ impl<S> SyncAction<S> for SelectState<S> {
 
 #[cfg(test)]
 mod tests {
-    use behaviortree_common::Behavior;
-
-    use crate::test_behavior_interface::{TestAction, TestShared};
+    use crate::{
+        Behavior,
+        test_behavior_interface::{TestAction, TestShared},
+    };
 
     use super::*;
 

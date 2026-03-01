@@ -1,4 +1,4 @@
-use behaviortree_common::Status;
+use crate::Status;
 
 pub trait ImmediateAction<S> {
     /// Runs the action in a single tick
@@ -80,7 +80,6 @@ pub mod test_behavior_interface {
     }
 
     impl<S> SyncAction<S> for GenericTestSyncAction {
-        #[tracing::instrument(level = "trace", name = "GenericTestSyncAction", skip_all, ret)]
         fn tick(&mut self, _dt: f64, _shared: &mut S) -> Status {
             let mut status = if self.status {
                 Status::Success

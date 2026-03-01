@@ -1,8 +1,6 @@
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use behaviortree::{ActionType, BehaviorTree, ImmediateAction};
-use behaviortree_common::{Behavior, Status};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use behaviortree::{ActionType, Behavior, BehaviorTree, ImmediateAction, Status};
 
 #[derive(Debug, serde::Serialize)]
 enum Input<T> {
@@ -46,7 +44,6 @@ impl Into<ActionType<OperationShared>> for Operation {
 
 struct AddState(Input<usize>, Input<usize>, Output);
 impl ImmediateAction<OperationShared> for AddState {
-    #[tracing::instrument(level = "trace", name = "Add::run", skip(self, shared), ret)]
     fn run(&mut self, _dt: f64, shared: &mut OperationShared) -> bool {
         let mut blackboard = shared.blackboard.write().unwrap();
 
@@ -73,7 +70,6 @@ impl ImmediateAction<OperationShared> for AddState {
         true
     }
 
-    #[tracing::instrument(level = "trace", name = "Add::reset", skip_all)]
     fn reset(&mut self, _shared: &mut OperationShared) {}
 
     fn name(&self) -> &'static str {
@@ -83,7 +79,6 @@ impl ImmediateAction<OperationShared> for AddState {
 
 struct SubState(Input<usize>, Input<usize>, Output);
 impl ImmediateAction<OperationShared> for SubState {
-    #[tracing::instrument(level = "trace", name = "Sub::run", skip(self, shared), ret)]
     fn run(&mut self, _dt: f64, shared: &mut OperationShared) -> bool {
         let mut blackboard = shared.blackboard.write().unwrap();
 
@@ -110,7 +105,6 @@ impl ImmediateAction<OperationShared> for SubState {
         true
     }
 
-    #[tracing::instrument(level = "trace", name = "Sub::reset", skip_all)]
     fn reset(&mut self, _shared: &mut OperationShared) {}
 
     fn name(&self) -> &'static str {
@@ -119,11 +113,6 @@ impl ImmediateAction<OperationShared> for SubState {
 }
 
 fn main() -> Result<(), String> {
-    tracing_subscriber::Registry::default()
-        .with(tracing_forest::ForestLayer::default())
-        .try_init()
-        .map_err(|e| e.to_string())?;
-
     let behavior = Behavior::Sequence(vec![
         Behavior::Action(Operation::Add(
             Input::Literal(10),
@@ -136,8 +125,6 @@ fn main() -> Result<(), String> {
             Output::Blackboard("sub".into()),
         )),
     ]);
-    let output = serde_json::to_string_pretty(&behavior).unwrap();
-    tracing::info!("Behavior:\n{output}");
 
     let operation_shared = OperationShared::default();
     let blackboard = operation_shared.blackboard.clone();
@@ -152,6 +139,5 @@ fn main() -> Result<(), String> {
     let blackboard = blackboard.read().unwrap();
     let sub = blackboard.get(&"sub".to_string()).unwrap();
     assert_eq!(*sub, 10);
-    tracing::info!("Blackboard: {:?}", &(*blackboard));
     Ok(())
 }

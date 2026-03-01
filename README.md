@@ -1,65 +1,17 @@
 # behaviortree-rs
 
-Contains `async_behaviortree` and `behaviortree` packages
+Experimental codebase that contains the following packages
 
-`async_behaviortree` is actively maintained
+Different strategies for running behavior trees
 
-# Class Diagram
-
-```mermaid
-classDiagram
-
-class Behavior~A~ {
-    <<enum>>
-    Leaf
-    Decorator
-    Control
-}
-
-class ImmediateAction~S~ {
-    <<trait>>
-    fn run(&mut self, delta: f64, shared: &mut S) bool
-    fn reset(&mut self, shared: &mut S)
-    fn name(&self) &'static str
-}
-
-class AsyncAction~S~ {
-    <<trait>>
-    async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
-    fn reset(&mut self, shared: &mut S)
-    fn name(&self) &'static str
-}
-
-class AsyncActionType~S~ {
-    <<enum>>
-    Immediate
-    Async
-
-    async fn run(&mut self, delta: &mut watch::Receiver~f64~, shared: &mut S) bool
-    fn reset(&mut self, shared: &mut S)
-    fn name(&self) &'static str
-}
-
-class AsyncChild~S~ {
-    <<struct>>
-    AsyncActionType~S~ action_type
-    watch::Sender~Option~Status~~ status
-}
-
-class AsyncBehaviorTree {
-    <<struct>>
-    AsyncChild~S~ child
-}
-
-Behavior --> ImmediateAction
-Behavior --> AsyncAction
-
-ImmediateAction --> AsyncActionType
-AsyncAction --> AsyncActionType
-
-AsyncActionType --> AsyncChild
-AsyncChild --> AsyncBehaviorTree
-```
+- `behaviortree`
+  - Flaws:
+    - Ticks actions even when they return `Status::Pending` (need a more `Future` like API)
+- `async_behaviortree`
+  - Flaws:
+    - Uses dynamic memory allocation during runtime (`Box::pin`)
+    - Frequent dynamic memory allocations causing fragmentation
+    - Memory allocation is not contiguous (needs arena allocation)
 
 # Roadmap
 
@@ -75,14 +27,3 @@ AsyncChild --> AsyncBehaviorTree
   - [ ] Control
     - [x] Sequence
     - [x] Select
-    - [x] WhileAll
-- [x] Tracing
-  - [x] BehaviorTree
-  - [x] AsyncBehaviorTree
-- [ ] Examples
-  - [ ] BehaviorTree
-    - [x] Simple Immediate
-    - [ ] Simple Sync
-  - [ ] AsyncBehaviorTree
-    - [x] Simple Immediate
-    - [ ] Simple Async
