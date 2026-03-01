@@ -1,4 +1,5 @@
-pub use behaviortree_common::*;
+mod behavior;
+pub use behavior::*;
 
 mod async_interface;
 pub use async_interface::*;

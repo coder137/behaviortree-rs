@@ -22,8 +22,12 @@ impl DhatTester {
 
     #[cfg(feature = "test-dhat")]
     fn new_dhat(name: &'static str) -> Self {
+        const DHAT_TEST_DIR: &str = "target/dhat";
+        if !std::fs::exists(DHAT_TEST_DIR).unwrap() {
+            let _ignore = std::fs::create_dir_all(DHAT_TEST_DIR);
+        }
         let profiler = dhat::Profiler::builder()
-            .file_name(format!("{name}.json"))
+            .file_name(format!("{DHAT_TEST_DIR}/{name}.json"))
             .build();
         Self {
             name,

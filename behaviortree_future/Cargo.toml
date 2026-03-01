@@ -10,7 +10,7 @@ default = ["test-dhat"]
 test-dhat = []
 
 [dependencies]
-behaviortree_common = { path = "../behaviortree_common" }
+serde = { version = "1.0", features = ["rc", "derive"] }
 
 reusable-box-future = "0.2.0"
 

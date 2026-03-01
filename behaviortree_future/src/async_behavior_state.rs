@@ -1,7 +1,5 @@
-use behaviortree_common::Behavior;
-
 use crate::{
-    BehaviorTreeAsyncRunner, SafeDeltaType,
+    Behavior, BehaviorTreeAsyncRunner, SafeDeltaType,
     behavior_nodes::{AsyncAction, AsyncInvert, AsyncSequence},
 };
 
@@ -34,7 +32,6 @@ impl<A> AsyncBehaviorState<A> {
                 Self::Sequence(AsyncSequence::new(children))
             }
             Behavior::Select(behaviors) => todo!(),
-            Behavior::WhileAll(behaviors, behavior) => todo!(),
         }
     }
 
