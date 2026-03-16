@@ -174,14 +174,14 @@ mod tests {
     // Sequence
 
     #[test]
-    fn test_sequence_with_dhat() {
+    fn test_sequence_success_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let runner = TestOperationRunner::new();
         let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
 
         let action = {
-            let _profiler = DhatTester::new("test_sequence_with_dhat_pre");
+            let _profiler = DhatTester::new("test_sequence_success_with_dhat_pre");
             let action1 = TestOperation::Add(1, 2, true, 1);
             let action2 = TestOperation::Add(1, 2, true, 1);
             let action1 =
@@ -197,9 +197,51 @@ mod tests {
 
         executor
             .spawn_local("_", async move {
-                let _profiler = DhatTester::new("test_sequence_with_dhat_post");
+                let _profiler = DhatTester::new("test_sequence_success_with_dhat_post");
                 let status = action.await;
                 assert!(status);
+            })
+            .detach();
+
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        assert_eq!(executor.num_tasks(), 0);
+        assert_eq!(runner.borrow().num, 6);
+    }
+
+    #[test]
+    fn test_sequence_failure_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::new();
+        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+
+        let action = {
+            let _profiler = DhatTester::new("test_sequence_failure_with_dhat_pre");
+            let action1 = TestOperation::Add(1, 2, true, 1);
+            let action2 = TestOperation::Add(1, 2, false, 1);
+            let action3 = TestOperation::Add(1, 2, true, 1);
+            let action1 =
+                AsyncAction::new(runner.clone(), action1, executor.delta().inner().into());
+            let action2 =
+                AsyncAction::new(runner.clone(), action2, executor.delta().inner().into());
+            let action3 =
+                AsyncAction::new(runner.clone(), action3, executor.delta().inner().into());
+            let action = AsyncSequence::new(vec![
+                AsyncBehaviorState::Action(action1),
+                AsyncBehaviorState::Action(action2),
+                AsyncBehaviorState::Action(action3),
+            ]);
+            action
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler = DhatTester::new("test_sequence_failure_with_dhat_post");
+                let status = action.await;
+                assert!(!status);
             })
             .detach();
 
