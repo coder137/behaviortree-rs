@@ -1,0 +1,38 @@
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.ci]
+script = '''
+cargo build
+cargo nextest run
+cargo nextest run --features test-dhat
+'''
+
+[tasks.coverage-view]
+run_task = { name = ["coverage-view-inner", "clean-profraw"] }
+
+# Private tasks
+[tasks.coverage-view-inner]
+script = '''
+cargo +nightly llvm-cov --html --branch --open nextest --features test-dhat
+'''
+private = true
+
+[tasks.clean-profraw]
+script_runner = "python"
+script_extension = "py"
+script = '''
+import os
+import glob
+
+files = glob.glob("*.profraw")
+
+for file_path in files:
+    try:
+        os.remove(file_path)
+        print(f"Deleted: {file_path}")
+    except Exception as e:
+        print(f"Error deleting {file_path}: {e}")
+'''
+private = true

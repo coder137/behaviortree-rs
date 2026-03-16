@@ -20,6 +20,14 @@ impl DhatTester {
         this
     }
 
+    pub fn stats(_stats_cb: impl FnOnce(dhat::HeapStats)) {
+        #[cfg(feature = "test-dhat")]
+        {
+            let stats = dhat::HeapStats::get();
+            _stats_cb(stats);
+        }
+    }
+
     #[cfg(feature = "test-dhat")]
     fn new_dhat(name: &'static str) -> Self {
         const DHAT_TEST_DIR: &str = "target/dhat";

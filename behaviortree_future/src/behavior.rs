@@ -6,10 +6,6 @@
 pub enum Behavior<A> {
     /// A high level description of an action.
     Action(A),
-    /// Waits an amount of time before continuing.
-    ///
-    /// f64: Time in milliseconds
-    Wait(f64),
 
     /// Converts `Success` into `Failure` and vice versa.
     Invert(Box<Behavior<A>>),

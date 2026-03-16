@@ -19,7 +19,6 @@ impl<A> AsyncBehaviorState<A> {
             Behavior::Action(action) => {
                 Self::Action(AsyncAction::new(runner.clone(), action, delta.clone()))
             }
-            Behavior::Wait(_) => todo!(),
             Behavior::Invert(behavior) => {
                 let child = Self::from_behavior(*behavior, runner.clone(), delta.clone());
                 Self::Invert(AsyncInvert::new(child))

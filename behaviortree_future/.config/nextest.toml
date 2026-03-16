@@ -1,0 +1,7 @@
+[test-groups]
+dhat-tests = { max-threads = 1 }
+
+# https://nexte.st/docs/filtersets/
+[[profile.default.overrides]]
+filter = 'test(with_dhat)'
+test-group = 'dhat-tests'
