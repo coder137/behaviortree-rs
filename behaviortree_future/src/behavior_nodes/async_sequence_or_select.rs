@@ -1,6 +1,6 @@
 use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_behavior_state::AsyncBehaviorState};
 
-pub struct AsyncSequenceOrSelect<A> {
+struct AsyncSequenceOrSelect<A> {
     children: Vec<AsyncBehaviorState<A>>,
     current_index: usize,
 
