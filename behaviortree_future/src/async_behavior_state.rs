@@ -1,5 +1,5 @@
 use crate::{
-    Behavior, BehaviorTreeAsyncRunner, SafeDeltaType,
+    AsyncActionContext, Behavior, BehaviorTreeAsyncAction,
     behavior_nodes::{AsyncAction, AsyncInvert, AsyncSelect, AsyncSequence},
 };
 
@@ -11,46 +11,44 @@ pub enum AsyncBehaviorState<A> {
 }
 
 impl<A> AsyncBehaviorState<A> {
-    pub fn from_behavior<R>(behavior: Behavior<A>, runner: R, delta: SafeDeltaType) -> Self
+    pub fn from_behavior<R>(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
     where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
+        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+        R: 'static,
     {
         match behavior {
-            Behavior::Action(action) => {
-                Self::Action(AsyncAction::new(runner.clone(), action, delta.clone()))
-            }
+            Behavior::Action(action) => Self::Action(AsyncAction::new(action, ctx)),
             Behavior::Invert(behavior) => {
-                let child = Self::from_behavior(*behavior, runner.clone(), delta.clone());
+                let child = Self::from_behavior(*behavior, ctx);
                 Self::Invert(AsyncInvert::new(child))
             }
             Behavior::Sequence(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, runner.clone(), delta.clone()))
+                    .map(|b| Self::from_behavior(b, ctx))
                     .collect::<Vec<_>>();
                 Self::Sequence(AsyncSequence::new(children))
             }
             Behavior::Select(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, runner.clone(), delta.clone()))
+                    .map(|b| Self::from_behavior(b, ctx))
                     .collect::<Vec<_>>();
                 Self::Select(AsyncSelect::new(children))
             }
         }
     }
 
-    pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
+    pub fn reset<R>(&mut self, ctx: AsyncActionContext<R>)
     where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
+        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+        R: 'static,
     {
         match self {
-            AsyncBehaviorState::Action(async_action) => async_action.reset(runner, delta),
-            AsyncBehaviorState::Invert(async_invert) => async_invert.reset(runner, delta),
-            AsyncBehaviorState::Sequence(async_sequence) => async_sequence.reset(runner, delta),
-            AsyncBehaviorState::Select(async_select) => async_select.reset(runner, delta),
+            AsyncBehaviorState::Action(a) => a.reset(ctx),
+            AsyncBehaviorState::Invert(a) => a.reset(ctx),
+            AsyncBehaviorState::Sequence(a) => a.reset(ctx),
+            AsyncBehaviorState::Select(a) => a.reset(ctx),
         }
     }
 }
@@ -65,10 +63,10 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         match self.as_mut().get_mut() {
-            AsyncBehaviorState::Action(async_action) => std::pin::pin!(async_action).poll(cx),
-            AsyncBehaviorState::Invert(async_invert) => std::pin::pin!(async_invert).poll(cx),
-            AsyncBehaviorState::Sequence(async_sequence) => std::pin::pin!(async_sequence).poll(cx),
-            AsyncBehaviorState::Select(async_select) => std::pin::pin!(async_select).poll(cx),
+            AsyncBehaviorState::Action(a) => std::pin::pin!(a).poll(cx),
+            AsyncBehaviorState::Invert(a) => std::pin::pin!(a).poll(cx),
+            AsyncBehaviorState::Sequence(a) => std::pin::pin!(a).poll(cx),
+            AsyncBehaviorState::Select(a) => std::pin::pin!(a).poll(cx),
         }
     }
 }

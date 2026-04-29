@@ -1,73 +1,86 @@
-use std::{cell::Cell, rc::Rc};
+#[derive(Clone, Copy)]
+struct AsyncActionContextInner<R> {
+    runner: R,
+    delta: f64,
+}
 
-pub type UnsafeDeltaType = Rc<Cell<f64>>;
-
-#[derive(Clone)]
-pub struct SafeDeltaType(UnsafeDeltaType);
-
-impl SafeDeltaType {
-    pub fn get(&self) -> f64 {
-        self.0.get()
+impl<R> AsyncActionContextInner<R> {
+    fn consume_delta(&mut self) -> f64 {
+        let delta = self.delta;
+        self.delta = 0.0;
+        delta
     }
 }
 
-impl From<UnsafeDeltaType> for SafeDeltaType {
-    fn from(value: Rc<Cell<f64>>) -> Self {
-        Self(value)
+pub struct AsyncActionContextOwned<R> {
+    ctx: std::rc::Rc<std::cell::UnsafeCell<AsyncActionContextInner<R>>>,
+}
+
+impl<R> Clone for AsyncActionContextOwned<R> {
+    fn clone(&self) -> Self {
+        Self {
+            ctx: self.ctx.clone(),
+        }
     }
 }
 
-/// Trait that must be implemented on runner for user action
-///
-/// Runner must either
-/// - Point to the same memory location
-/// - Contain fields that point to the same memory location
-///
-/// For example:
-///
-/// ```
-/// #[derive(Clone)]
-/// pub enum Action {}
-///
-///
-/// pub struct Data {}
-/// type RcData = std::rc::Rc<Data>;
-/// impl behaviortree_future::BehaviorTreeAsyncRunner<Action> for RcData {
-///
-/// fn create_future(
-///        self,
-///        action: Action, delta: behaviortree_future::SafeDeltaType) -> impl std::future::Future<Output = bool> {
-///     async move { true }
-/// }
-///
-/// fn reset(&mut self, action: &Action) {}
-///
-/// }
-/// ```
-///
-/// ```
-/// pub struct Data {}
-/// type R = std::rc::Rc<std::cell::RefCell<Data>>;
-/// ```
-///
-/// ```rust
-/// pub struct Data {}
-/// #[derive(Clone)]
-/// struct RefData {
-///     inner: std::rc::Rc<Data>
-/// }
-/// type R = RefData;
-/// ```
-pub trait BehaviorTreeAsyncRunner<A>
-where
-    Self: Clone,
-    A: Clone,
-{
-    fn create_future(
-        self,
-        action: A,
-        delta: SafeDeltaType,
-    ) -> impl std::future::Future<Output = bool>;
+impl<R> AsyncActionContextOwned<R> {
+    pub fn new(runner: R, delta: f64) -> Self {
+        let ctx = std::rc::Rc::new(std::cell::UnsafeCell::new(AsyncActionContextInner {
+            runner,
+            delta,
+        }));
+        Self { ctx }
+    }
 
-    fn reset(&mut self, action: &A);
+    pub fn create_ctx(&self) -> AsyncActionContext<R> {
+        let ctx = self.ctx.get();
+        AsyncActionContext { ctx }
+    }
+}
+
+pub struct AsyncActionContext<R> {
+    ctx: *mut AsyncActionContextInner<R>,
+}
+
+impl<R> Clone for AsyncActionContext<R> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<R> Copy for AsyncActionContext<R> {}
+
+impl<R> AsyncActionContext<R> {
+    pub fn peek_delta(&self) -> f64 {
+        self.safe_ctx_ref().delta
+    }
+
+    pub fn consume_delta(&mut self) -> f64 {
+        self.safe_ctx_ref_mut().consume_delta()
+    }
+
+    pub fn runner_ref<Ret>(&self, mut cb: impl FnMut(&R) -> Ret) -> Ret {
+        let r = &self.safe_ctx_ref().runner;
+        cb(r)
+    }
+
+    pub fn runner_ref_mut<Ret>(&mut self, mut cb: impl FnMut(&mut R) -> Ret) -> Ret {
+        let r = &mut self.safe_ctx_ref_mut().runner;
+        cb(r)
+    }
+
+    fn safe_ctx_ref(&self) -> &AsyncActionContextInner<R> {
+        unsafe { &*self.ctx }
+    }
+
+    fn safe_ctx_ref_mut(&mut self) -> &mut AsyncActionContextInner<R> {
+        unsafe { &mut *self.ctx }
+    }
+}
+
+pub trait BehaviorTreeAsyncAction<R> {
+    fn create_future(self, ctx: AsyncActionContext<R>) -> impl std::future::Future<Output = bool>;
+
+    fn reset(&self, ctx: &mut AsyncActionContext<R>);
 }

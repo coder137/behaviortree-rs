@@ -1,4 +1,4 @@
-use crate::{BehaviorTreeAsyncRunner, SafeDeltaType};
+use crate::{AsyncActionContext, BehaviorTreeAsyncAction};
 
 pub struct AsyncAction<A> {
     action: A,
@@ -7,23 +7,23 @@ pub struct AsyncAction<A> {
 }
 
 impl<A> AsyncAction<A> {
-    pub fn new<R>(runner: R, action: A, delta: SafeDeltaType) -> Self
+    pub fn new<R>(action: A, ctx: AsyncActionContext<R>) -> Self
     where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
+        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+        R: 'static,
     {
-        let future = runner.create_future(action.clone(), delta);
+        let future = action.clone().create_future(ctx);
         let future = reusable_box_future::ReusableLocalBoxFuture::new(future);
         Self { action, future }
     }
 
-    pub fn reset<R>(&mut self, mut runner: R, delta: SafeDeltaType)
+    pub fn reset<R>(&mut self, mut ctx: AsyncActionContext<R>)
     where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
+        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+        R: 'static,
     {
-        runner.reset(&self.action);
-        let future = runner.create_future(self.action.clone(), delta);
+        self.action.reset(&mut ctx);
+        let future = self.action.clone().create_future(ctx);
         self.future.set(future);
     }
 }
@@ -45,6 +45,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
+        AsyncActionContextOwned,
         behavior_nodes::AsyncAction,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -53,13 +54,15 @@ mod tests {
     fn test_action_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let ctx_ref = ctx.create_ctx();
 
         let action = {
             let _profiler = DhatTester::new("test_action_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let action = AsyncAction::new(runner.clone(), action, executor.delta().inner().into());
+            let action = AsyncAction::new(action, ctx_ref);
             action
         };
 
@@ -77,7 +80,7 @@ mod tests {
         executor.tick(16.67, None);
         executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 3);
+        assert_eq!(inner.get(), 3);
     }
 
     #[test]
@@ -85,58 +88,56 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
         let delta = executor.delta().inner();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, delta.get());
+        let ctx_ref = ctx.create_ctx();
 
         let mut action = {
             let _profiler = DhatTester::new("test_action_retry_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let action = AsyncAction::new(runner.clone(), action, delta.clone().into());
+            let action = AsyncAction::new(action, ctx_ref);
             action
         };
 
-        let runner_clone = runner.clone();
+        let mut count = 2;
+        let future = std::future::poll_fn(move |cx| {
+            if count == 0 {
+                return std::task::Poll::Ready(true);
+            }
+            let status = std::pin::pin!(&mut action).poll(cx);
+            match status {
+                std::task::Poll::Ready(s) => {
+                    count -= 1;
+                    assert!(s);
+                    action.reset(ctx_ref);
+                    cx.waker().wake_by_ref();
+                    std::task::Poll::Pending
+                }
+                std::task::Poll::Pending => std::task::Poll::Pending,
+            }
+        });
+
         executor
             .spawn_local("_", async move {
                 let _profiler = DhatTester::new("test_action_retry_with_dhat_post");
-
-                let mut count = 2;
-
-                // Poll and reset the future twice, before returning success
-                let status = std::future::poll_fn(|cx| {
-                    println!("Count: {}", count);
-                    if count == 0 {
-                        return std::task::Poll::Ready(true);
-                    }
-
-                    let status = std::pin::pin!(&mut action).poll(cx);
-                    match status {
-                        std::task::Poll::Ready(status) => {
-                            count -= 1;
-                            assert!(status);
-                            action.reset(runner_clone.clone(), delta.clone().into());
-                            cx.waker().wake_by_ref();
-                            std::task::Poll::Pending
-                        }
-                        std::task::Poll::Pending => std::task::Poll::Pending,
-                    }
-                })
-                .await;
+                let status = future.await;
                 assert!(status);
                 DhatTester::stats(|stats| {
                     assert_eq!(stats.total_bytes, 0);
-                })
+                });
             })
             .detach();
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 3);
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
 
         executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 6);
     }
 }
