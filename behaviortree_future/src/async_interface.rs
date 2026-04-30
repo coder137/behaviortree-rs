@@ -12,7 +12,7 @@ impl<R> AsyncActionContextInner<R> {
     }
 }
 
-pub struct AsyncActionContextOwned<R> {
+pub(crate) struct AsyncActionContextOwned<R> {
     ctx: std::rc::Rc<std::cell::UnsafeCell<AsyncActionContextInner<R>>>,
 }
 
@@ -77,6 +77,10 @@ impl<R> AsyncActionContext<R> {
     fn safe_ctx_ref_mut(&mut self) -> &mut AsyncActionContextInner<R> {
         unsafe { &mut *self.ctx }
     }
+}
+
+pub(crate) trait BehaviorTreeReset<R> {
+    fn reset(&mut self, ctx: AsyncActionContext<R>);
 }
 
 pub trait BehaviorTreeAsyncAction<R> {

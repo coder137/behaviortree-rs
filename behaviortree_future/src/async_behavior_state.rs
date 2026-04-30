@@ -1,13 +1,14 @@
 use crate::{
-    AsyncActionContext, Behavior, BehaviorTreeAsyncAction,
+    AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeReset,
     behavior_nodes::{AsyncAction, AsyncInvert, AsyncSelect, AsyncSequence},
 };
 
+#[pin_project::pin_project(project = AsyncBehaviorStateProj)]
 pub enum AsyncBehaviorState<A> {
-    Action(AsyncAction<A>),
-    Invert(AsyncInvert<A>),
-    Sequence(AsyncSequence<A>),
-    Select(AsyncSelect<A>),
+    Action(#[pin] AsyncAction<A>),
+    Invert(#[pin] AsyncInvert<A>),
+    Sequence(#[pin] AsyncSequence<A>),
+    Select(#[pin] AsyncSelect<A>),
 }
 
 impl<A> AsyncBehaviorState<A> {
@@ -38,35 +39,37 @@ impl<A> AsyncBehaviorState<A> {
             }
         }
     }
+}
 
-    pub fn reset<R>(&mut self, ctx: AsyncActionContext<R>)
-    where
-        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-        R: 'static,
-    {
-        match self {
-            AsyncBehaviorState::Action(a) => a.reset(ctx),
-            AsyncBehaviorState::Invert(a) => a.reset(ctx),
-            AsyncBehaviorState::Sequence(a) => a.reset(ctx),
-            AsyncBehaviorState::Select(a) => a.reset(ctx),
-        }
+impl<A, R> BehaviorTreeReset<R> for AsyncBehaviorState<A>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
+    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+        let r: &mut dyn BehaviorTreeReset<R> = match self {
+            AsyncBehaviorState::Action(a) => a,
+            AsyncBehaviorState::Invert(a) => a,
+            AsyncBehaviorState::Sequence(a) => a,
+            AsyncBehaviorState::Select(a) => a,
+        };
+        r.reset(ctx);
     }
 }
 
-impl<A> std::future::Future for AsyncBehaviorState<A>
-where
-    A: Unpin,
-{
+impl<A> std::future::Future for AsyncBehaviorState<A> {
     type Output = bool;
     fn poll(
-        mut self: std::pin::Pin<&mut Self>,
+        self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        match self.as_mut().get_mut() {
-            AsyncBehaviorState::Action(a) => std::pin::pin!(a).poll(cx),
-            AsyncBehaviorState::Invert(a) => std::pin::pin!(a).poll(cx),
-            AsyncBehaviorState::Sequence(a) => std::pin::pin!(a).poll(cx),
-            AsyncBehaviorState::Select(a) => std::pin::pin!(a).poll(cx),
-        }
+        let this = self.project();
+        let future: std::pin::Pin<&mut dyn std::future::Future<Output = bool>> = match this {
+            AsyncBehaviorStateProj::Action(f) => f,
+            AsyncBehaviorStateProj::Invert(f) => f,
+            AsyncBehaviorStateProj::Sequence(f) => f,
+            AsyncBehaviorStateProj::Select(f) => f,
+        };
+        future.poll(cx)
     }
 }

@@ -1,4 +1,7 @@
-use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_behavior_state::AsyncBehaviorState};
+use crate::{
+    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset,
+    async_behavior_state::AsyncBehaviorState,
+};
 
 struct AsyncSequenceOrSelect<A> {
     children: Vec<AsyncBehaviorState<A>>,
@@ -16,23 +19,22 @@ impl<A> AsyncSequenceOrSelect<A> {
             next_check,
         }
     }
+}
 
-    pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
-    where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
-    {
+impl<A, R> BehaviorTreeReset<R> for AsyncSequenceOrSelect<A>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
+    fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.current_index = 0;
         self.children.iter_mut().for_each(|c| {
-            c.reset(runner.clone(), delta.clone());
+            c.reset(ctx);
         });
     }
 }
 
-impl<A> std::future::Future for AsyncSequenceOrSelect<A>
-where
-    A: Unpin,
-{
+impl<A> std::future::Future for AsyncSequenceOrSelect<A> {
     type Output = bool;
 
     fn poll(
@@ -42,7 +44,8 @@ where
         let bt = self.as_mut().get_mut();
 
         let current_child = &mut bt.children[bt.current_index];
-        let child_status = std::pin::pin!(current_child).poll(cx);
+        let current_child = std::pin::Pin::new(current_child);
+        let child_status = current_child.poll(cx);
         match child_status {
             std::task::Poll::Ready(result) => {
                 if result == bt.next_check {
@@ -77,20 +80,19 @@ impl<A> AsyncSequence<A> {
             inner: AsyncSequenceOrSelect::new(children, true),
         }
     }
+}
 
-    pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
-    where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
-    {
-        self.inner.reset(runner, delta);
+impl<A, R> BehaviorTreeReset<R> for AsyncSequence<A>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
+    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+        self.inner.reset(ctx);
     }
 }
 
-impl<A> std::future::Future for AsyncSequence<A>
-where
-    A: Unpin,
-{
+impl<A> std::future::Future for AsyncSequence<A> {
     type Output = bool;
 
     fn poll(
@@ -112,20 +114,19 @@ impl<A> AsyncSelect<A> {
             inner: AsyncSequenceOrSelect::new(children, false),
         }
     }
+}
 
-    pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
-    where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
-    {
-        self.inner.reset(runner, delta);
+impl<A, R> BehaviorTreeReset<R> for AsyncSelect<A>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
+    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+        self.inner.reset(ctx);
     }
 }
 
-impl<A> std::future::Future for AsyncSelect<A>
-where
-    A: Unpin,
-{
+impl<A> std::future::Future for AsyncSelect<A> {
     type Output = bool;
 
     fn poll(
@@ -142,6 +143,7 @@ mod tests {
     use super::*;
 
     use crate::{
+        AsyncActionContextOwned,
         behavior_nodes::AsyncAction,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -152,17 +154,16 @@ mod tests {
     fn test_sequence_success_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_success_with_dhat_pre");
             let action1 = TestOperation::Add(1, 2, true, 1);
             let action2 = TestOperation::Add(1, 2, true, 1);
-            let action1 =
-                AsyncAction::new(runner.clone(), action1, executor.delta().inner().into());
-            let action2 =
-                AsyncAction::new(runner.clone(), action2, executor.delta().inner().into());
+            let action1 = AsyncAction::new(action1, ctx.create_ctx());
+            let action2 = AsyncAction::new(action2, ctx.create_ctx());
             let action = AsyncSequence::new(vec![
                 AsyncBehaviorState::Action(action1),
                 AsyncBehaviorState::Action(action2),
@@ -180,30 +181,30 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 3);
+
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 6);
     }
 
     #[test]
     fn test_sequence_failure_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_failure_with_dhat_pre");
             let action1 = TestOperation::Add(1, 2, true, 1);
             let action2 = TestOperation::Add(1, 2, false, 1);
             let action3 = TestOperation::Add(1, 2, true, 1);
-            let action1 =
-                AsyncAction::new(runner.clone(), action1, executor.delta().inner().into());
-            let action2 =
-                AsyncAction::new(runner.clone(), action2, executor.delta().inner().into());
-            let action3 =
-                AsyncAction::new(runner.clone(), action3, executor.delta().inner().into());
+            let action1 = AsyncAction::new(action1, ctx.create_ctx());
+            let action2 = AsyncAction::new(action2, ctx.create_ctx());
+            let action3 = AsyncAction::new(action3, ctx.create_ctx());
             let action = AsyncSequence::new(vec![
                 AsyncBehaviorState::Action(action1),
                 AsyncBehaviorState::Action(action2),
@@ -222,10 +223,12 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 3);
+
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 6);
     }
 
     // Select
@@ -234,17 +237,16 @@ mod tests {
     fn test_select_failure_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
 
         let action = {
             let _profiler = DhatTester::new("test_select_failure_with_dhat_pre");
             let action1 = TestOperation::Add(1, 2, false, 1);
             let action2 = TestOperation::Add(1, 2, false, 1);
-            let action1 =
-                AsyncAction::new(runner.clone(), action1, executor.delta().inner().into());
-            let action2 =
-                AsyncAction::new(runner.clone(), action2, executor.delta().inner().into());
+            let action1 = AsyncAction::new(action1, ctx.create_ctx());
+            let action2 = AsyncAction::new(action2, ctx.create_ctx());
             let action = AsyncSelect::new(vec![
                 AsyncBehaviorState::Action(action1),
                 AsyncBehaviorState::Action(action2),
@@ -262,30 +264,30 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 3);
+
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 6);
     }
 
     #[test]
     fn test_select_success_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
 
         let action = {
             let _profiler = DhatTester::new("test_select_success_with_dhat_pre");
             let action1 = TestOperation::Add(1, 2, false, 1);
             let action2 = TestOperation::Add(1, 2, true, 1);
             let action3 = TestOperation::Add(1, 2, false, 1);
-            let action1 =
-                AsyncAction::new(runner.clone(), action1, executor.delta().inner().into());
-            let action2 =
-                AsyncAction::new(runner.clone(), action2, executor.delta().inner().into());
-            let action3 =
-                AsyncAction::new(runner.clone(), action3, executor.delta().inner().into());
+            let action1 = AsyncAction::new(action1, ctx.create_ctx());
+            let action2 = AsyncAction::new(action2, ctx.create_ctx());
+            let action3 = AsyncAction::new(action3, ctx.create_ctx());
             let action = AsyncSelect::new(vec![
                 AsyncBehaviorState::Action(action1),
                 AsyncBehaviorState::Action(action2),
@@ -304,9 +306,11 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 3);
+
         executor.tick(16.67, None);
         executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 6);
     }
 }

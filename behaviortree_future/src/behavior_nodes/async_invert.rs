@@ -1,4 +1,7 @@
-use crate::{BehaviorTreeAsyncRunner, SafeDeltaType, async_behavior_state::AsyncBehaviorState};
+use crate::{
+    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset,
+    async_behavior_state::AsyncBehaviorState,
+};
 
 pub struct AsyncInvert<A> {
     child: Box<AsyncBehaviorState<A>>,
@@ -10,28 +13,28 @@ impl<A> AsyncInvert<A> {
             child: Box::new(child),
         }
     }
+}
 
-    pub fn reset<R>(&mut self, runner: R, delta: SafeDeltaType)
-    where
-        R: BehaviorTreeAsyncRunner<A> + 'static,
-        A: Clone + 'static,
-    {
-        self.child.reset(runner, delta);
+impl<A, R> BehaviorTreeReset<R> for AsyncInvert<A>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
+    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+        self.child.reset(ctx);
     }
 }
 
-impl<A> std::future::Future for AsyncInvert<A>
-where
-    A: Unpin,
-{
+impl<A> std::future::Future for AsyncInvert<A> {
     type Output = bool;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let child = &mut self.as_mut().get_mut().child;
-        std::pin::pin!(child).poll(cx).map(|s| !s)
+        let bt = self.as_mut().get_mut();
+        let child = std::pin::Pin::new(&mut bt.child);
+        child.poll(cx).map(|s| !s)
     }
 }
 
@@ -40,6 +43,7 @@ mod tests {
     use super::*;
 
     use crate::{
+        AsyncActionContextOwned,
         behavior_nodes::AsyncAction,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -48,13 +52,14 @@ mod tests {
     fn test_invert_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::new();
-        let runner = std::rc::Rc::new(std::cell::RefCell::new(runner));
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
 
         let action = {
             let _profiler = DhatTester::new("test_invert_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let action = AsyncAction::new(runner.clone(), action, executor.delta().inner().into());
+            let action = AsyncAction::new(action, ctx.create_ctx());
             let action = AsyncInvert::new(AsyncBehaviorState::Action(action));
             action
         };
@@ -70,6 +75,6 @@ mod tests {
         executor.tick(16.67, None);
         executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(runner.borrow().num, 3);
+        assert_eq!(inner.get(), 3);
     }
 }

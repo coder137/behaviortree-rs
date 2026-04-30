@@ -1,8 +1,10 @@
-use crate::{AsyncActionContext, BehaviorTreeAsyncAction};
+use crate::{AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset};
 
+#[pin_project::pin_project]
 pub struct AsyncAction<A> {
     action: A,
     // state
+    #[pin]
     future: reusable_box_future::ReusableLocalBoxFuture<bool>,
 }
 
@@ -16,34 +18,35 @@ impl<A> AsyncAction<A> {
         let future = reusable_box_future::ReusableLocalBoxFuture::new(future);
         Self { action, future }
     }
+}
 
-    pub fn reset<R>(&mut self, mut ctx: AsyncActionContext<R>)
-    where
-        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-        R: 'static,
-    {
+impl<A, R> BehaviorTreeReset<R> for AsyncAction<A>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
+    fn reset(&mut self, mut ctx: AsyncActionContext<R>) {
         self.action.reset(&mut ctx);
         let future = self.action.clone().create_future(ctx);
         self.future.set(future);
     }
 }
 
-impl<A> std::future::Future for AsyncAction<A>
-where
-    A: Unpin,
-{
+impl<A> std::future::Future for AsyncAction<A> {
     type Output = bool;
 
     fn poll(
-        mut self: std::pin::Pin<&mut Self>,
+        self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        self.as_mut().get_mut().future.poll(cx)
+        let this = self.project();
+        this.future.poll(cx)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{
         AsyncActionContextOwned,
         behavior_nodes::AsyncAction,

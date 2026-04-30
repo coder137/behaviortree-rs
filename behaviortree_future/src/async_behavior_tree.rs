@@ -1,6 +1,7 @@
 use crate::AsyncActionContextOwned;
 use crate::Behavior;
 use crate::BehaviorTreeAsyncAction;
+use crate::BehaviorTreeReset;
 use crate::async_behavior_state::AsyncBehaviorState;
 
 pub struct AsyncBehaviorTree<A, R> {
@@ -45,7 +46,7 @@ impl<A, R> AsyncBehaviorTree<A, R> {
 
 impl<A, R> std::future::Future for AsyncBehaviorTree<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + Unpin + 'static,
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
     R: 'static,
 {
     type Output = bool;
