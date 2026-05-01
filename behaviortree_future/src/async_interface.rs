@@ -37,6 +37,12 @@ impl<R> AsyncActionContextOwned<R> {
         let ctx = self.ctx.get();
         AsyncActionContext { ctx }
     }
+
+    pub fn update_delta(&self, current_delta: f64) {
+        let mut ctx = self.create_ctx();
+        let delta = &mut ctx.safe_ctx_ref_mut().delta;
+        *delta = current_delta;
+    }
 }
 
 pub struct AsyncActionContext<R> {

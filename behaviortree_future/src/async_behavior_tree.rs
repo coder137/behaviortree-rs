@@ -6,7 +6,8 @@ use crate::behavior_nodes::AsyncLoop;
 
 pub struct AsyncBehaviorTree<A, R> {
     child: AsyncBehaviorState<A, R>,
-    _ctx: AsyncActionContextOwned<R>,
+    ctx: AsyncActionContextOwned<R>,
+    delta: std::rc::Rc<std::cell::Cell<f64>>,
 }
 
 impl<A, R> AsyncBehaviorTree<A, R> {
@@ -28,7 +29,7 @@ impl<A, R> AsyncBehaviorTree<A, R> {
         } else {
             child
         };
-        Self { child, _ctx: ctx }
+        Self { child, ctx, delta }
     }
 }
 
@@ -43,6 +44,8 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let bt = self.as_mut().get_mut();
+        let current_delta = bt.delta.get();
+        bt.ctx.update_delta(current_delta);
         let child = std::pin::Pin::new(&mut bt.child);
         child.poll(cx)
     }
@@ -89,6 +92,7 @@ mod tests {
 
         let runner = TestOperationRunner::default();
         let inner = runner.num.clone();
+        let inner_delta = runner.delta.clone();
 
         let action = {
             let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_pre");
@@ -112,26 +116,37 @@ mod tests {
             })
             .detach();
 
-        executor.tick(16.67, None);
-        executor.tick(16.67, None);
+        println!("D: {:?}", inner_delta);
+        executor.tick(10.0, None);
+        println!("D: {:?}", inner_delta);
+
+        executor.tick(20.0, None);
         println!("{:?}", inner);
         assert_eq!(inner.get(), 3);
+        println!("D: {:?}", inner_delta);
 
         // Reset takes place
-        executor.tick(16.67, None);
-        executor.tick(16.67, None);
+        executor.tick(30.0, None);
+        println!("D: {:?}", inner_delta);
+
+        executor.tick(40.0, None);
         println!("{:?}", inner);
         assert_eq!(inner.get(), 6);
+        println!("D: {:?}", inner_delta);
 
         //Reset takes place
-        executor.tick(16.67, None);
-        executor.tick(16.67, None);
+        executor.tick(50.0, None);
+        println!("D: {:?}", inner_delta);
+
+        executor.tick(60.0, None);
         println!("{:?}", inner);
         assert_eq!(inner.get(), 9);
+        println!("D: {:?}", inner_delta);
 
         // shutdown gracefully
         cancel.cancel();
-        executor.tick(16.67, None);
+        executor.tick(70.0, None);
+        println!("D: {:?}", inner_delta);
         assert_eq!(executor.num_tasks(), 0);
     }
 }

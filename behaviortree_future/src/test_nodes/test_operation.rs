@@ -16,12 +16,18 @@ impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
             match self {
                 TestOperation::Add(a, b, retval, times) => {
                     for _t in 0..times {
+                        let delta = ctx.consume_delta();
+                        ctx.runner_ref(|r| {
+                            r.set_delta(delta);
+                        });
                         yield_now().await;
                     }
+
                     let c = a + b;
                     let delta = ctx.consume_delta();
-                    ctx.runner_ref_mut(|r| {
-                        r.set_num(c, delta);
+                    ctx.runner_ref(|r| {
+                        r.set_num(c);
+                        r.set_delta(delta);
                     });
                     retval
                 }
@@ -35,17 +41,22 @@ impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
 #[derive(Debug)]
 pub struct TestOperationRunner {
     pub num: std::rc::Rc<std::cell::Cell<u32>>,
+    pub delta: std::rc::Rc<std::cell::Cell<f64>>,
 }
 
 impl TestOperationRunner {
     pub fn new(num: u32) -> Self {
         Self {
             num: std::rc::Rc::new(std::cell::Cell::new(num)),
+            delta: std::rc::Rc::new(std::cell::Cell::new(0.0)),
         }
     }
 
-    pub fn set_num(&mut self, num: u32, _delta: f64) {
-        // self.num += num;
+    pub fn set_delta(&self, delta: f64) {
+        self.delta.replace(delta);
+    }
+
+    pub fn set_num(&self, num: u32) {
         let new_num = self.num.get() + num;
         self.num.replace(new_num);
     }
