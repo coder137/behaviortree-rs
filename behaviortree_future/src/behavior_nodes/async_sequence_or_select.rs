@@ -3,16 +3,16 @@ use crate::{
     async_behavior_state::AsyncBehaviorState,
 };
 
-struct AsyncSequenceOrSelect<A> {
-    children: Vec<AsyncBehaviorState<A>>,
+struct AsyncSequenceOrSelect<A, R> {
+    children: Vec<AsyncBehaviorState<A, R>>,
     current_index: usize,
 
     //
     next_check: bool,
 }
 
-impl<A> AsyncSequenceOrSelect<A> {
-    pub fn new(children: Vec<AsyncBehaviorState<A>>, next_check: bool) -> Self {
+impl<A, R> AsyncSequenceOrSelect<A, R> {
+    pub fn new(children: Vec<AsyncBehaviorState<A, R>>, next_check: bool) -> Self {
         Self {
             children,
             current_index: 0,
@@ -21,7 +21,7 @@ impl<A> AsyncSequenceOrSelect<A> {
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncSequenceOrSelect<A>
+impl<A, R> BehaviorTreeReset<R> for AsyncSequenceOrSelect<A, R>
 where
     A: BehaviorTreeAsyncAction<R> + Clone + 'static,
     R: 'static,
@@ -34,7 +34,11 @@ where
     }
 }
 
-impl<A> std::future::Future for AsyncSequenceOrSelect<A> {
+impl<A, R> std::future::Future for AsyncSequenceOrSelect<A, R>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
     type Output = bool;
 
     fn poll(
@@ -70,19 +74,19 @@ impl<A> std::future::Future for AsyncSequenceOrSelect<A> {
     }
 }
 
-pub struct AsyncSequence<A> {
-    inner: AsyncSequenceOrSelect<A>,
+pub struct AsyncSequence<A, R> {
+    inner: AsyncSequenceOrSelect<A, R>,
 }
 
-impl<A> AsyncSequence<A> {
-    pub fn new(children: Vec<AsyncBehaviorState<A>>) -> Self {
+impl<A, R> AsyncSequence<A, R> {
+    pub fn new(children: Vec<AsyncBehaviorState<A, R>>) -> Self {
         Self {
             inner: AsyncSequenceOrSelect::new(children, true),
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncSequence<A>
+impl<A, R> BehaviorTreeReset<R> for AsyncSequence<A, R>
 where
     A: BehaviorTreeAsyncAction<R> + Clone + 'static,
     R: 'static,
@@ -92,7 +96,11 @@ where
     }
 }
 
-impl<A> std::future::Future for AsyncSequence<A> {
+impl<A, R> std::future::Future for AsyncSequence<A, R>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
     type Output = bool;
 
     fn poll(
@@ -104,19 +112,19 @@ impl<A> std::future::Future for AsyncSequence<A> {
     }
 }
 
-pub struct AsyncSelect<A> {
-    inner: AsyncSequenceOrSelect<A>,
+pub struct AsyncSelect<A, R> {
+    inner: AsyncSequenceOrSelect<A, R>,
 }
 
-impl<A> AsyncSelect<A> {
-    pub fn new(children: Vec<AsyncBehaviorState<A>>) -> Self {
+impl<A, R> AsyncSelect<A, R> {
+    pub fn new(children: Vec<AsyncBehaviorState<A, R>>) -> Self {
         Self {
             inner: AsyncSequenceOrSelect::new(children, false),
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncSelect<A>
+impl<A, R> BehaviorTreeReset<R> for AsyncSelect<A, R>
 where
     A: BehaviorTreeAsyncAction<R> + Clone + 'static,
     R: 'static,
@@ -126,7 +134,11 @@ where
     }
 }
 
-impl<A> std::future::Future for AsyncSelect<A> {
+impl<A, R> std::future::Future for AsyncSelect<A, R>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
     type Output = bool;
 
     fn poll(

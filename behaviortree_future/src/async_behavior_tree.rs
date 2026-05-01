@@ -1,16 +1,12 @@
 use crate::AsyncActionContextOwned;
 use crate::Behavior;
 use crate::BehaviorTreeAsyncAction;
-use crate::BehaviorTreeReset;
 use crate::async_behavior_state::AsyncBehaviorState;
+use crate::behavior_nodes::AsyncLoop;
 
 pub struct AsyncBehaviorTree<A, R> {
-    ctx: AsyncActionContextOwned<R>,
-    should_loop: bool,
-
-    // state
-    child: AsyncBehaviorState<A>,
-    result: Option<bool>,
+    child: AsyncBehaviorState<A, R>,
+    _ctx: AsyncActionContextOwned<R>,
 }
 
 impl<A, R> AsyncBehaviorTree<A, R> {
@@ -25,22 +21,14 @@ impl<A, R> AsyncBehaviorTree<A, R> {
         R: 'static,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
-        let ctx_ref = ctx.create_ctx();
-        let child = AsyncBehaviorState::from_behavior(behavior, ctx_ref);
-        Self::new(child, ctx, should_loop)
-    }
-
-    pub(crate) fn new(
-        child: AsyncBehaviorState<A>,
-        ctx: AsyncActionContextOwned<R>,
-        should_loop: bool,
-    ) -> Self {
-        Self {
-            child,
-            ctx,
-            should_loop,
-            result: None,
-        }
+        let child = AsyncBehaviorState::from_behavior(behavior, ctx.create_ctx());
+        let child = if should_loop {
+            let child = AsyncLoop::new(child, ctx.create_ctx());
+            AsyncBehaviorState::Loop(child)
+        } else {
+            child
+        };
+        Self { child, _ctx: ctx }
     }
 }
 
@@ -55,24 +43,8 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let bt = self.as_mut().get_mut();
-        if bt.result.is_some() && bt.should_loop {
-            bt.result = None;
-            bt.child.reset(bt.ctx.create_ctx());
-        }
-
-        let child_status = std::pin::pin!(&mut bt.child).poll(cx);
-        match child_status {
-            std::task::Poll::Ready(result) => {
-                bt.result = Some(result);
-                if bt.should_loop {
-                    cx.waker().wake_by_ref();
-                    std::task::Poll::Pending
-                } else {
-                    std::task::Poll::Ready(result)
-                }
-            }
-            std::task::Poll::Pending => std::task::Poll::Pending,
-        }
+        let child = std::pin::Pin::new(&mut bt.child);
+        child.poll(cx)
     }
 }
 

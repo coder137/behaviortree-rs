@@ -1,18 +1,19 @@
 use crate::{
     AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    behavior_nodes::{AsyncAction, AsyncInvert, AsyncSelect, AsyncSequence},
+    behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence},
 };
 
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
-pub enum AsyncBehaviorState<A> {
+pub enum AsyncBehaviorState<A, R> {
     Action(#[pin] AsyncAction<A>),
-    Invert(#[pin] AsyncInvert<A>),
-    Sequence(#[pin] AsyncSequence<A>),
-    Select(#[pin] AsyncSelect<A>),
+    Invert(#[pin] AsyncInvert<A, R>),
+    Sequence(#[pin] AsyncSequence<A, R>),
+    Select(#[pin] AsyncSelect<A, R>),
+    Loop(#[pin] AsyncLoop<A, R>),
 }
 
-impl<A> AsyncBehaviorState<A> {
-    pub fn from_behavior<R>(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
+impl<A, R> AsyncBehaviorState<A, R> {
+    pub fn from_behavior(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
     where
         A: BehaviorTreeAsyncAction<R> + Clone + 'static,
         R: 'static,
@@ -41,7 +42,7 @@ impl<A> AsyncBehaviorState<A> {
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncBehaviorState<A>
+impl<A, R> BehaviorTreeReset<R> for AsyncBehaviorState<A, R>
 where
     A: BehaviorTreeAsyncAction<R> + Clone + 'static,
     R: 'static,
@@ -52,12 +53,17 @@ where
             AsyncBehaviorState::Invert(a) => a,
             AsyncBehaviorState::Sequence(a) => a,
             AsyncBehaviorState::Select(a) => a,
+            AsyncBehaviorState::Loop(a) => a,
         };
         r.reset(ctx);
     }
 }
 
-impl<A> std::future::Future for AsyncBehaviorState<A> {
+impl<A, R> std::future::Future for AsyncBehaviorState<A, R>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
     type Output = bool;
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -69,6 +75,7 @@ impl<A> std::future::Future for AsyncBehaviorState<A> {
             AsyncBehaviorStateProj::Invert(f) => f,
             AsyncBehaviorStateProj::Sequence(f) => f,
             AsyncBehaviorStateProj::Select(f) => f,
+            AsyncBehaviorStateProj::Loop(f) => f,
         };
         future.poll(cx)
     }

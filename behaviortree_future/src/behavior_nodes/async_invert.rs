@@ -3,19 +3,19 @@ use crate::{
     async_behavior_state::AsyncBehaviorState,
 };
 
-pub struct AsyncInvert<A> {
-    child: Box<AsyncBehaviorState<A>>,
+pub struct AsyncInvert<A, R> {
+    child: Box<AsyncBehaviorState<A, R>>,
 }
 
-impl<A> AsyncInvert<A> {
-    pub fn new(child: AsyncBehaviorState<A>) -> Self {
+impl<A, R> AsyncInvert<A, R> {
+    pub fn new(child: AsyncBehaviorState<A, R>) -> Self {
         Self {
             child: Box::new(child),
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncInvert<A>
+impl<A, R> BehaviorTreeReset<R> for AsyncInvert<A, R>
 where
     A: BehaviorTreeAsyncAction<R> + Clone + 'static,
     R: 'static,
@@ -25,7 +25,11 @@ where
     }
 }
 
-impl<A> std::future::Future for AsyncInvert<A> {
+impl<A, R> std::future::Future for AsyncInvert<A, R>
+where
+    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
+    R: 'static,
+{
     type Output = bool;
 
     fn poll(
