@@ -1,6 +1,6 @@
 use crate::{
     AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence},
+    behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncTimes},
 };
 
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
@@ -10,6 +10,7 @@ pub enum AsyncBehaviorState<A, R> {
     Sequence(#[pin] AsyncSequence<A, R>),
     Select(#[pin] AsyncSelect<A, R>),
     Loop(#[pin] AsyncLoop<A, R>),
+    Times(#[pin] AsyncTimes<A, R>),
 }
 
 impl<A, R> AsyncBehaviorState<A, R> {
@@ -54,6 +55,7 @@ where
             AsyncBehaviorState::Sequence(a) => a,
             AsyncBehaviorState::Select(a) => a,
             AsyncBehaviorState::Loop(a) => a,
+            AsyncBehaviorState::Times(a) => a,
         };
         r.reset(ctx);
     }
@@ -76,6 +78,7 @@ where
             AsyncBehaviorStateProj::Sequence(f) => f,
             AsyncBehaviorStateProj::Select(f) => f,
             AsyncBehaviorStateProj::Loop(f) => f,
+            AsyncBehaviorStateProj::Times(f) => f,
         };
         future.poll(cx)
     }

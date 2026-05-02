@@ -3,6 +3,7 @@ use crate::{AsyncActionContext, BehaviorTreeAsyncAction};
 #[derive(Debug, Clone)]
 pub enum TestOperation {
     Add(u32, u32, bool, u32),
+    Yield(bool),
 }
 
 impl TestOperation {}
@@ -29,6 +30,10 @@ impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
                         r.set_num(c);
                         r.set_delta(delta);
                     });
+                    retval
+                }
+                TestOperation::Yield(retval) => {
+                    yield_now().await;
                     retval
                 }
             }

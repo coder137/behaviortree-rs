@@ -43,7 +43,8 @@ where
     ) -> std::task::Poll<Self::Output> {
         let bt = self.as_mut().get_mut();
         if bt.completed {
-            bt.reset(bt.ctx);
+            bt.completed = false;
+            bt.child.reset(bt.ctx);
         }
 
         let child = std::pin::Pin::new(&mut bt.child);
