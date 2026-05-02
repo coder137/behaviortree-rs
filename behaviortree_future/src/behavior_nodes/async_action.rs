@@ -74,7 +74,7 @@ mod tests {
                 assert!(status);
                 DhatTester::stats(|stats| {
                     assert_eq!(stats.total_bytes, 0);
-                })
+                });
             })
             .detach();
 
