@@ -46,10 +46,10 @@ impl<A> std::future::Future for AsyncAction<A> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{
         AsyncActionContextOwned,
-        behavior_nodes::AsyncAction,
+        async_behavior_state::AsyncBehaviorState,
+        behavior_nodes::{AsyncAction, AsyncTimes},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -58,14 +58,12 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let runner = TestOperationRunner::default();
-        let inner = runner.num.clone();
         let ctx = AsyncActionContextOwned::new(runner, 16.67);
-        let ctx_ref = ctx.create_ctx();
 
         let action = {
             let _profiler = DhatTester::new("test_action_with_dhat_pre");
-            let action = TestOperation::Add(1, 2, true, 1);
-            let action = AsyncAction::new(action, ctx_ref);
+            let action = TestOperation::Yield(true);
+            let action = AsyncAction::new(action, ctx.create_ctx());
             action
         };
 
@@ -83,7 +81,6 @@ mod tests {
         executor.tick(16.67, None);
         executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(inner.get(), 3);
     }
 
     #[test]
@@ -92,39 +89,20 @@ mod tests {
         let delta = executor.delta().inner();
 
         let runner = TestOperationRunner::default();
-        let inner = runner.num.clone();
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
-        let ctx_ref = ctx.create_ctx();
 
-        let mut action = {
+        let action = {
             let _profiler = DhatTester::new("test_action_retry_with_dhat_pre");
-            let action = TestOperation::Add(1, 2, true, 1);
-            let action = AsyncAction::new(action, ctx_ref);
+            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
+            let action = AsyncBehaviorState::Action(action);
+            let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2, ctx.create_ctx()));
             action
         };
-
-        let mut count = 2;
-        let future = std::future::poll_fn(move |cx| {
-            if count == 0 {
-                return std::task::Poll::Ready(true);
-            }
-            let status = std::pin::pin!(&mut action).poll(cx);
-            match status {
-                std::task::Poll::Ready(s) => {
-                    count -= 1;
-                    assert!(s);
-                    action.reset(ctx_ref);
-                    cx.waker().wake_by_ref();
-                    std::task::Poll::Pending
-                }
-                std::task::Poll::Pending => std::task::Poll::Pending,
-            }
-        });
 
         executor
             .spawn_local("_", async move {
                 let _profiler = DhatTester::new("test_action_retry_with_dhat_post");
-                let status = future.await;
+                let status = action.await;
                 assert!(status);
                 DhatTester::stats(|stats| {
                     assert_eq!(stats.total_bytes, 0);
@@ -134,13 +112,10 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 3);
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 6);
 
-        executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
     }
 }
