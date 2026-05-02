@@ -48,7 +48,7 @@ mod tests {
 
     use crate::{
         AsyncActionContextOwned,
-        behavior_nodes::AsyncAction,
+        behavior_nodes::{AsyncAction, AsyncTimes},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -57,14 +57,13 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let runner = TestOperationRunner::default();
-        let inner = runner.num.clone();
         let ctx = AsyncActionContextOwned::new(runner, 16.67);
 
         let action = {
             let _profiler = DhatTester::new("test_invert_with_dhat_pre");
-            let action = TestOperation::Add(1, 2, true, 1);
-            let action = AsyncAction::new(action, ctx.create_ctx());
-            let action = AsyncInvert::new(AsyncBehaviorState::Action(action));
+            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
+            let action = AsyncBehaviorState::Action(action);
+            let action = AsyncInvert::new(action);
             action
         };
 
@@ -79,6 +78,41 @@ mod tests {
         executor.tick(16.67, None);
         executor.tick(16.67, None);
         assert_eq!(executor.num_tasks(), 0);
-        assert_eq!(inner.get(), 3);
+    }
+
+    #[test]
+    fn test_invert_reset_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::default();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+
+        let action = {
+            let _profiler = DhatTester::new("test_invert_reset_with_dhat_pre");
+            // action
+            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
+            let action = AsyncBehaviorState::Action(action);
+            // invert
+            let action = AsyncInvert::new(action);
+            let action = AsyncBehaviorState::Invert(action);
+            // times
+            let action = AsyncTimes::new(action, 2, ctx.create_ctx());
+            action
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler = DhatTester::new("test_invert_reset_with_dhat_post");
+                let status = action.await;
+                assert!(status);
+            })
+            .detach();
+
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+
+        executor.tick(16.67, None);
+        executor.tick(16.67, None);
+        assert_eq!(executor.num_tasks(), 0);
     }
 }

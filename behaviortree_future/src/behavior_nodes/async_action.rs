@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_action_retry_with_dhat() {
+    fn test_action_reset_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
         let delta = executor.delta().inner();
 
@@ -92,7 +92,7 @@ mod tests {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
 
         let action = {
-            let _profiler = DhatTester::new("test_action_retry_with_dhat_pre");
+            let _profiler = DhatTester::new("test_action_reset_with_dhat_pre");
             let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
             let action = AsyncBehaviorState::Action(action);
             let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2, ctx.create_ctx()));
@@ -101,7 +101,7 @@ mod tests {
 
         executor
             .spawn_local("_", async move {
-                let _profiler = DhatTester::new("test_action_retry_with_dhat_post");
+                let _profiler = DhatTester::new("test_action_reset_with_dhat_post");
                 let status = action.await;
                 assert!(status);
                 DhatTester::stats(|stats| {
