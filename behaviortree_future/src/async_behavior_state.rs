@@ -30,14 +30,14 @@ impl<A, R> AsyncBehaviorState<A, R> {
                     .into_iter()
                     .map(|b| Self::from_behavior(b, ctx))
                     .collect::<Vec<_>>();
-                Self::Sequence(AsyncSequence::new(children))
+                Self::Sequence(AsyncSequence::new(children, ctx))
             }
             Behavior::Select(behaviors) => {
                 let children = behaviors
                     .into_iter()
                     .map(|b| Self::from_behavior(b, ctx))
                     .collect::<Vec<_>>();
-                Self::Select(AsyncSelect::new(children))
+                Self::Select(AsyncSelect::new(children, ctx))
             }
         }
     }

@@ -4,6 +4,7 @@ use crate::{AsyncActionContext, BehaviorTreeAsyncAction};
 pub enum TestOperation {
     Add(u32, u32, bool, u32),
     Yield(bool),
+    ConsumeDelta(bool),
 }
 
 impl TestOperation {}
@@ -17,7 +18,7 @@ impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
             match self {
                 TestOperation::Add(a, b, retval, times) => {
                     for _t in 0..times {
-                        let delta = ctx.consume_delta();
+                        let delta = ctx.peek_delta();
                         ctx.runner_ref(|r| {
                             r.set_delta(delta);
                         });
@@ -25,7 +26,7 @@ impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
                     }
 
                     let c = a + b;
-                    let delta = ctx.consume_delta();
+                    let delta = ctx.peek_delta();
                     ctx.runner_ref(|r| {
                         r.set_num(c);
                         r.set_delta(delta);
@@ -34,6 +35,13 @@ impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
                 }
                 TestOperation::Yield(retval) => {
                     yield_now().await;
+                    retval
+                }
+                TestOperation::ConsumeDelta(retval) => {
+                    let delta = ctx.consume_delta();
+                    ctx.runner_ref(|r| {
+                        r.set_delta(delta);
+                    });
                     retval
                 }
             }
