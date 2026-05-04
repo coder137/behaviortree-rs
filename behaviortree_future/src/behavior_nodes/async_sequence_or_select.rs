@@ -573,4 +573,71 @@ mod tests {
         assert_eq!(inner.get(), 6);
         assert_eq!(executor.num_tasks(), 0);
     }
+
+    #[test]
+    fn test_select_failure_reset_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+
+        let action = {
+            let _profiler = DhatTester::new("test_select_failure_reset_with_dhat_pre");
+            let action = AsyncSelect::new(
+                vec![
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, false, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(false),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, false, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(false),
+                        ctx.create_ctx(),
+                    )),
+                ],
+                ctx.create_ctx(),
+            );
+            let action = AsyncBehaviorState::Select(action);
+            let action = AsyncTimes::new(action, 2, ctx.create_ctx());
+            action
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler = DhatTester::new("test_select_failure_reset_with_dhat_post");
+                let status = action.await;
+                assert!(status);
+            })
+            .detach();
+
+        executor.tick(16.67, None);
+        assert_eq!(inner.get(), 3);
+
+        executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
+
+        // reset
+        executor.tick(16.67, None);
+        assert_eq!(inner.get(), 6);
+
+        //
+        executor.tick(16.67, None);
+        assert_eq!(inner.get(), 9);
+
+        executor.tick(16.67, None);
+        assert_eq!(inner.get(), 12);
+        assert_eq!(executor.num_tasks(), 1);
+
+        executor.tick(16.67, None);
+        assert_eq!(inner.get(), 12);
+        assert_eq!(executor.num_tasks(), 0);
+    }
 }
