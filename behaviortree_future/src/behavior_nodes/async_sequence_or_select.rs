@@ -216,6 +216,9 @@ mod tests {
                 let _profiler = DhatTester::new("test_sequence_success_no_consume_with_dhat_post");
                 let status = action.await;
                 assert!(status);
+                DhatTester::stats(|stats| {
+                    assert_eq!(stats.total_bytes, 0);
+                });
             })
             .detach();
 
@@ -255,6 +258,9 @@ mod tests {
                 let _profiler = DhatTester::new("test_sequence_success_consume_with_dhat_post");
                 let status = action.await;
                 assert!(status);
+                DhatTester::stats(|stats| {
+                    assert_eq!(stats.total_bytes, 0);
+                });
             })
             .detach();
 
@@ -292,6 +298,9 @@ mod tests {
                 let _profiler = DhatTester::new("test_sequence_success_with_dhat_post");
                 let status = action.await;
                 assert!(status);
+                DhatTester::stats(|stats| {
+                    assert_eq!(stats.total_bytes, 0);
+                });
             })
             .detach();
 
@@ -337,6 +346,9 @@ mod tests {
                 let _profiler = DhatTester::new("test_sequence_failure_with_dhat_post");
                 let status = action.await;
                 assert!(!status);
+                DhatTester::stats(|stats| {
+                    assert_eq!(stats.total_bytes, 0);
+                });
             })
             .detach();
 
@@ -392,6 +404,9 @@ mod tests {
                 let _profiler = DhatTester::new("test_sequence_success_reset_with_dhat_post");
                 let status = action.await;
                 assert!(status);
+                DhatTester::stats(|stats| {
+                    assert_eq!(stats.total_bytes, 0);
+                });
             })
             .detach();
 
