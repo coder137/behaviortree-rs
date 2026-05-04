@@ -128,6 +128,7 @@ mod tests {
             let action = AsyncAction::new(TestOperation::Add(1, 2, true, 1), ctx.create_ctx());
             let action = AsyncBehaviorState::Action(action);
             let action = AsyncLoop::new(action, ctx.create_ctx());
+            let action = AsyncBehaviorState::Loop(action);
             action
         };
 
