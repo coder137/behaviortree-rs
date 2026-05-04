@@ -116,37 +116,33 @@ mod tests {
             })
             .detach();
 
-        println!("D: {:?}", inner_delta);
         executor.tick(10.0, None);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 10.0);
 
         executor.tick(20.0, None);
-        println!("{:?}", inner);
         assert_eq!(inner.get(), 3);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 20.0);
 
         // Reset takes place
         executor.tick(30.0, None);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 30.0);
 
         executor.tick(40.0, None);
-        println!("{:?}", inner);
         assert_eq!(inner.get(), 6);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 40.0);
 
         //Reset takes place
         executor.tick(50.0, None);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 50.0);
 
         executor.tick(60.0, None);
-        println!("{:?}", inner);
         assert_eq!(inner.get(), 9);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 60.0);
 
         // shutdown gracefully
         cancel.cancel();
         executor.tick(70.0, None);
-        println!("D: {:?}", inner_delta);
+        assert_eq!(inner_delta.get(), 70.0);
         assert_eq!(executor.num_tasks(), 0);
     }
 }
