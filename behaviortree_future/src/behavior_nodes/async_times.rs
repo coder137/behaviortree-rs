@@ -26,8 +26,7 @@ impl<A, R> AsyncTimes<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncTimes<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.current_times = 0;
@@ -38,8 +37,7 @@ where
 
 impl<A, R> std::future::Future for AsyncTimes<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
 

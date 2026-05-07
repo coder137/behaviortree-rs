@@ -16,8 +16,7 @@ pub enum AsyncBehaviorState<A, R> {
 impl<A, R> AsyncBehaviorState<A, R> {
     pub fn from_behavior(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
     where
-        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-        R: 'static,
+        A: BehaviorTreeAsyncAction<R>,
     {
         match behavior {
             Behavior::Action(action) => Self::Action(AsyncAction::new(action, ctx)),
@@ -45,8 +44,7 @@ impl<A, R> AsyncBehaviorState<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncBehaviorState<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         let r: &mut dyn BehaviorTreeReset<R> = match self {
@@ -63,8 +61,7 @@ where
 
 impl<A, R> std::future::Future for AsyncBehaviorState<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
     fn poll(

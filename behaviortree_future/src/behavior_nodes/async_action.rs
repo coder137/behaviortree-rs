@@ -11,24 +11,19 @@ pub struct AsyncAction<A> {
 impl<A> AsyncAction<A> {
     pub fn new<R>(action: A, ctx: AsyncActionContext<R>) -> Self
     where
-        A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-        R: 'static,
+        A: BehaviorTreeAsyncAction<R>,
     {
-        let future = action.clone().create_future(ctx);
-        let future = reusable_box_future::ReusableLocalBoxFuture::new(future);
+        let future = action.create_future(ctx);
         Self { action, future }
     }
 }
 
 impl<A, R> BehaviorTreeReset<R> for AsyncAction<A>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
-    fn reset(&mut self, mut ctx: AsyncActionContext<R>) {
-        self.action.reset(&mut ctx);
-        let future = self.action.clone().create_future(ctx);
-        self.future.set(future);
+    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+        self.action.reset_future(ctx, &mut self.future);
     }
 }
 

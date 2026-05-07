@@ -90,7 +90,14 @@ pub(crate) trait BehaviorTreeReset<R> {
 }
 
 pub trait BehaviorTreeAsyncAction<R> {
-    fn create_future(self, ctx: AsyncActionContext<R>) -> impl std::future::Future<Output = bool>;
+    fn create_future(
+        &self,
+        ctx: AsyncActionContext<R>,
+    ) -> reusable_box_future::ReusableLocalBoxFuture<bool>;
 
-    fn reset(&self, ctx: &mut AsyncActionContext<R>);
+    fn reset_future(
+        &self,
+        ctx: AsyncActionContext<R>,
+        future: &mut reusable_box_future::ReusableLocalBoxFuture<bool>,
+    );
 }

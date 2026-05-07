@@ -29,8 +29,7 @@ impl<A, R> AsyncSequenceOrSelect<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncSequenceOrSelect<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.current_index = 0;
@@ -42,8 +41,7 @@ where
 
 impl<A, R> std::future::Future for AsyncSequenceOrSelect<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
 
@@ -103,8 +101,7 @@ impl<A, R> AsyncSequence<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncSequence<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.inner.reset(ctx);
@@ -113,8 +110,7 @@ where
 
 impl<A, R> std::future::Future for AsyncSequence<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
 
@@ -141,8 +137,7 @@ impl<A, R> AsyncSelect<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncSelect<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.inner.reset(ctx);
@@ -151,8 +146,7 @@ where
 
 impl<A, R> std::future::Future for AsyncSelect<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
 

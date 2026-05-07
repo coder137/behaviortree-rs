@@ -21,8 +21,7 @@ impl<A, R> AsyncLoop<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncLoop<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.completed = false;
@@ -32,8 +31,7 @@ where
 
 impl<A, R> std::future::Future for AsyncLoop<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
 

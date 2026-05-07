@@ -17,8 +17,7 @@ impl<A, R> AsyncInvert<A, R> {
 
 impl<A, R> BehaviorTreeReset<R> for AsyncInvert<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.child.reset(ctx);
@@ -27,8 +26,7 @@ where
 
 impl<A, R> std::future::Future for AsyncInvert<A, R>
 where
-    A: BehaviorTreeAsyncAction<R> + Clone + 'static,
-    R: 'static,
+    A: BehaviorTreeAsyncAction<R>,
 {
     type Output = bool;
 
