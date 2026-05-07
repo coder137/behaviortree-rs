@@ -11,26 +11,25 @@ test-dhat = []
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-
 pin-project = "1.1"
 reusable-box-future = "0.2.0"
 
 [dev-dependencies]
+# Async
 ticked_async_executor = { version = "0.4" }
-
-tokio-util = { version = "*" }
+tokio-util = { version = "0.7" }
 tokio = { version = "1.52", features = ["full"] }
 
+# Error handling
 anyhow = { version = "1.0" }
 
 # Memory profiling
 dhat = { version = "0.3.3" }
 
-#
+# Arena allocator
 slab = { version = "0.4" }
-rhai = { version = "1.24" }
 
-# TODO, Performance profiling (criterion)
+# Performance profiling
 criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
