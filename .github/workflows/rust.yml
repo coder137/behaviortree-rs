@@ -22,6 +22,7 @@ jobs:
       - uses: taiki-e/install-action@cargo-make
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: taiki-e/install-action@cargo-clippy
 
       - name: behaviortree package
         working-directory: ${{github.workspace}}/behaviortree
