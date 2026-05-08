@@ -5,6 +5,7 @@ args = ["clean"]
 [tasks.ci]
 script = '''
 cargo build
+cargo +nightly miri test
 cargo nextest run
 cargo nextest run --features test-dhat
 cargo run --example simple
