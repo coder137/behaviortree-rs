@@ -1,0 +1,146 @@
+use crate::AsyncActionContextOwned;
+use crate::Behavior;
+use crate::BehaviorTreeAsyncAction;
+use crate::async_behavior_state::AsyncBehaviorState;
+use crate::behavior_nodes::AsyncLoop;
+
+pub struct AsyncBehaviorTree<A, R> {
+    child: AsyncBehaviorState<A, R>,
+    ctx: AsyncActionContextOwned<R>,
+    delta: std::rc::Rc<std::cell::Cell<f64>>,
+}
+
+impl<A, R> AsyncBehaviorTree<A, R> {
+    pub fn from_behavior(
+        behavior: Behavior<A>,
+        runner: R,
+        delta: std::rc::Rc<std::cell::Cell<f64>>,
+        should_loop: bool,
+    ) -> Self
+    where
+        A: BehaviorTreeAsyncAction<R>,
+    {
+        let ctx = AsyncActionContextOwned::new(runner, delta.get());
+        let child = AsyncBehaviorState::from_behavior(behavior, ctx.create_ctx());
+        let child = if should_loop {
+            let child = AsyncLoop::new(child, ctx.create_ctx());
+            AsyncBehaviorState::Loop(child)
+        } else {
+            child
+        };
+        Self { child, ctx, delta }
+    }
+}
+
+impl<A, R> std::future::Future for AsyncBehaviorTree<A, R>
+where
+    A: BehaviorTreeAsyncAction<R>,
+{
+    type Output = bool;
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let bt = self.as_mut().get_mut();
+        let current_delta = bt.delta.get();
+        bt.ctx.update_delta(current_delta);
+        let child = std::pin::Pin::new(&mut bt.child);
+        child.poll(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_nodes::{DhatTester, TestOperation, TestOperationRunner};
+
+    use super::*;
+
+    #[test]
+    fn test_behaviortree_no_loop_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::default();
+
+        let bt = {
+            let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_pre");
+            let action = TestOperation::Add(1, 2, true, 1);
+            let bt = AsyncBehaviorTree::from_behavior(
+                Behavior::Action(action),
+                runner,
+                executor.delta().inner().into(),
+                false,
+            );
+            bt
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_post");
+                let status = bt.await;
+                assert!(status);
+            })
+            .detach();
+
+        executor.wait_till_completed(16.67);
+    }
+
+    #[test]
+    fn test_behaviortree_loop_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let inner_delta = runner.delta.clone();
+
+        let action = {
+            let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_pre");
+            let action = TestOperation::Add(1, 2, true, 1);
+            let action = AsyncBehaviorTree::from_behavior(
+                Behavior::Action(action),
+                runner,
+                executor.delta().inner().into(),
+                true,
+            );
+            action
+        };
+
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let cancel_clone = cancel.clone();
+        executor
+            .spawn_local("_", async move {
+                let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_post");
+                let ret = cancel_clone.run_until_cancelled_owned(action).await;
+                assert!(ret.is_none());
+            })
+            .detach();
+
+        executor.tick(10.0, None);
+        assert_eq!(inner_delta.get(), 10.0);
+
+        executor.tick(20.0, None);
+        assert_eq!(inner.get(), 3);
+        assert_eq!(inner_delta.get(), 20.0);
+
+        // Reset takes place
+        executor.tick(30.0, None);
+        assert_eq!(inner_delta.get(), 30.0);
+
+        executor.tick(40.0, None);
+        assert_eq!(inner.get(), 6);
+        assert_eq!(inner_delta.get(), 40.0);
+
+        //Reset takes place
+        executor.tick(50.0, None);
+        assert_eq!(inner_delta.get(), 50.0);
+
+        executor.tick(60.0, None);
+        assert_eq!(inner.get(), 9);
+        assert_eq!(inner_delta.get(), 60.0);
+
+        // shutdown gracefully
+        cancel.cancel();
+        executor.tick(70.0, None);
+        assert_eq!(inner_delta.get(), 70.0);
+        assert_eq!(executor.num_tasks(), 0);
+    }
+}

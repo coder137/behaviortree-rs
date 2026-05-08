@@ -17,7 +17,16 @@ jobs:
             os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94
+      - uses: taiki-e/install-action@cargo-make
+      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: rust installation
+        run: |
+          rustup component add clippy
+          rustup +nightly component add miri
 
       - name: behaviortree package
         working-directory: ${{github.workspace}}/behaviortree
@@ -35,3 +44,8 @@ jobs:
           cargo build
           cargo run --example simple_async
           cargo run --example custom_wait
+
+      - name: behaviortree_future package
+        working-directory: ${{github.workspace}}/behaviortree_future
+        run: |
+          cargo make ci

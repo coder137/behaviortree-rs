@@ -1,0 +1,37 @@
+[package]
+name = "behaviortree_future"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+
+# Memory usage
+test-dhat = []
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+pin-project = "1.1"
+reusable-box-future = "0.2.0"
+
+[dev-dependencies]
+# Async
+ticked_async_executor = { version = "0.4" }
+tokio-util = { version = "0.7" }
+tokio = { version = "1.52", features = ["full"] }
+
+# Error handling
+anyhow = { version = "1.0" }
+
+# Memory profiling
+dhat = { version = "0.3.3" }
+
+# Arena allocator
+slab = { version = "0.4" }
+
+# Performance profiling
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "pointer_benchmark"
+harness = false
