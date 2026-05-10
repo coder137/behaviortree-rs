@@ -182,7 +182,8 @@ fn main() -> anyhow::Result<()> {
     let mut executor = TickedAsyncExecutor::default();
     let delta = executor.delta().inner();
 
-    let behavior_tree = AsyncBehaviorTree::from_behavior(behavior, runner, delta.into(), true);
+    let (bt, bt_controller) =
+        AsyncBehaviorTree::from_behavior(Behavior::Loop(behavior.into()), runner, delta.into());
 
     let cancel = CancellationToken::new();
     let cancel_clone = cancel.clone();
@@ -193,7 +194,7 @@ fn main() -> anyhow::Result<()> {
                     .file_name(format!("simple_example.json"))
                     .build();
 
-                cancel_clone.run_until_cancelled_owned(behavior_tree).await;
+                cancel_clone.run_until_cancelled_owned(bt).await;
                 let _stats = dhat::HeapStats::get();
                 println!("Stats: {_stats:?}");
             }

@@ -38,6 +38,10 @@ impl<A, R> AsyncBehaviorState<A, R> {
                     .collect::<Vec<_>>();
                 Self::Select(AsyncSelect::new(children, ctx))
             }
+            Behavior::Loop(behavior) => {
+                let child = Self::from_behavior(*behavior, ctx);
+                Self::Loop(AsyncLoop::new(child, ctx))
+            }
         }
     }
 }
