@@ -182,7 +182,7 @@ fn main() -> anyhow::Result<()> {
     let mut executor = TickedAsyncExecutor::default();
     let delta = executor.delta().inner();
 
-    let (bt, bt_controller) =
+    let (bt, _bt_controller) =
         AsyncBehaviorTree::from_behavior(Behavior::Loop(behavior.into()), runner, delta.into());
 
     let cancel = CancellationToken::new();

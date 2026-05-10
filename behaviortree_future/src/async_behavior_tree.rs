@@ -19,34 +19,12 @@ pub struct AsyncBehaviorTreeController {
 }
 
 impl AsyncBehaviorTreeController {
-    pub fn reset(&self) -> Result<(), ()> {
-        match self.control.get() {
-            Control::None => {
-                self.control.replace(Control::Reset);
-            }
-            Control::Reset => {
-                // already reset, do nothing
-            }
-            Control::Shutdown => {
-                return Err(());
-            }
-        }
-        Ok(())
+    pub fn reset(&self) {
+        self.control.replace(Control::Reset);
     }
 
-    pub fn shutdown(&self) -> Result<(), ()> {
-        match self.control.get() {
-            Control::None => {
-                self.control.replace(Control::Shutdown);
-            }
-            Control::Reset => {
-                self.control.replace(Control::Shutdown);
-            }
-            Control::Shutdown => {
-                return Err(());
-            }
-        }
-        Ok(())
+    pub fn shutdown(self) {
+        self.control.replace(Control::Shutdown);
     }
 }
 
@@ -125,7 +103,7 @@ mod tests {
         let bt = {
             let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let (bt, bt_controller) = AsyncBehaviorTree::from_behavior(
+            let (bt, _bt_controller) = AsyncBehaviorTree::from_behavior(
                 Behavior::Action(action),
                 runner,
                 executor.delta().inner().into(),
@@ -155,7 +133,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let (bt, bt_controller) = AsyncBehaviorTree::from_behavior(
+            let (bt, _bt_controller) = AsyncBehaviorTree::from_behavior(
                 Behavior::Loop(Behavior::Action(action).into()),
                 runner,
                 executor.delta().inner().into(),
