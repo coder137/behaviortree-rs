@@ -239,4 +239,56 @@ mod tests {
         assert_eq!(inner_delta.get(), 60.0);
         assert_eq!(executor.num_tasks(), 0);
     }
+
+    #[test]
+    fn test_behaviortree_no_loop_with_early_reset_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let inner_delta = runner.delta.clone();
+
+        let (bt, bt_controller) = {
+            let _profiler =
+                DhatTester::new("test_behaviortree_no_loop_with_early_reset_with_dhat_pre");
+            let action = TestOperation::Add(1, 2, true, 1);
+            let (bt, bt_controller) = AsyncBehaviorTree::from_behavior(
+                Behavior::Action(action).into(),
+                runner,
+                executor.delta().inner().into(),
+            );
+            (bt, bt_controller)
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler =
+                    DhatTester::new("test_behaviortree_no_loop_with_early_reset_with_dhat_post");
+                let status = bt.await;
+                let status = status.unwrap();
+                assert!(status);
+            })
+            .detach();
+
+        executor.tick(10.0, None);
+        assert_eq!(inner_delta.get(), 10.0);
+
+        bt_controller.reset();
+
+        executor.tick(20.0, None);
+        assert_eq!(inner.get(), 0);
+        assert_eq!(inner_delta.get(), 20.0);
+
+        bt_controller.reset();
+
+        executor.tick(30.0, None);
+        assert_eq!(inner.get(), 0);
+        assert_eq!(inner_delta.get(), 30.0);
+
+        executor.tick(40.0, None);
+        assert_eq!(inner.get(), 3);
+        assert_eq!(inner_delta.get(), 40.0);
+
+        assert_eq!(executor.num_tasks(), 0);
+    }
 }
