@@ -180,4 +180,63 @@ mod tests {
         assert_eq!(inner_delta.get(), 70.0);
         assert_eq!(executor.num_tasks(), 0);
     }
+
+    #[test]
+    fn test_behaviortree_loop_with_early_shutdown_with_dhat() {
+        let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
+
+        let runner = TestOperationRunner::default();
+        let inner = runner.num.clone();
+        let inner_delta = runner.delta.clone();
+
+        let (bt, bt_controller) = {
+            let _profiler =
+                DhatTester::new("test_behaviortree_loop_with_early_shutdown_with_dhat_pre");
+            let action = TestOperation::Add(1, 2, true, 1);
+            let (bt, bt_controller) = AsyncBehaviorTree::from_behavior(
+                Behavior::Loop(Behavior::Action(action).into()),
+                runner,
+                executor.delta().inner().into(),
+            );
+            (bt, bt_controller)
+        };
+
+        executor
+            .spawn_local("_", async move {
+                let _profiler =
+                    DhatTester::new("test_behaviortree_loop_with_early_shutdown_with_dhat_post");
+                let status = bt.await;
+                assert!(status.is_none());
+            })
+            .detach();
+
+        executor.tick(10.0, None);
+        assert_eq!(inner_delta.get(), 10.0);
+
+        executor.tick(20.0, None);
+        assert_eq!(inner.get(), 3);
+        assert_eq!(inner_delta.get(), 20.0);
+
+        // Reset takes place
+        executor.tick(30.0, None);
+        assert_eq!(inner_delta.get(), 30.0);
+
+        executor.tick(40.0, None);
+        assert_eq!(inner.get(), 6);
+        assert_eq!(inner_delta.get(), 40.0);
+
+        //Reset takes place
+        executor.tick(50.0, None);
+        assert_eq!(inner_delta.get(), 50.0);
+
+        executor.tick(60.0, None);
+        assert_eq!(inner.get(), 9);
+        assert_eq!(inner_delta.get(), 60.0);
+
+        // shutdown gracefully
+        bt_controller.shutdown();
+        executor.tick(70.0, None);
+        assert_eq!(inner_delta.get(), 60.0);
+        assert_eq!(executor.num_tasks(), 0);
+    }
 }
