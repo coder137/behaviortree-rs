@@ -1,35 +1,31 @@
-use crate::{
-    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    async_behavior_state::AsyncBehaviorState,
-};
+use crate::{AsyncActionContext, BehaviorTreeReset};
 
-pub struct AsyncInvert<A, R> {
-    child: Box<AsyncBehaviorState<A, R>>,
+pub struct AsyncInvert<C> {
+    child: Box<C>,
 }
 
-impl<A, R> AsyncInvert<A, R> {
-    pub fn new(child: AsyncBehaviorState<A, R>) -> Self {
+impl<C> AsyncInvert<C> {
+    pub fn new(child: C) -> Self {
         Self {
-            child: Box::new(child),
+            child: child.into(),
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncInvert<A, R>
+impl<C, R> BehaviorTreeReset<R> for AsyncInvert<C>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: BehaviorTreeReset<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.child.reset(ctx);
     }
 }
 
-impl<A, R> std::future::Future for AsyncInvert<A, R>
+impl<C> std::future::Future for AsyncInvert<C>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: std::future::Future<Output = bool> + Unpin,
 {
-    type Output = bool;
-
+    type Output = C::Output;
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -46,6 +42,7 @@ mod tests {
 
     use crate::{
         AsyncActionContextOwned,
+        async_behavior_state::AsyncBehaviorState,
         behavior_nodes::{AsyncAction, AsyncTimes},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -125,7 +122,7 @@ mod tests {
             let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
             let action = AsyncBehaviorState::Action(action);
             // invert
-            let action = AsyncInvert::new(action);
+            let action = AsyncInvert::new(action.into());
             let action = AsyncBehaviorState::Invert(action);
             // times
             let action = AsyncTimes::new(action, 2, ctx.create_ctx());

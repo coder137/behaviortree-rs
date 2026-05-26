@@ -29,7 +29,6 @@ where
 
 impl<A> std::future::Future for AsyncAction<A> {
     type Output = bool;
-
     fn poll(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,

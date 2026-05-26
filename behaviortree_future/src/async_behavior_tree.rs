@@ -31,7 +31,7 @@ impl AsyncBehaviorTreeController {
 pub struct AsyncBehaviorTree<A, R> {
     child: AsyncBehaviorState<A, R>,
     ctx: AsyncActionContextOwned<R>,
-    delta: std::rc::Rc<std::cell::Cell<f64>>,
+    delta: Rc<Cell<f64>>,
 
     // control
     control: Rc<Cell<Control>>,
@@ -84,7 +84,7 @@ where
         let current_delta = bt.delta.get();
         bt.ctx.update_delta(current_delta);
         let child = std::pin::Pin::new(&mut bt.child);
-        child.poll(cx).map(|s| Some(s))
+        child.poll(cx).map(Some)
     }
 }
 

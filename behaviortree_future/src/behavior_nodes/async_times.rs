@@ -1,10 +1,7 @@
-use crate::{
-    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    async_behavior_state::AsyncBehaviorState,
-};
+use crate::{AsyncActionContext, BehaviorTreeReset};
 
-pub struct AsyncTimes<A, R> {
-    child: Box<AsyncBehaviorState<A, R>>,
+pub struct AsyncTimes<C, R> {
+    child: Box<C>,
     current_times: u64,
     reset: bool,
 
@@ -12,8 +9,8 @@ pub struct AsyncTimes<A, R> {
     ctx: AsyncActionContext<R>,
 }
 
-impl<A, R> AsyncTimes<A, R> {
-    pub fn new(child: AsyncBehaviorState<A, R>, times: u64, ctx: AsyncActionContext<R>) -> Self {
+impl<C, R> AsyncTimes<C, R> {
+    pub fn new(child: C, times: u64, ctx: AsyncActionContext<R>) -> Self {
         Self {
             child: Box::new(child),
             current_times: 0,
@@ -24,9 +21,9 @@ impl<A, R> AsyncTimes<A, R> {
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncTimes<A, R>
+impl<C, R> BehaviorTreeReset<R> for AsyncTimes<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: BehaviorTreeReset<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.current_times = 0;
@@ -35,12 +32,11 @@ where
     }
 }
 
-impl<A, R> std::future::Future for AsyncTimes<A, R>
+impl<C, R> std::future::Future for AsyncTimes<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: std::future::Future<Output = bool> + BehaviorTreeReset<R> + Unpin,
 {
-    type Output = bool;
-
+    type Output = C::Output;
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,

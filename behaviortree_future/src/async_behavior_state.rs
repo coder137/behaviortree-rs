@@ -6,11 +6,11 @@ use crate::{
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
 pub enum AsyncBehaviorState<A, R> {
     Action(#[pin] AsyncAction<A>),
-    Invert(#[pin] AsyncInvert<A, R>),
-    Sequence(#[pin] AsyncSequence<A, R>),
-    Select(#[pin] AsyncSelect<A, R>),
-    Loop(#[pin] AsyncLoop<A, R>),
-    Times(#[pin] AsyncTimes<A, R>),
+    Invert(#[pin] AsyncInvert<AsyncBehaviorState<A, R>>),
+    Sequence(#[pin] AsyncSequence<AsyncBehaviorState<A, R>, R>),
+    Select(#[pin] AsyncSelect<AsyncBehaviorState<A, R>, R>),
+    Loop(#[pin] AsyncLoop<AsyncBehaviorState<A, R>, R>),
+    Times(#[pin] AsyncTimes<AsyncBehaviorState<A, R>, R>),
 }
 
 impl<A, R> AsyncBehaviorState<A, R> {
@@ -19,7 +19,10 @@ impl<A, R> AsyncBehaviorState<A, R> {
         A: BehaviorTreeAsyncAction<R>,
     {
         match behavior {
-            Behavior::Action(action) => Self::Action(AsyncAction::new(action, ctx)),
+            Behavior::Action(action) => {
+                //
+                Self::Action(AsyncAction::new(action, ctx))
+            }
             Behavior::Invert(behavior) => {
                 let child = Self::from_behavior(*behavior, ctx);
                 Self::Invert(AsyncInvert::new(child))
@@ -82,5 +85,21 @@ where
             AsyncBehaviorStateProj::Times(f) => f,
         };
         future.poll(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_nodes::{TestOperation, TestOperationRunner};
+
+    use super::*;
+
+    #[test]
+    fn test_unpin_or_not_unpin() {
+        // Trait: Unpin
+        static_assertions::assert_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Unpin);
+
+        // Trait: !Send
+        static_assertions::assert_not_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Send);
     }
 }
