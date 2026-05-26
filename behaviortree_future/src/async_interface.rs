@@ -1,4 +1,4 @@
-use crate::{Behavior, Status};
+use crate::Status;
 
 #[derive(Clone, Copy)]
 struct AsyncActionContextInner<R> {
@@ -105,13 +105,9 @@ pub trait BehaviorTreeAsyncAction<R> {
 }
 
 pub trait BehaviorTreeObserver<A> {
-    fn create_id(&self, behavior: &Behavior<A>) -> usize;
     fn update(&self, id: usize, status: Option<Status>);
 }
 
 impl<A> BehaviorTreeObserver<A> for () {
-    fn create_id(&self, _behavior: &Behavior<A>) -> usize {
-        0
-    }
     fn update(&self, _id: usize, _status: Option<Status>) {}
 }

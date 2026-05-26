@@ -7,6 +7,7 @@ use crate::BehaviorTreeAsyncAction;
 use crate::BehaviorTreeObserver;
 use crate::BehaviorTreeReset;
 use crate::async_behavior_state::AsyncBehaviorState;
+use crate::async_behavior_state::AsyncBehaviorStateObserver;
 
 #[derive(Clone, Copy)]
 enum Control {
@@ -30,7 +31,7 @@ impl AsyncBehaviorTreeController {
 }
 
 pub struct AsyncBehaviorTree<A, R, O> {
-    child: AsyncBehaviorState<A, R, O>,
+    state: AsyncBehaviorState<A, R, O>,
     ctx: AsyncActionContextOwned<R>,
     delta: Rc<Cell<f64>>,
 
@@ -39,42 +40,37 @@ pub struct AsyncBehaviorTree<A, R, O> {
 }
 
 impl<A, R, O> AsyncBehaviorTree<A, R, O> {
-    pub fn new_from_behavior(
+    pub fn from_behavior_with_observer(
         behavior: Behavior<A>,
         runner: R,
-        delta: Rc<Cell<f64>>,
-        observer: Option<Rc<O>>,
-    ) -> (Self, AsyncBehaviorTreeController)
+        delta: std::rc::Rc<std::cell::Cell<f64>>,
+        observer: Rc<O>,
+    ) -> (
+        Self,
+        AsyncBehaviorTreeController,
+        AsyncBehaviorStateObserver<A>,
+    )
     where
-        A: BehaviorTreeAsyncAction<R>,
+        A: Clone + BehaviorTreeAsyncAction<R>,
         O: BehaviorTreeObserver<A>,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
-        let child =
-            AsyncBehaviorState::<A, R, O>::from_behavior(behavior, ctx.create_ctx(), observer);
-
+        let mut id = 0;
+        let (state, state_observer) = AsyncBehaviorState::from_behavior_with_observer(
+            behavior,
+            ctx.create_ctx(),
+            observer,
+            &mut id,
+        );
         let control = Rc::new(Cell::new(Control::None));
         let behaviortree = Self {
-            child,
+            state,
             ctx,
             delta,
             control: control.clone(),
         };
         let behaviortree_controller = AsyncBehaviorTreeController { control };
-        (behaviortree, behaviortree_controller)
-    }
-
-    pub fn from_behavior_with_observer(
-        behavior: Behavior<A>,
-        runner: R,
-        delta: std::rc::Rc<std::cell::Cell<f64>>,
-        observer: O,
-    ) -> (Self, AsyncBehaviorTreeController)
-    where
-        A: BehaviorTreeAsyncAction<R>,
-        O: BehaviorTreeObserver<A>,
-    {
-        Self::new_from_behavior(behavior, runner, delta, Some(Rc::new(observer)))
+        (behaviortree, behaviortree_controller, state_observer)
     }
 }
 
@@ -87,7 +83,17 @@ impl<A, R> AsyncBehaviorTree<A, R, ()> {
     where
         A: BehaviorTreeAsyncAction<R>,
     {
-        Self::new_from_behavior(behavior, runner, delta, None)
+        let ctx = AsyncActionContextOwned::new(runner, delta.get());
+        let state = AsyncBehaviorState::from_behavior(behavior, ctx.create_ctx());
+        let control = Rc::new(Cell::new(Control::None));
+        let behaviortree = Self {
+            state,
+            ctx,
+            delta,
+            control: control.clone(),
+        };
+        let behaviortree_controller = AsyncBehaviorTreeController { control };
+        (behaviortree, behaviortree_controller)
     }
 }
 
@@ -106,7 +112,7 @@ where
             Control::None => {}
             Control::Reset => {
                 bt.control.replace(Control::None);
-                bt.child.reset(bt.ctx.create_ctx());
+                bt.state.reset(bt.ctx.create_ctx());
             }
             Control::Shutdown => {
                 return std::task::Poll::Ready(None);
@@ -114,8 +120,8 @@ where
         }
         let current_delta = bt.delta.get();
         bt.ctx.update_delta(current_delta);
-        let child = std::pin::Pin::new(&mut bt.child);
-        child.poll(cx).map(Some)
+        let state = std::pin::Pin::new(&mut bt.state);
+        state.poll(cx).map(Some)
     }
 }
 
