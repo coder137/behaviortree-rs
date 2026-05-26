@@ -1,6 +1,9 @@
 mod behavior;
 pub use behavior::*;
 
+mod status;
+pub use status::*;
+
 mod async_interface;
 pub use async_interface::*;
 

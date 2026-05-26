@@ -75,7 +75,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_async_loop_with_dhat_pre");
             let action = AsyncAction::new(TestOperation::Add(1, 2, true, 1), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
+            let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
             let action = AsyncLoop::new(action, ctx.create_ctx());
             action
         };
@@ -120,9 +120,9 @@ mod tests {
         let mut action = {
             let _profiler = DhatTester::new("test_async_loop_reset_with_dhat_pre");
             let action = AsyncAction::new(TestOperation::Add(1, 2, true, 1), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
+            let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
             let action = AsyncLoop::new(action, ctx.create_ctx());
-            let action = AsyncBehaviorState::Loop(action);
+            let action = AsyncBehaviorState::<_, _, ()>::Loop(action, None);
             action
         };
 

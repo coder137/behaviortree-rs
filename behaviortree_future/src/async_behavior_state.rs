@@ -1,74 +1,93 @@
+use std::rc::Rc;
+
 use crate::{
-    AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeReset,
+    AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeObserver, BehaviorTreeReset,
+    Status,
     behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncTimes},
 };
 
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
-pub enum AsyncBehaviorState<A, R> {
-    Action(#[pin] AsyncAction<A>),
-    Invert(#[pin] AsyncInvert<AsyncBehaviorState<A, R>>),
-    Sequence(#[pin] AsyncSequence<AsyncBehaviorState<A, R>, R>),
-    Select(#[pin] AsyncSelect<AsyncBehaviorState<A, R>, R>),
-    Loop(#[pin] AsyncLoop<AsyncBehaviorState<A, R>, R>),
-    Times(#[pin] AsyncTimes<AsyncBehaviorState<A, R>, R>),
+pub enum AsyncBehaviorState<A, R, O> {
+    Action(#[pin] AsyncAction<A>, Option<(Rc<O>, usize)>),
+    Invert(#[pin] AsyncInvert<AsyncBehaviorState<A, R, O>>),
+    Sequence(
+        #[pin] AsyncSequence<AsyncBehaviorState<A, R, O>, R>,
+        Option<(Rc<O>, usize)>,
+    ),
+    Select(#[pin] AsyncSelect<AsyncBehaviorState<A, R, O>, R>),
+    Loop(
+        #[pin] AsyncLoop<AsyncBehaviorState<A, R, O>, R>,
+        Option<(Rc<O>, usize)>,
+    ),
+    Times(#[pin] AsyncTimes<AsyncBehaviorState<A, R, O>, R>),
 }
 
-impl<A, R> AsyncBehaviorState<A, R> {
-    pub fn from_behavior(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
+impl<A, R, O> AsyncBehaviorState<A, R, O> {
+    pub fn from_behavior(
+        behavior: Behavior<A>,
+        ctx: AsyncActionContext<R>,
+        observer: Option<Rc<O>>,
+    ) -> Self
     where
         A: BehaviorTreeAsyncAction<R>,
+        O: BehaviorTreeObserver<A>,
     {
+        let parent_o = observer
+            .as_ref()
+            .map(|o| (o.clone(), o.create_id(&behavior)));
         match behavior {
-            Behavior::Action(action) => {
-                //
-                Self::Action(AsyncAction::new(action, ctx))
-            }
+            Behavior::Action(action) => Self::Action(AsyncAction::new(action, ctx), parent_o),
             Behavior::Invert(behavior) => {
-                let child = Self::from_behavior(*behavior, ctx);
+                let child = Self::from_behavior(*behavior, ctx, observer);
                 Self::Invert(AsyncInvert::new(child))
             }
             Behavior::Sequence(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, ctx))
+                    .map(|b| Self::from_behavior(b, ctx, observer.clone()))
                     .collect::<Vec<_>>();
-                Self::Sequence(AsyncSequence::new(children, ctx))
+                Self::Sequence(AsyncSequence::new(children, ctx), parent_o)
             }
             Behavior::Select(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, ctx))
+                    .map(|b| Self::from_behavior(b, ctx, observer.clone()))
                     .collect::<Vec<_>>();
                 Self::Select(AsyncSelect::new(children, ctx))
             }
             Behavior::Loop(behavior) => {
-                let child = Self::from_behavior(*behavior, ctx);
-                Self::Loop(AsyncLoop::new(child, ctx))
+                let child = Self::from_behavior(*behavior, ctx, observer);
+                Self::Loop(AsyncLoop::new(child, ctx), parent_o)
             }
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncBehaviorState<A, R>
+impl<A, R, O> BehaviorTreeReset<R> for AsyncBehaviorState<A, R, O>
 where
     A: BehaviorTreeAsyncAction<R>,
+    O: BehaviorTreeObserver<A>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        let r: &mut dyn BehaviorTreeReset<R> = match self {
-            AsyncBehaviorState::Action(a) => a,
-            AsyncBehaviorState::Invert(a) => a,
-            AsyncBehaviorState::Sequence(a) => a,
-            AsyncBehaviorState::Select(a) => a,
-            AsyncBehaviorState::Loop(a) => a,
-            AsyncBehaviorState::Times(a) => a,
+        let (r, o): (&mut dyn BehaviorTreeReset<R>, &mut Option<(Rc<O>, usize)>) = match self {
+            AsyncBehaviorState::Action(a, o) => (a, o),
+            AsyncBehaviorState::Invert(a) => (a, &mut None),
+            AsyncBehaviorState::Sequence(a, o) => (a, o),
+            AsyncBehaviorState::Select(a) => (a, &mut None),
+            AsyncBehaviorState::Loop(a, o) => (a, o),
+            AsyncBehaviorState::Times(a) => (a, &mut None),
         };
         r.reset(ctx);
+        o.as_ref().map(|(o, id)| {
+            o.update(*id, None);
+        });
     }
 }
 
-impl<A, R> std::future::Future for AsyncBehaviorState<A, R>
+impl<A, R, O> std::future::Future for AsyncBehaviorState<A, R, O>
 where
     A: BehaviorTreeAsyncAction<R>,
+    O: BehaviorTreeObserver<A>,
 {
     type Output = bool;
     fn poll(
@@ -76,15 +95,35 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        let future: std::pin::Pin<&mut dyn std::future::Future<Output = bool>> = match this {
-            AsyncBehaviorStateProj::Action(f) => f,
-            AsyncBehaviorStateProj::Invert(f) => f,
-            AsyncBehaviorStateProj::Sequence(f) => f,
-            AsyncBehaviorStateProj::Select(f) => f,
-            AsyncBehaviorStateProj::Loop(f) => f,
-            AsyncBehaviorStateProj::Times(f) => f,
+        let (future, observer): (
+            std::pin::Pin<&mut dyn std::future::Future<Output = bool>>,
+            &mut Option<(Rc<O>, usize)>,
+        ) = match this {
+            AsyncBehaviorStateProj::Action(f, o) => (f, o),
+            AsyncBehaviorStateProj::Invert(f) => (f, &mut None),
+            AsyncBehaviorStateProj::Sequence(f, o) => (f, o),
+            AsyncBehaviorStateProj::Select(f) => (f, &mut None),
+            AsyncBehaviorStateProj::Loop(f, o) => (f, o),
+            AsyncBehaviorStateProj::Times(f) => (f, &mut None),
         };
-        future.poll(cx)
+        let poll_status = future.poll(cx);
+        let status = Status::from(poll_status);
+        observer.as_ref().map(|(o, id)| {
+            o.update(*id, Some(status));
+        });
+        poll_status
+    }
+}
+
+impl From<std::task::Poll<bool>> for Status {
+    fn from(value: std::task::Poll<bool>) -> Self {
+        match value {
+            std::task::Poll::Ready(status) => match status {
+                true => Status::Success,
+                false => Status::Failure,
+            },
+            std::task::Poll::Pending => Status::Running,
+        }
     }
 }
 
@@ -97,9 +136,9 @@ mod tests {
     #[test]
     fn test_unpin_or_not_unpin() {
         // Trait: Unpin
-        static_assertions::assert_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Unpin);
+        static_assertions::assert_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner, ()>: Unpin);
 
         // Trait: !Send
-        static_assertions::assert_not_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Send);
+        static_assertions::assert_not_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner, ()>: Send);
     }
 }

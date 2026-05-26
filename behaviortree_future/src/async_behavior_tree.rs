@@ -4,6 +4,7 @@ use std::rc::Rc;
 use crate::AsyncActionContextOwned;
 use crate::Behavior;
 use crate::BehaviorTreeAsyncAction;
+use crate::BehaviorTreeObserver;
 use crate::BehaviorTreeReset;
 use crate::async_behavior_state::AsyncBehaviorState;
 
@@ -28,8 +29,8 @@ impl AsyncBehaviorTreeController {
     }
 }
 
-pub struct AsyncBehaviorTree<A, R> {
-    child: AsyncBehaviorState<A, R>,
+pub struct AsyncBehaviorTree<A, R, O> {
+    child: AsyncBehaviorState<A, R, O>,
     ctx: AsyncActionContextOwned<R>,
     delta: Rc<Cell<f64>>,
 
@@ -37,17 +38,20 @@ pub struct AsyncBehaviorTree<A, R> {
     control: Rc<Cell<Control>>,
 }
 
-impl<A, R> AsyncBehaviorTree<A, R> {
-    pub fn from_behavior(
+impl<A, R, O> AsyncBehaviorTree<A, R, O> {
+    pub fn new_from_behavior(
         behavior: Behavior<A>,
         runner: R,
-        delta: std::rc::Rc<std::cell::Cell<f64>>,
+        delta: Rc<Cell<f64>>,
+        observer: Option<Rc<O>>,
     ) -> (Self, AsyncBehaviorTreeController)
     where
         A: BehaviorTreeAsyncAction<R>,
+        O: BehaviorTreeObserver<A>,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
-        let child = AsyncBehaviorState::from_behavior(behavior, ctx.create_ctx());
+        let child =
+            AsyncBehaviorState::<A, R, O>::from_behavior(behavior, ctx.create_ctx(), observer);
 
         let control = Rc::new(Cell::new(Control::None));
         let behaviortree = Self {
@@ -59,11 +63,38 @@ impl<A, R> AsyncBehaviorTree<A, R> {
         let behaviortree_controller = AsyncBehaviorTreeController { control };
         (behaviortree, behaviortree_controller)
     }
+
+    pub fn from_behavior_with_observer(
+        behavior: Behavior<A>,
+        runner: R,
+        delta: std::rc::Rc<std::cell::Cell<f64>>,
+        observer: O,
+    ) -> (Self, AsyncBehaviorTreeController)
+    where
+        A: BehaviorTreeAsyncAction<R>,
+        O: BehaviorTreeObserver<A>,
+    {
+        Self::new_from_behavior(behavior, runner, delta, Some(Rc::new(observer)))
+    }
 }
 
-impl<A, R> std::future::Future for AsyncBehaviorTree<A, R>
+impl<A, R> AsyncBehaviorTree<A, R, ()> {
+    pub fn from_behavior(
+        behavior: Behavior<A>,
+        runner: R,
+        delta: std::rc::Rc<std::cell::Cell<f64>>,
+    ) -> (Self, AsyncBehaviorTreeController)
+    where
+        A: BehaviorTreeAsyncAction<R>,
+    {
+        Self::new_from_behavior(behavior, runner, delta, None)
+    }
+}
+
+impl<A, R, O> std::future::Future for AsyncBehaviorTree<A, R, O>
 where
     A: BehaviorTreeAsyncAction<R>,
+    O: BehaviorTreeObserver<A>,
 {
     type Output = Option<bool>;
     fn poll(

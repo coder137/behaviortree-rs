@@ -1,3 +1,5 @@
+use crate::{Behavior, Status};
+
 #[derive(Clone, Copy)]
 struct AsyncActionContextInner<R> {
     runner: R,
@@ -100,4 +102,16 @@ pub trait BehaviorTreeAsyncAction<R> {
         ctx: AsyncActionContext<R>,
         future: &mut reusable_box_future::ReusableLocalBoxFuture<bool>,
     );
+}
+
+pub trait BehaviorTreeObserver<A> {
+    fn create_id(&self, behavior: &Behavior<A>) -> usize;
+    fn update(&self, id: usize, status: Option<Status>);
+}
+
+impl<A> BehaviorTreeObserver<A> for () {
+    fn create_id(&self, _behavior: &Behavior<A>) -> usize {
+        0
+    }
+    fn update(&self, _id: usize, _status: Option<Status>) {}
 }
