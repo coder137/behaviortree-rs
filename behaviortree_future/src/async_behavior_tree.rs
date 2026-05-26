@@ -84,7 +84,7 @@ where
         let current_delta = bt.delta.get();
         bt.ctx.update_delta(current_delta);
         let child = std::pin::Pin::new(&mut bt.child);
-        child.poll(cx).map(|s| Some(s))
+        child.poll(cx).map(Some)
     }
 }
 

@@ -43,8 +43,7 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let bt = self.as_mut().get_mut();
-
-        let status = loop {
+        loop {
             let current_child = &mut bt.children[bt.current_index];
             let current_child = std::pin::Pin::new(current_child);
             let child_status = current_child.poll(cx);
@@ -75,8 +74,7 @@ where
                 std::task::Poll::Pending => std::task::Poll::Pending,
             };
             break status;
-        };
-        status
+        }
     }
 }
 
