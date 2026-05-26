@@ -7,13 +7,13 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum AsyncBehaviorStateObserver<A> {
-    Action(A, usize),
-    Invert(usize, Rc<AsyncBehaviorStateObserver<A>>),
-    Sequence(usize, Rc<[AsyncBehaviorStateObserver<A>]>),
-    Select(usize, Rc<[AsyncBehaviorStateObserver<A>]>),
-    Loop(usize, Rc<AsyncBehaviorStateObserver<A>>),
-    Times(usize, Rc<AsyncBehaviorStateObserver<A>>),
+pub enum AsyncBehaviorStateObserver {
+    Action(&'static str, usize),
+    Invert(usize, Rc<AsyncBehaviorStateObserver>),
+    Sequence(usize, Rc<[AsyncBehaviorStateObserver]>),
+    Select(usize, Rc<[AsyncBehaviorStateObserver]>),
+    Loop(usize, Rc<AsyncBehaviorStateObserver>),
+    Times(usize, Rc<AsyncBehaviorStateObserver>),
 }
 
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
@@ -38,9 +38,9 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
         ctx: AsyncActionContext<R>,
         observer: Rc<O>,
         id: &mut usize,
-    ) -> (Self, AsyncBehaviorStateObserver<A>)
+    ) -> (Self, AsyncBehaviorStateObserver)
     where
-        A: Clone + BehaviorTreeAsyncAction<R>,
+        A: BehaviorTreeAsyncAction<R>,
         O: BehaviorTreeObserver<A>,
     {
         let parent_id = *id;
@@ -48,7 +48,8 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
         let parent_o = (observer.clone(), parent_id);
         match behavior {
             Behavior::Action(action) => {
-                let state_observer = AsyncBehaviorStateObserver::Action(action.clone(), parent_o.1);
+                let action_name = observer.action_name(&action);
+                let state_observer = AsyncBehaviorStateObserver::Action(action_name, parent_o.1);
                 let state = Self::Action(AsyncAction::new(action, ctx), Some(parent_o));
                 (state, state_observer)
             }
@@ -63,7 +64,7 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
             Behavior::Sequence(behaviors) => {
                 let (children_state, children_state_observer): (
                     Vec<AsyncBehaviorState<A, R, O>>,
-                    Vec<AsyncBehaviorStateObserver<A>>,
+                    Vec<AsyncBehaviorStateObserver>,
                 ) = behaviors
                     .into_iter()
                     .map(|b| Self::from_behavior_with_observer(b, ctx, observer.clone(), id))
@@ -77,7 +78,7 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
             Behavior::Select(behaviors) => {
                 let (children_state, children_state_observer): (
                     Vec<AsyncBehaviorState<A, R, O>>,
-                    Vec<AsyncBehaviorStateObserver<A>>,
+                    Vec<AsyncBehaviorStateObserver>,
                 ) = behaviors
                     .into_iter()
                     .map(|b| Self::from_behavior_with_observer(b, ctx, observer.clone(), id))
@@ -148,9 +149,9 @@ where
             AsyncBehaviorState::Times(a) => (a, &mut None),
         };
         r.reset(ctx);
-        o.as_ref().map(|(o, id)| {
+        if let Some((o, id)) = o.as_ref() {
             o.update(*id, None);
-        });
+        }
     }
 }
 
@@ -178,9 +179,9 @@ where
         };
         let poll_status = future.poll(cx);
         let status = Status::from(poll_status);
-        observer.as_ref().map(|(o, id)| {
+        if let Some((o, id)) = observer.as_ref() {
             o.update(*id, Some(status));
-        });
+        }
         poll_status
     }
 }

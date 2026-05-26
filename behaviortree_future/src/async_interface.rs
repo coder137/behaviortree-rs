@@ -105,9 +105,13 @@ pub trait BehaviorTreeAsyncAction<R> {
 }
 
 pub trait BehaviorTreeObserver<A> {
+    fn action_name(&self, action: &A) -> &'static str;
     fn update(&self, id: usize, status: Option<Status>);
 }
 
 impl<A> BehaviorTreeObserver<A> for () {
+    fn action_name(&self, _action: &A) -> &'static str {
+        ""
+    }
     fn update(&self, _id: usize, _status: Option<Status>) {}
 }

@@ -48,10 +48,10 @@ impl<A, R, O> AsyncBehaviorTree<A, R, O> {
     ) -> (
         Self,
         AsyncBehaviorTreeController,
-        AsyncBehaviorStateObserver<A>,
+        AsyncBehaviorStateObserver,
     )
     where
-        A: Clone + BehaviorTreeAsyncAction<R>,
+        A: BehaviorTreeAsyncAction<R>,
         O: BehaviorTreeObserver<A>,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
