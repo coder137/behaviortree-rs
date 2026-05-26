@@ -12,7 +12,7 @@ pub use async_behavior_tree::*;
 
 //
 mod async_behavior_state;
-pub use async_behavior_state::AsyncBehaviorStateObserver;
+pub use async_behavior_state::AsyncBehaviorStateTree;
 mod behavior_nodes;
 
 #[cfg(test)]

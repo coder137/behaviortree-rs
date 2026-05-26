@@ -7,7 +7,7 @@ use crate::BehaviorTreeAsyncAction;
 use crate::BehaviorTreeObserver;
 use crate::BehaviorTreeReset;
 use crate::async_behavior_state::AsyncBehaviorState;
-use crate::async_behavior_state::AsyncBehaviorStateObserver;
+use crate::async_behavior_state::AsyncBehaviorStateTree;
 
 #[derive(Clone, Copy)]
 enum Control {
@@ -45,11 +45,7 @@ impl<A, R, O> AsyncBehaviorTree<A, R, O> {
         runner: R,
         delta: std::rc::Rc<std::cell::Cell<f64>>,
         observer: Rc<O>,
-    ) -> (
-        Self,
-        AsyncBehaviorTreeController,
-        AsyncBehaviorStateObserver,
-    )
+    ) -> (Self, AsyncBehaviorTreeController, AsyncBehaviorStateTree)
     where
         A: BehaviorTreeAsyncAction<R>,
         O: BehaviorTreeObserver<A>,
