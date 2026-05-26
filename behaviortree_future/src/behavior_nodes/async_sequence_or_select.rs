@@ -1,10 +1,7 @@
-use crate::{
-    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    async_behavior_state::AsyncBehaviorState,
-};
+use crate::{AsyncActionContext, BehaviorTreeReset};
 
-struct AsyncSequenceOrSelect<A, R> {
-    children: Vec<AsyncBehaviorState<A, R>>,
+struct AsyncSequenceOrSelect<C, R> {
+    children: Vec<C>,
     current_index: usize,
 
     //
@@ -12,12 +9,8 @@ struct AsyncSequenceOrSelect<A, R> {
     ctx: AsyncActionContext<R>,
 }
 
-impl<A, R> AsyncSequenceOrSelect<A, R> {
-    pub fn new(
-        children: Vec<AsyncBehaviorState<A, R>>,
-        next_check: bool,
-        ctx: AsyncActionContext<R>,
-    ) -> Self {
+impl<C, R> AsyncSequenceOrSelect<C, R> {
+    pub fn new(children: Vec<C>, next_check: bool, ctx: AsyncActionContext<R>) -> Self {
         Self {
             children,
             current_index: 0,
@@ -27,9 +20,9 @@ impl<A, R> AsyncSequenceOrSelect<A, R> {
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncSequenceOrSelect<A, R>
+impl<C, R> BehaviorTreeReset<R> for AsyncSequenceOrSelect<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: BehaviorTreeReset<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.current_index = 0;
@@ -39,11 +32,11 @@ where
     }
 }
 
-impl<A, R> std::future::Future for AsyncSequenceOrSelect<A, R>
+impl<C, R> std::future::Future for AsyncSequenceOrSelect<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: std::future::Future<Output = bool> + Unpin,
 {
-    type Output = bool;
+    type Output = C::Output;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -87,32 +80,32 @@ where
     }
 }
 
-pub struct AsyncSequence<A, R> {
-    inner: AsyncSequenceOrSelect<A, R>,
+pub struct AsyncSequence<C, R> {
+    inner: AsyncSequenceOrSelect<C, R>,
 }
 
-impl<A, R> AsyncSequence<A, R> {
-    pub fn new(children: Vec<AsyncBehaviorState<A, R>>, ctx: AsyncActionContext<R>) -> Self {
+impl<C, R> AsyncSequence<C, R> {
+    pub fn new(children: Vec<C>, ctx: AsyncActionContext<R>) -> Self {
         Self {
             inner: AsyncSequenceOrSelect::new(children, true, ctx),
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncSequence<A, R>
+impl<C, R> BehaviorTreeReset<R> for AsyncSequence<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: BehaviorTreeReset<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.inner.reset(ctx);
     }
 }
 
-impl<A, R> std::future::Future for AsyncSequence<A, R>
+impl<C, R> std::future::Future for AsyncSequence<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: std::future::Future<Output = bool> + Unpin,
 {
-    type Output = bool;
+    type Output = C::Output;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -123,32 +116,32 @@ where
     }
 }
 
-pub struct AsyncSelect<A, R> {
-    inner: AsyncSequenceOrSelect<A, R>,
+pub struct AsyncSelect<C, R> {
+    inner: AsyncSequenceOrSelect<C, R>,
 }
 
-impl<A, R> AsyncSelect<A, R> {
-    pub fn new(children: Vec<AsyncBehaviorState<A, R>>, ctx: AsyncActionContext<R>) -> Self {
+impl<C, R> AsyncSelect<C, R> {
+    pub fn new(children: Vec<C>, ctx: AsyncActionContext<R>) -> Self {
         Self {
             inner: AsyncSequenceOrSelect::new(children, false, ctx),
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncSelect<A, R>
+impl<C, R> BehaviorTreeReset<R> for AsyncSelect<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: BehaviorTreeReset<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.inner.reset(ctx);
     }
 }
 
-impl<A, R> std::future::Future for AsyncSelect<A, R>
+impl<C, R> std::future::Future for AsyncSelect<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: std::future::Future<Output = bool> + Unpin,
 {
-    type Output = bool;
+    type Output = C::Output;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -165,6 +158,7 @@ mod tests {
 
     use crate::{
         AsyncActionContextOwned,
+        async_behavior_state::AsyncBehaviorState,
         behavior_nodes::{AsyncAction, AsyncTimes},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };

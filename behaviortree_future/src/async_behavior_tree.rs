@@ -31,7 +31,7 @@ impl AsyncBehaviorTreeController {
 pub struct AsyncBehaviorTree<A, R> {
     child: AsyncBehaviorState<A, R>,
     ctx: AsyncActionContextOwned<R>,
-    delta: std::rc::Rc<std::cell::Cell<f64>>,
+    delta: Rc<Cell<f64>>,
 
     // control
     control: Rc<Cell<Control>>,

@@ -20,6 +20,9 @@ ticked_async_executor = { version = "0.4" }
 tokio-util = { version = "0.7" }
 tokio = { version = "1.52", features = ["full"] }
 
+#
+static_assertions = "1.1.0"
+
 # Error handling
 anyhow = { version = "1.0" }
 

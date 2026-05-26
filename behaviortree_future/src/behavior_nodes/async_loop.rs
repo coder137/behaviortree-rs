@@ -1,16 +1,13 @@
-use crate::{
-    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    async_behavior_state::AsyncBehaviorState,
-};
+use crate::{AsyncActionContext, BehaviorTreeReset};
 
-pub struct AsyncLoop<A, R> {
-    child: Box<AsyncBehaviorState<A, R>>,
+pub struct AsyncLoop<C, R> {
+    child: Box<C>,
     completed: bool,
     ctx: AsyncActionContext<R>,
 }
 
-impl<A, R> AsyncLoop<A, R> {
-    pub fn new(child: AsyncBehaviorState<A, R>, ctx: AsyncActionContext<R>) -> Self {
+impl<C, R> AsyncLoop<C, R> {
+    pub fn new(child: C, ctx: AsyncActionContext<R>) -> Self {
         Self {
             child: Box::new(child),
             completed: false,
@@ -19,9 +16,9 @@ impl<A, R> AsyncLoop<A, R> {
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncLoop<A, R>
+impl<C, R> BehaviorTreeReset<R> for AsyncLoop<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: BehaviorTreeReset<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
         self.completed = false;
@@ -29,12 +26,11 @@ where
     }
 }
 
-impl<A, R> std::future::Future for AsyncLoop<A, R>
+impl<C, R> std::future::Future for AsyncLoop<C, R>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    C: std::future::Future<Output = bool> + BehaviorTreeReset<R> + Unpin,
 {
-    type Output = bool;
-
+    type Output = C::Output;
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
