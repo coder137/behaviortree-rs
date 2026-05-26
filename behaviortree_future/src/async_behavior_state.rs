@@ -6,7 +6,7 @@ use crate::{
     behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncTimes},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AsyncBehaviorStateObserver {
     Action(&'static str, usize),
     Invert(usize, Rc<AsyncBehaviorStateObserver>),
