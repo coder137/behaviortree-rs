@@ -52,7 +52,7 @@ impl<A, R, O> AsyncBehaviorTree<A, R, O> {
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
         let mut id = 0;
-        let (state, state_observer) = AsyncBehaviorState::from_behavior_with_observer(
+        let (state, state_tree) = AsyncBehaviorState::from_behavior_with_observer(
             behavior,
             ctx.create_ctx(),
             observer,
@@ -66,7 +66,7 @@ impl<A, R, O> AsyncBehaviorTree<A, R, O> {
             control: control.clone(),
         };
         let behaviortree_controller = AsyncBehaviorTreeController { control };
-        (behaviortree, behaviortree_controller, state_observer)
+        (behaviortree, behaviortree_controller, state_tree)
     }
 }
 

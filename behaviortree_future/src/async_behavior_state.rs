@@ -49,17 +49,17 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
         match behavior {
             Behavior::Action(action) => {
                 let action_name = observer.action_name(&action);
-                let state_observer = AsyncBehaviorStateTree::Action(action_name, parent_o.1);
+                let state_tree = AsyncBehaviorStateTree::Action(action_name, parent_o.1);
                 let state = Self::Action(AsyncAction::new(action, ctx), Some(parent_o));
-                (state, state_observer)
+                (state, state_tree)
             }
             Behavior::Invert(behavior) => {
                 let (child_state, child_state_observer) =
                     Self::from_behavior_with_observer(*behavior, ctx, observer, id);
                 let state = Self::Invert(AsyncInvert::new(child_state));
-                let state_observer =
+                let state_tree =
                     AsyncBehaviorStateTree::Invert(parent_o.1, child_state_observer.into());
-                (state, state_observer)
+                (state, state_tree)
             }
             Behavior::Sequence(behaviors) => {
                 let (children_state, children_state_observer): (
@@ -70,10 +70,10 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
                     .map(|b| Self::from_behavior_with_observer(b, ctx, observer.clone(), id))
                     .unzip();
                 let children_state_observer = std::rc::Rc::from(children_state_observer);
-                let state_observer =
+                let state_tree =
                     AsyncBehaviorStateTree::Sequence(parent_o.1, children_state_observer);
                 let state = Self::Sequence(AsyncSequence::new(children_state, ctx), Some(parent_o));
-                (state, state_observer)
+                (state, state_tree)
             }
             Behavior::Select(behaviors) => {
                 let (children_state, children_state_observer): (
@@ -84,18 +84,18 @@ impl<A, R, O> AsyncBehaviorState<A, R, O> {
                     .map(|b| Self::from_behavior_with_observer(b, ctx, observer.clone(), id))
                     .unzip();
                 let children_state_observer = std::rc::Rc::from(children_state_observer);
-                let state_observer =
+                let state_tree =
                     AsyncBehaviorStateTree::Select(parent_o.1, children_state_observer);
                 let state = Self::Select(AsyncSelect::new(children_state, ctx));
-                (state, state_observer)
+                (state, state_tree)
             }
             Behavior::Loop(behavior) => {
                 let (child_state, child_state_observer) =
                     Self::from_behavior_with_observer(*behavior, ctx, observer, id);
-                let state_observer =
+                let state_tree =
                     AsyncBehaviorStateTree::Loop(parent_o.1, child_state_observer.into());
                 let state = Self::Loop(AsyncLoop::new(child_state, ctx), Some(parent_o));
-                (state, state_observer)
+                (state, state_tree)
             }
         }
     }
