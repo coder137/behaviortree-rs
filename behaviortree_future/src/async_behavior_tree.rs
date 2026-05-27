@@ -55,9 +55,10 @@ impl<A, R, O> AsyncBehaviorTree<A, R, O> {
         let (state, state_tree) = AsyncBehaviorState::from_behavior_with_observer(
             behavior,
             ctx.create_ctx(),
-            observer,
+            observer.clone(),
             &mut id,
         );
+        observer.init(id);
         let control = Rc::new(Cell::new(Control::None));
         let behaviortree = Self {
             state,

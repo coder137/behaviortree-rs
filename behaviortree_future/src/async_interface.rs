@@ -106,6 +106,12 @@ pub trait BehaviorTreeAsyncAction<R> {
 
 pub trait BehaviorTreeObserver<A> {
     fn action_name(&self, action: &A) -> &'static str;
+
+    /// Ids are assigned from 0 -> capacity
+    ///
+    /// When init is called we have [0..=capacity] nodes have status: `None`
+    fn init(&self, capacity: usize);
+
     fn update(&self, id: usize, status: Option<Status>);
 }
 
@@ -113,5 +119,6 @@ impl<A> BehaviorTreeObserver<A> for () {
     fn action_name(&self, _action: &A) -> &'static str {
         ""
     }
+    fn init(&self, _capacity: usize) {}
     fn update(&self, _id: usize, _status: Option<Status>) {}
 }
