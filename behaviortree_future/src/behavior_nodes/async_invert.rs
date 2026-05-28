@@ -123,7 +123,7 @@ mod tests {
             let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
             // invert
             let action = AsyncInvert::new(action.into());
-            let action = AsyncBehaviorState::Invert(action);
+            let action = AsyncBehaviorState::Invert::<_, _, ()>(action, None);
             // times
             let action = AsyncTimes::new(action, 2, ctx.create_ctx());
             action

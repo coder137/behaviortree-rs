@@ -591,7 +591,7 @@ mod tests {
                 ],
                 ctx.create_ctx(),
             );
-            let action = AsyncBehaviorState::Select(action);
+            let action = AsyncBehaviorState::Select::<_, _, ()>(action, None);
             let action = AsyncTimes::new(action, 2, ctx.create_ctx());
             action
         };
