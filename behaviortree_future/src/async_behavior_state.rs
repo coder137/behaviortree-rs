@@ -19,10 +19,7 @@ impl<A, R> AsyncBehaviorState<A, R> {
         A: BehaviorTreeAsyncAction<R>,
     {
         match behavior {
-            Behavior::Action(action) => {
-                //
-                Self::Action(AsyncAction::new(action, ctx))
-            }
+            Behavior::Action(action) => Self::Action(AsyncAction::new(action, ctx)),
             Behavior::Invert(behavior) => {
                 let child = Self::from_behavior(*behavior, ctx);
                 Self::Invert(AsyncInvert::new(child))
@@ -95,7 +92,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_unpin_or_not_unpin() {
+    fn test_trait_assumptions() {
         // Trait: Unpin
         static_assertions::assert_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Unpin);
 

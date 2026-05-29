@@ -1,3 +1,5 @@
+use crate::Status;
+
 #[derive(Clone, Copy)]
 struct AsyncActionContextInner<R> {
     runner: R,
@@ -100,4 +102,15 @@ pub trait BehaviorTreeAsyncAction<R> {
         ctx: AsyncActionContext<R>,
         future: &mut reusable_box_future::ReusableLocalBoxFuture<bool>,
     );
+}
+
+pub trait BehaviorTreeObserver<A> {
+    fn action_name(action: &A) -> &'static str;
+
+    /// Ids are assigned from 0 -> capacity
+    ///
+    /// When init is called we have [0..=capacity] nodes have status: `None`
+    fn init(&self, capacity: usize);
+
+    fn update(&self, id: usize, status: Option<Status>);
 }
