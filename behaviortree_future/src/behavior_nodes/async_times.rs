@@ -86,7 +86,7 @@ mod tests {
         let ctx = AsyncActionContextOwned::new(runner, 10.0);
 
         let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-        let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
+        let action = AsyncBehaviorState::Action(action);
         let future = AsyncTimes::new(action, 0, ctx.create_ctx());
 
         let mut executor = TickedAsyncExecutor::default();
@@ -107,7 +107,7 @@ mod tests {
         let ctx = AsyncActionContextOwned::new(runner, 10.0);
 
         let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-        let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
+        let action = AsyncBehaviorState::Action(action);
         let future = AsyncTimes::new(action, 1, ctx.create_ctx());
 
         let mut executor = TickedAsyncExecutor::default();
@@ -130,7 +130,7 @@ mod tests {
         let ctx = AsyncActionContextOwned::new(runner, 10.0);
 
         let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-        let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
+        let action = AsyncBehaviorState::Action(action);
         let future = AsyncTimes::new(action, 2, ctx.create_ctx());
 
         let mut executor = TickedAsyncExecutor::default();
@@ -157,19 +157,13 @@ mod tests {
         let runner = TestOperationRunner::default();
         let ctx = AsyncActionContextOwned::new(runner, 10.0);
 
-        let action = AsyncBehaviorState::<_, _, ()>::Action(
-            AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx()),
-            None,
-        );
-        let action = AsyncBehaviorState::Times::<_, _, ()>(
-            AsyncTimes::new(action, 1, ctx.create_ctx()),
-            None,
-        );
+        let action = AsyncBehaviorState::Action(AsyncAction::new(
+            TestOperation::Yield(true),
+            ctx.create_ctx(),
+        ));
+        let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 1, ctx.create_ctx()));
 
-        let future = AsyncBehaviorState::Times::<_, _, ()>(
-            AsyncTimes::new(action, 2, ctx.create_ctx()),
-            None,
-        );
+        let future = AsyncBehaviorState::Times(AsyncTimes::new(action, 2, ctx.create_ctx()));
 
         let mut executor = TickedAsyncExecutor::default();
         executor

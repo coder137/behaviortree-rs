@@ -175,22 +175,22 @@ mod tests {
             let _profiler = DhatTester::new("test_sequence_success_no_consume_with_dhat_pre");
             let action = AsyncSequence::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, true, 0), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, true, 0), ctx.create_ctx()),
-                        None,
-                    ),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(true),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, true, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(true),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, true, 0),
+                        ctx.create_ctx(),
+                    )),
                 ],
                 ctx.create_ctx(),
             );
@@ -231,8 +231,8 @@ mod tests {
             let action2 = AsyncAction::new(TestOperation::ConsumeDelta(true), ctx.create_ctx());
             let action = AsyncSequence::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(action1, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action2, None),
+                    AsyncBehaviorState::Action(action1),
+                    AsyncBehaviorState::Action(action2),
                 ],
                 ctx.create_ctx(),
             );
@@ -271,8 +271,8 @@ mod tests {
             let action2 = AsyncAction::new(action2, ctx.create_ctx());
             let action = AsyncSequence::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(action1, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action2, None),
+                    AsyncBehaviorState::Action(action1),
+                    AsyncBehaviorState::Action(action2),
                 ],
                 ctx.create_ctx(),
             );
@@ -318,9 +318,9 @@ mod tests {
             let action3 = AsyncAction::new(action3, ctx.create_ctx());
             let action = AsyncSequence::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(action1, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action2, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action3, None),
+                    AsyncBehaviorState::Action(action1),
+                    AsyncBehaviorState::Action(action2),
+                    AsyncBehaviorState::Action(action3),
                 ],
                 ctx.create_ctx(),
             );
@@ -360,26 +360,26 @@ mod tests {
             let _profiler = DhatTester::new("test_sequence_success_reset_with_dhat_pre");
             let sequence = AsyncSequence::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, true, 0), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, true, 0), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx()),
-                        None,
-                    ),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, true, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(true),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, true, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(true),
+                        ctx.create_ctx(),
+                    )),
                 ],
                 ctx.create_ctx(),
             );
-            let action = AsyncBehaviorState::Sequence(sequence, None);
+            let action = AsyncBehaviorState::Sequence(sequence);
 
             let action = AsyncTimes::new(action, 2, ctx.create_ctx());
             action
@@ -433,22 +433,22 @@ mod tests {
             let _profiler = DhatTester::new("test_select_failure_no_consume_with_dhat_pre");
             let action = AsyncSelect::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(false), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, false, 0), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(false), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, false, 0), ctx.create_ctx()),
-                        None,
-                    ),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(false),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, false, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(false),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, false, 0),
+                        ctx.create_ctx(),
+                    )),
                 ],
                 ctx.create_ctx(),
             );
@@ -489,8 +489,8 @@ mod tests {
             let action2 = AsyncAction::new(action2, ctx.create_ctx());
             let action = AsyncSelect::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(action1, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action2, None),
+                    AsyncBehaviorState::Action(action1),
+                    AsyncBehaviorState::Action(action2),
                 ],
                 ctx.create_ctx(),
             );
@@ -533,9 +533,9 @@ mod tests {
             let action3 = AsyncAction::new(action3, ctx.create_ctx());
             let action = AsyncSelect::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(action1, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action2, None),
-                    AsyncBehaviorState::<_, _, ()>::Action(action3, None),
+                    AsyncBehaviorState::Action(action1),
+                    AsyncBehaviorState::Action(action2),
+                    AsyncBehaviorState::Action(action3),
                 ],
                 ctx.create_ctx(),
             );
@@ -572,26 +572,26 @@ mod tests {
             let _profiler = DhatTester::new("test_select_failure_reset_with_dhat_pre");
             let action = AsyncSelect::new(
                 vec![
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, false, 0), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(false), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Add(1, 2, false, 0), ctx.create_ctx()),
-                        None,
-                    ),
-                    AsyncBehaviorState::<_, _, ()>::Action(
-                        AsyncAction::new(TestOperation::Yield(false), ctx.create_ctx()),
-                        None,
-                    ),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, false, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(false),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Add(1, 2, false, 0),
+                        ctx.create_ctx(),
+                    )),
+                    AsyncBehaviorState::Action(AsyncAction::new(
+                        TestOperation::Yield(false),
+                        ctx.create_ctx(),
+                    )),
                 ],
                 ctx.create_ctx(),
             );
-            let action = AsyncBehaviorState::Select::<_, _, ()>(action, None);
+            let action = AsyncBehaviorState::Select(action);
             let action = AsyncTimes::new(action, 2, ctx.create_ctx());
             action
         };

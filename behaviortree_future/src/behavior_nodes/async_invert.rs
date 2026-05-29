@@ -57,7 +57,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_invert_success_with_dhat_pre");
             let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-            let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
+            let action = AsyncBehaviorState::Action(action);
             let action = AsyncInvert::new(action);
             action
         };
@@ -88,7 +88,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_invert_failure_with_dhat_pre");
             let action = AsyncAction::new(TestOperation::Yield(false), ctx.create_ctx());
-            let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
+            let action = AsyncBehaviorState::Action(action);
             let action = AsyncInvert::new(action);
             action
         };
@@ -120,10 +120,10 @@ mod tests {
             let _profiler = DhatTester::new("test_invert_reset_with_dhat_pre");
             // action
             let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-            let action = AsyncBehaviorState::<_, _, ()>::Action(action, None);
+            let action = AsyncBehaviorState::Action(action);
             // invert
             let action = AsyncInvert::new(action.into());
-            let action = AsyncBehaviorState::Invert::<_, _, ()>(action, None);
+            let action = AsyncBehaviorState::Invert(action);
             // times
             let action = AsyncTimes::new(action, 2, ctx.create_ctx());
             action

@@ -114,11 +114,3 @@ pub trait BehaviorTreeObserver<A> {
 
     fn update(&self, id: usize, status: Option<Status>);
 }
-
-impl<A> BehaviorTreeObserver<A> for () {
-    fn action_name(&self, _action: &A) -> &'static str {
-        ""
-    }
-    fn init(&self, _capacity: usize) {}
-    fn update(&self, _id: usize, _status: Option<Status>) {}
-}

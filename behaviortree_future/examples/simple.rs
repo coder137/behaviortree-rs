@@ -1,5 +1,8 @@
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
 use behaviortree_future::{
-    AsyncActionContext, AsyncBehaviorTree, Behavior, BehaviorTreeAsyncAction,
+    AsyncActionContext, AsyncBehaviorTree, Behavior, BehaviorTreeAsyncAction, BehaviorTreeObserver,
+    Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -10,7 +13,7 @@ pub enum Data<T> {
     Blackboard(std::rc::Rc<String>),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Action {
     Add { i1: usize, i2: usize, o: usize },
     Sub,
@@ -32,6 +35,8 @@ impl Action {
             a + b
         });
 
+        yield_now().await;
+        yield_now().await;
         yield_now().await;
 
         memory.run(|mut s| {
@@ -148,6 +153,35 @@ pub struct ActionRunner {
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
+pub struct MyObserver {
+    map: RefCell<HashMap<usize, Option<Status>>>,
+}
+
+impl BehaviorTreeObserver<Action> for MyObserver {
+    fn action_name(&self, action: &Action) -> &'static str {
+        match action {
+            Action::Add { .. } => "Add",
+            Action::Sub => "Sub",
+            Action::Mul => "Mul",
+            Action::Div => "Div",
+        }
+    }
+
+    fn init(&self, capacity: usize) {
+        let mut m = self.map.borrow_mut();
+        m.extend((0..capacity).into_iter().map(|i| (i, None)));
+        println!("init: {:?}", m);
+    }
+
+    fn update(&self, id: usize, current_status: Option<Status>) {
+        let mut b = self.map.borrow_mut();
+        if b[&id] != current_status {
+            b.insert(id, current_status);
+            println!("update: {} {:?}", id, current_status);
+        }
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     println!("Hello World");
 
@@ -182,8 +216,18 @@ fn main() -> anyhow::Result<()> {
     let mut executor = TickedAsyncExecutor::default();
     let delta = executor.delta().inner();
 
-    let (bt, _bt_controller) =
-        AsyncBehaviorTree::from_behavior(Behavior::Loop(behavior.into()), runner, delta.into());
+    let observer = Rc::new(MyObserver {
+        map: RefCell::new(HashMap::default()),
+    });
+    let behavior: Behavior<Action> = Behavior::Loop(behavior.into()).into();
+
+    let (bt, _bt_controller, _bt_state_tree) = AsyncBehaviorTree::from_behavior_with_observer(
+        behavior.clone(),
+        runner,
+        delta.into(),
+        observer,
+    );
+    println!("Observer: {:#?}", _bt_state_tree);
 
     let cancel = CancellationToken::new();
     let cancel_clone = cancel.clone();
