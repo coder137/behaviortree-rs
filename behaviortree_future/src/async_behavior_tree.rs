@@ -164,7 +164,7 @@ where
 }
 
 impl<A> BehaviorTreeObserver<A> for () {
-    fn action_name(&self, _action: &A) -> &'static str {
+    fn action_name(_action: &A) -> &'static str {
         ""
     }
     fn init(&self, _capacity: usize) {}

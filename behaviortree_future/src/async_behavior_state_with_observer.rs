@@ -57,7 +57,7 @@ impl<A, R, O> AsyncBehaviorStateWithObserver<A, R, O> {
         let parent_o = (observer.clone(), parent_id);
         match behavior {
             Behavior::Action(action) => {
-                let action_name = observer.action_name(&action);
+                let action_name = O::action_name(&action);
                 let state_tree = AsyncBehaviorStateTree::Action(action_name, parent_o.1);
                 let state = Self::Action(AsyncAction::new(action, ctx), parent_o);
                 (state, state_tree)

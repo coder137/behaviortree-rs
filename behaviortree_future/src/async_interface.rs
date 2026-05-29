@@ -105,7 +105,7 @@ pub trait BehaviorTreeAsyncAction<R> {
 }
 
 pub trait BehaviorTreeObserver<A> {
-    fn action_name(&self, action: &A) -> &'static str;
+    fn action_name(action: &A) -> &'static str;
 
     /// Ids are assigned from 0 -> capacity
     ///

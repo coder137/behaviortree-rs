@@ -158,7 +158,7 @@ pub struct MyObserver {
 }
 
 impl BehaviorTreeObserver<Action> for MyObserver {
-    fn action_name(&self, action: &Action) -> &'static str {
+    fn action_name(action: &Action) -> &'static str {
         match action {
             Action::Add { .. } => "Add",
             Action::Sub => "Sub",
