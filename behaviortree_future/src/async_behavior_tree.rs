@@ -18,6 +18,7 @@ enum Control {
     Shutdown,
 }
 
+#[derive(Clone)]
 pub struct AsyncBehaviorTreeController {
     control: Rc<Cell<Control>>,
 }
