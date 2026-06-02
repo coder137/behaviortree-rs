@@ -1,4 +1,4 @@
-use crate::{AsyncActionContext, BehaviorTreeAsyncAction};
+use crate::{AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeAsyncHandler};
 
 #[derive(Debug, Clone)]
 pub enum TestOperation {
@@ -52,53 +52,26 @@ impl TestOperation {
 }
 
 impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
-    fn create_future(
+    fn make_future<'a, H>(
         &self,
         ctx: AsyncActionContext<TestOperationRunner>,
-    ) -> reusable_box_future::ReusableLocalBoxFuture<bool> {
+        handler: H,
+    ) -> H::Output
+    where
+        H: BehaviorTreeAsyncHandler<'a>,
+    {
         match *self {
             TestOperation::Add(a, b, retval, times) => {
-                reusable_box_future::ReusableLocalBoxFuture::new(TestOperation::this_add(
-                    a, b, retval, times, ctx,
-                ))
+                handler.future(Self::this_add(a, b, retval, times, ctx))
             }
-            TestOperation::Yield(retval) => {
-                reusable_box_future::ReusableLocalBoxFuture::new(Self::this_yield(retval))
-            }
+            TestOperation::Yield(retval) => handler.future(Self::this_yield(retval)),
             TestOperation::ConsumeDelta(retval) => {
-                reusable_box_future::ReusableLocalBoxFuture::new(TestOperation::this_consume_delta(
-                    retval, ctx,
-                ))
+                handler.future(Self::this_consume_delta(retval, ctx))
             }
         }
     }
 
-    fn reset_future(
-        &self,
-        ctx: AsyncActionContext<TestOperationRunner>,
-        future: &mut reusable_box_future::ReusableLocalBoxFuture<bool>,
-    ) {
-        match *self {
-            TestOperation::Add(a, b, retval, times) => {
-                future
-                    .try_set(Self::this_add(a, b, retval, times, ctx))
-                    .map_err(|_| {})
-                    .unwrap();
-            }
-            TestOperation::Yield(retval) => {
-                future
-                    .try_set(Self::this_yield(retval))
-                    .map_err(|_| {})
-                    .unwrap();
-            }
-            TestOperation::ConsumeDelta(retval) => {
-                future
-                    .try_set(Self::this_consume_delta(retval, ctx))
-                    .map_err(|_| {})
-                    .unwrap();
-            }
-        }
-    }
+    fn reset(&self, ctx: AsyncActionContext<TestOperationRunner>) {}
 }
 
 #[derive(Debug)]

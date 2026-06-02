@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use behaviortree_future::{
-    AsyncActionContext, AsyncBehaviorTree, Behavior, BehaviorTreeAsyncAction, BehaviorTreeObserver,
-    Status,
+    AsyncActionContext, AsyncBehaviorTree, Behavior, BehaviorTreeAsyncAction,
+    BehaviorTreeAsyncHandler, BehaviorTreeObserver, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -37,7 +37,7 @@ impl Action {
 
         yield_now().await;
         yield_now().await;
-        yield_now().await;
+        // yield_now().await;
 
         memory.run(|mut s| {
             println!("SUM: {sum}");
@@ -48,43 +48,19 @@ impl Action {
 }
 
 impl BehaviorTreeAsyncAction<ActionRunner> for Action {
-    fn create_future(
-        &self,
-        ctx: AsyncActionContext<ActionRunner>,
-    ) -> reusable_box_future::ReusableLocalBoxFuture<bool> {
+    fn make_future<'a, H>(&self, ctx: AsyncActionContext<ActionRunner>, handler: H) -> H::Output
+    where
+        H: BehaviorTreeAsyncHandler<'a>,
+    {
         match *self {
-            Action::Add { i1, i2, o } => {
-                reusable_box_future::ReusableLocalBoxFuture::new(Self::add(i1, i2, o, ctx))
-            }
-            Action::Sub => reusable_box_future::ReusableLocalBoxFuture::new(async move { true }),
-            Action::Mul => reusable_box_future::ReusableLocalBoxFuture::new(async move { true }),
-            Action::Div => reusable_box_future::ReusableLocalBoxFuture::new(async move { true }),
+            Action::Add { i1, i2, o } => handler.future(Self::add(i1, i2, o, ctx)),
+            Action::Sub => handler.future(async move { true }),
+            Action::Mul => handler.future(async move { true }),
+            Action::Div => handler.future(async move { true }),
         }
     }
 
-    fn reset_future(
-        &self,
-        ctx: AsyncActionContext<ActionRunner>,
-        future: &mut reusable_box_future::ReusableLocalBoxFuture<bool>,
-    ) {
-        match *self {
-            Action::Add { i1, i2, o } => {
-                future
-                    .try_set(Self::add(i1, i2, o, ctx))
-                    .map_err(|_| {})
-                    .unwrap();
-            }
-            Action::Sub => {
-                future.set(async move { true });
-            }
-            Action::Mul => {
-                future.set(async move { true });
-            }
-            Action::Div => {
-                future.set(async move { true });
-            }
-        }
-    }
+    fn reset(&self, ctx: AsyncActionContext<ActionRunner>) {}
 }
 
 #[derive(Clone)]
