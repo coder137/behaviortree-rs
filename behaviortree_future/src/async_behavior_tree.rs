@@ -28,7 +28,7 @@ impl AsyncBehaviorTreeController {
         self.control.replace(Control::Reset);
     }
 
-    pub fn shutdown(self) {
+    pub fn shutdown(&self) {
         self.control.replace(Control::Shutdown);
     }
 }
