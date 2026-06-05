@@ -18,6 +18,7 @@ enum Control {
     Shutdown,
 }
 
+#[derive(Clone)]
 pub struct AsyncBehaviorTreeController {
     control: Rc<Cell<Control>>,
 }
@@ -27,7 +28,7 @@ impl AsyncBehaviorTreeController {
         self.control.replace(Control::Reset);
     }
 
-    pub fn shutdown(self) {
+    pub fn shutdown(&self) {
         self.control.replace(Control::Shutdown);
     }
 }
