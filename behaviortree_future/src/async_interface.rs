@@ -18,14 +18,6 @@ pub(crate) struct AsyncActionContextOwned<R> {
     ctx: std::rc::Rc<std::cell::UnsafeCell<AsyncActionContextInner<R>>>,
 }
 
-impl<R> Clone for AsyncActionContextOwned<R> {
-    fn clone(&self) -> Self {
-        Self {
-            ctx: self.ctx.clone(),
-        }
-    }
-}
-
 impl<R> AsyncActionContextOwned<R> {
     pub fn new(runner: R, delta: f64) -> Self {
         let ctx = std::rc::Rc::new(std::cell::UnsafeCell::new(AsyncActionContextInner {
