@@ -60,12 +60,12 @@ impl<R> AsyncActionContext<R> {
         self.safe_ctx_ref_mut().consume_delta()
     }
 
-    pub fn runner_ref<Ret>(&self, mut cb: impl FnMut(&R) -> Ret) -> Ret {
+    pub fn runner_ref<Ret>(&self, cb: impl FnOnce(&R) -> Ret) -> Ret {
         let r = &self.safe_ctx_ref().runner;
         cb(r)
     }
 
-    pub fn runner_ref_mut<Ret>(&mut self, mut cb: impl FnMut(&mut R) -> Ret) -> Ret {
+    pub fn runner_ref_mut<Ret>(&mut self, cb: impl FnOnce(&mut R) -> Ret) -> Ret {
         let r = &mut self.safe_ctx_ref_mut().runner;
         cb(r)
     }
