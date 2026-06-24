@@ -1,6 +1,8 @@
 use crate::{
     AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeReset,
-    behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncTimes},
+    behavior_nodes::{
+        AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
+    },
 };
 
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
@@ -11,6 +13,7 @@ pub enum AsyncBehaviorState<A, R> {
     Select(#[pin] AsyncSelect<AsyncBehaviorState<A, R>, R>),
     Loop(#[pin] AsyncLoop<AsyncBehaviorState<A, R>, R>),
     Times(#[pin] AsyncTimes<AsyncBehaviorState<A, R>, R>),
+    Subtree(#[pin] AsyncSubtree<AsyncBehaviorState<A, R>>),
 }
 
 impl<A, R> AsyncBehaviorState<A, R> {
@@ -42,6 +45,10 @@ impl<A, R> AsyncBehaviorState<A, R> {
                 let child = Self::from_behavior(*behavior, ctx);
                 Self::Loop(AsyncLoop::new(child, ctx))
             }
+            Behavior::Subtree(_name, behavior) => {
+                let child = Self::from_behavior(*behavior, ctx);
+                Self::Subtree(AsyncSubtree::new(child))
+            }
         }
     }
 }
@@ -58,6 +65,7 @@ where
             AsyncBehaviorState::Select(a) => a,
             AsyncBehaviorState::Loop(a) => a,
             AsyncBehaviorState::Times(a) => a,
+            AsyncBehaviorState::Subtree(a) => a,
         };
         r.reset(ctx);
     }
@@ -80,6 +88,7 @@ where
             AsyncBehaviorStateProj::Select(f) => f,
             AsyncBehaviorStateProj::Loop(f) => f,
             AsyncBehaviorStateProj::Times(f) => f,
+            AsyncBehaviorStateProj::Subtree(f) => f,
         };
         future.poll(cx)
     }

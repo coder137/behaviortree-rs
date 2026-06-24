@@ -26,4 +26,7 @@ pub enum Behavior<A> {
     ///
     /// Reset and restart the behavior once it has completed irrespective of success or failure
     Loop(Box<Behavior<A>>),
+
+    ///
+    Subtree(String, Box<Behavior<A>>),
 }

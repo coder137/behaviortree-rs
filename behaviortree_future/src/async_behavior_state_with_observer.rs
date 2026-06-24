@@ -3,7 +3,9 @@ use std::rc::Rc;
 use crate::{
     AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeObserver, BehaviorTreeReset,
     Status,
-    behavior_nodes::{AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncTimes},
+    behavior_nodes::{
+        AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -14,6 +16,7 @@ pub enum AsyncBehaviorStateTree {
     Select(usize, Rc<[AsyncBehaviorStateTree]>),
     Loop(usize, Rc<AsyncBehaviorStateTree>),
     Times(usize, Rc<AsyncBehaviorStateTree>),
+    Subtree(Rc<String>, usize, Rc<AsyncBehaviorStateTree>),
 }
 
 #[pin_project::pin_project(project = AsyncBehaviorStateWithObserverProj)]
@@ -37,6 +40,10 @@ pub enum AsyncBehaviorStateWithObserver<A, R, O> {
     ),
     Times(
         #[pin] AsyncTimes<AsyncBehaviorStateWithObserver<A, R, O>, R>,
+        (Rc<O>, usize),
+    ),
+    Subtree(
+        #[pin] AsyncSubtree<AsyncBehaviorStateWithObserver<A, R, O>>,
         (Rc<O>, usize),
     ),
 }
@@ -103,6 +110,17 @@ impl<A, R, O> AsyncBehaviorStateWithObserver<A, R, O> {
                 let state = Self::Loop(AsyncLoop::new(child_state, ctx), parent_o);
                 (state, state_tree)
             }
+            Behavior::Subtree(name, behavior) => {
+                let (child_state, child_state_tree) =
+                    Self::from_behavior(*behavior, ctx, observer, id);
+                let state_tree = AsyncBehaviorStateTree::Subtree(
+                    name.into(),
+                    parent_o.1,
+                    child_state_tree.into(),
+                );
+                let state = Self::Subtree(AsyncSubtree::new(child_state), parent_o);
+                (state, state_tree)
+            }
         }
     }
 }
@@ -120,6 +138,7 @@ where
             AsyncBehaviorStateWithObserver::Select(a, o) => (a, o),
             AsyncBehaviorStateWithObserver::Loop(a, o) => (a, o),
             AsyncBehaviorStateWithObserver::Times(a, o) => (a, o),
+            AsyncBehaviorStateWithObserver::Subtree(a, o) => (a, o),
         };
         r.reset(ctx);
         observer.0.update(observer.1, None);
@@ -147,6 +166,7 @@ where
             AsyncBehaviorStateWithObserverProj::Select(f, o) => (f, o),
             AsyncBehaviorStateWithObserverProj::Loop(f, o) => (f, o),
             AsyncBehaviorStateWithObserverProj::Times(f, o) => (f, o),
+            AsyncBehaviorStateWithObserverProj::Subtree(f, o) => (f, o),
         };
         let poll_status = future.poll(cx);
         let status = Status::from(poll_status);
