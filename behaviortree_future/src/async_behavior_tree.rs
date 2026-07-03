@@ -90,7 +90,7 @@ impl<AS, R, O> AsyncBehaviorTree<AS, R, O> {
         observer: Rc<O>,
     ) -> (Self, AsyncBehaviorTreeController, AsyncBehaviorStateTree)
     where
-        A: ActionToActionState<AS>,
+        A: ActionToActionState<AS, R>,
         AS: AsyncBehaviorActionState<R>,
         O: BehaviorTreeObserver<AS>,
     {
@@ -122,7 +122,7 @@ impl<AS, R> AsyncBehaviorTree<AS, R, ()> {
         delta: std::rc::Rc<std::cell::Cell<f64>>,
     ) -> (Self, AsyncBehaviorTreeController)
     where
-        A: ActionToActionState<AS>,
+        A: ActionToActionState<AS, R>,
         AS: AsyncBehaviorActionState<R>,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());

@@ -47,7 +47,7 @@ impl Action {
     }
 }
 
-impl ActionToActionState<Action> for Action {
+impl ActionToActionState<Action, ActionRunner> for Action {
     fn to_state(self) -> Action {
         self
     }

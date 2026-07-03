@@ -56,7 +56,7 @@ impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
         id: &mut usize,
     ) -> (Self, AsyncBehaviorStateTree)
     where
-        A: ActionToActionState<AS>,
+        A: ActionToActionState<AS, R>,
         AS: AsyncBehaviorActionState<R>,
         O: BehaviorTreeObserver<AS>,
     {

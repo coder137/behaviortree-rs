@@ -88,7 +88,10 @@ pub trait BehaviorTreeAsyncHandler<'a> {
     fn future(self, future: impl std::future::Future<Output = bool> + 'a) -> Self::Output;
 }
 
-pub trait ActionToActionState<AS> {
+pub trait ActionToActionState<AS, R>
+where
+    AS: AsyncBehaviorActionState<R>,
+{
     fn to_state(self) -> AS;
 }
 

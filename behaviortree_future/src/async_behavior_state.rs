@@ -19,7 +19,7 @@ pub enum AsyncBehaviorState<AS, R> {
 impl<AS, R> AsyncBehaviorState<AS, R> {
     pub fn from_behavior<A>(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
     where
-        A: ActionToActionState<AS>,
+        A: ActionToActionState<AS, R>,
         AS: AsyncBehaviorActionState<R>,
     {
         match behavior {
