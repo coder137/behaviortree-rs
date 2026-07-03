@@ -18,14 +18,6 @@ pub(crate) struct AsyncActionContextOwned<R> {
     ctx: std::rc::Rc<std::cell::UnsafeCell<AsyncActionContextInner<R>>>,
 }
 
-impl<R> Clone for AsyncActionContextOwned<R> {
-    fn clone(&self) -> Self {
-        Self {
-            ctx: self.ctx.clone(),
-        }
-    }
-}
-
 impl<R> AsyncActionContextOwned<R> {
     pub fn new(runner: R, delta: f64) -> Self {
         let ctx = std::rc::Rc::new(std::cell::UnsafeCell::new(AsyncActionContextInner {
@@ -68,12 +60,12 @@ impl<R> AsyncActionContext<R> {
         self.safe_ctx_ref_mut().consume_delta()
     }
 
-    pub fn runner_ref<Ret>(&self, mut cb: impl FnMut(&R) -> Ret) -> Ret {
+    pub fn runner_ref<Ret>(&self, cb: impl FnOnce(&R) -> Ret) -> Ret {
         let r = &self.safe_ctx_ref().runner;
         cb(r)
     }
 
-    pub fn runner_ref_mut<Ret>(&mut self, mut cb: impl FnMut(&mut R) -> Ret) -> Ret {
+    pub fn runner_ref_mut<Ret>(&mut self, cb: impl FnOnce(&mut R) -> Ret) -> Ret {
         let r = &mut self.safe_ctx_ref_mut().runner;
         cb(r)
     }

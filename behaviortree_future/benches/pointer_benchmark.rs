@@ -12,7 +12,7 @@ pub struct TestRefCell<R> {
 impl<R> TestRefCell<R> {
     pub fn get(&self) {}
 
-    pub fn get_mut<O>(&mut self, mut cb: impl FnMut(&mut Inner<R>) -> O) -> O {
+    pub fn get_mut<O>(&mut self, cb: impl FnOnce(&mut Inner<R>) -> O) -> O {
         let mut r = self.inner.borrow_mut();
         cb(&mut *r)
     }
@@ -23,7 +23,7 @@ pub struct TestUnsafeCell<R> {
 }
 
 impl<R> TestUnsafeCell<R> {
-    pub fn get_mut<O>(&mut self, mut cb: impl FnMut(&mut Inner<R>) -> O) -> O {
+    pub fn get_mut<O>(&mut self, cb: impl FnOnce(&mut Inner<R>) -> O) -> O {
         let r = unsafe { &mut *(self.inner.get()) };
         cb(r)
     }
@@ -34,7 +34,7 @@ pub struct TestPointer<R> {
 }
 
 impl<R> TestPointer<R> {
-    pub fn get_mut<O>(&mut self, mut cb: impl FnMut(&mut Inner<R>) -> O) -> O {
+    pub fn get_mut<O>(&mut self, cb: impl FnOnce(&mut Inner<R>) -> O) -> O {
         let r = unsafe { &mut *self.inner };
         cb(r)
     }
