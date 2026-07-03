@@ -1,7 +1,7 @@
 use reusable_box_future::ReusableLocalBoxFuture;
 
 use crate::{
-    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeAsyncHandler, BehaviorTreeReset,
+    AsyncActionContext, AsyncBehaviorActionState, BehaviorTreeAsyncHandler, BehaviorTreeReset,
 };
 
 struct CreateReusableLocalBoxFutureHandler;
@@ -21,35 +21,38 @@ impl<'a> BehaviorTreeAsyncHandler<'static> for UpdateReusableLocalBoxFutureHandl
 }
 
 #[pin_project::pin_project]
-pub struct AsyncAction<A> {
-    action: A,
+pub struct AsyncAction<AS> {
+    action_state: AS,
     // state
     #[pin]
     future: reusable_box_future::ReusableLocalBoxFuture<bool>,
 }
 
-impl<A> AsyncAction<A> {
-    pub fn new<R>(action: A, ctx: AsyncActionContext<R>) -> Self
+impl<AS> AsyncAction<AS> {
+    pub fn new<R>(action_state: AS, ctx: AsyncActionContext<R>) -> Self
     where
-        A: BehaviorTreeAsyncAction<R>,
+        AS: AsyncBehaviorActionState<R>,
     {
-        let future = action.make_future(ctx, CreateReusableLocalBoxFutureHandler);
-        Self { action, future }
+        let future = action_state.make_future(ctx, CreateReusableLocalBoxFutureHandler);
+        Self {
+            action_state,
+            future,
+        }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncAction<A>
+impl<AS, R> BehaviorTreeReset<R> for AsyncAction<AS>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    AS: AsyncBehaviorActionState<R>,
 {
     fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        self.action.reset(ctx);
-        self.action
+        self.action_state.reset(ctx);
+        self.action_state
             .make_future(ctx, UpdateReusableLocalBoxFutureHandler(&mut self.future));
     }
 }
 
-impl<A> std::future::Future for AsyncAction<A> {
+impl<AS> std::future::Future for AsyncAction<AS> {
     type Output = bool;
     fn poll(
         self: std::pin::Pin<&mut Self>,

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use behaviortree_future::{
-    AsyncActionContext, AsyncBehaviorTree, Behavior, BehaviorTreeAsyncAction,
+    ActionToActionState, AsyncActionContext, AsyncBehaviorActionState, AsyncBehaviorTree, Behavior,
     BehaviorTreeAsyncHandler, BehaviorTreeObserver, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
@@ -47,7 +47,13 @@ impl Action {
     }
 }
 
-impl BehaviorTreeAsyncAction<ActionRunner> for Action {
+impl ActionToActionState<Action> for Action {
+    fn to_state(self) -> Action {
+        self
+    }
+}
+
+impl AsyncBehaviorActionState<ActionRunner> for Action {
     fn make_future<'a, H>(&self, ctx: AsyncActionContext<ActionRunner>, handler: H) -> H::Output
     where
         H: BehaviorTreeAsyncHandler<'a>,

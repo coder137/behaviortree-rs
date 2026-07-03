@@ -1,4 +1,6 @@
-use crate::{AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeAsyncHandler};
+use crate::{
+    ActionToActionState, AsyncActionContext, AsyncBehaviorActionState, BehaviorTreeAsyncHandler,
+};
 
 #[derive(Debug, Clone)]
 pub enum TestOperation {
@@ -51,7 +53,13 @@ impl TestOperation {
     }
 }
 
-impl BehaviorTreeAsyncAction<TestOperationRunner> for TestOperation {
+impl ActionToActionState<TestOperation> for TestOperation {
+    fn to_state(self) -> TestOperation {
+        self
+    }
+}
+
+impl AsyncBehaviorActionState<TestOperationRunner> for TestOperation {
     fn make_future<'a, H>(
         &self,
         ctx: AsyncActionContext<TestOperationRunner>,

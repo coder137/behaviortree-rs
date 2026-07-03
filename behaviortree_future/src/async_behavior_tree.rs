@@ -1,10 +1,11 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use crate::ActionToActionState;
 use crate::AsyncActionContextOwned;
+use crate::AsyncBehaviorActionState;
 use crate::AsyncBehaviorStateTree;
 use crate::Behavior;
-use crate::BehaviorTreeAsyncAction;
 use crate::BehaviorTreeObserver;
 use crate::BehaviorTreeReset;
 use crate::Status;
@@ -34,15 +35,15 @@ impl AsyncBehaviorTreeController {
 }
 
 #[pin_project::pin_project(project = AsyncBehaviorTreeStateProj)]
-enum AsyncBehaviorTreeState<A, R, O> {
-    Default(#[pin] AsyncBehaviorState<A, R>),
-    Observer(#[pin] AsyncBehaviorStateWithObserver<A, R, O>),
+enum AsyncBehaviorTreeState<AS, R, O> {
+    Default(#[pin] AsyncBehaviorState<AS, R>),
+    Observer(#[pin] AsyncBehaviorStateWithObserver<AS, R, O>),
 }
 
-impl<A, R, O> BehaviorTreeReset<R> for AsyncBehaviorTreeState<A, R, O>
+impl<AS, R, O> BehaviorTreeReset<R> for AsyncBehaviorTreeState<AS, R, O>
 where
-    A: BehaviorTreeAsyncAction<R>,
-    O: BehaviorTreeObserver<A>,
+    AS: AsyncBehaviorActionState<R>,
+    O: BehaviorTreeObserver<AS>,
 {
     fn reset(&mut self, ctx: crate::AsyncActionContext<R>) {
         let r: &mut dyn BehaviorTreeReset<R> = match self {
@@ -53,10 +54,10 @@ where
     }
 }
 
-impl<A, R, O> std::future::Future for AsyncBehaviorTreeState<A, R, O>
+impl<AS, R, O> std::future::Future for AsyncBehaviorTreeState<AS, R, O>
 where
-    A: BehaviorTreeAsyncAction<R>,
-    O: BehaviorTreeObserver<A>,
+    AS: AsyncBehaviorActionState<R>,
+    O: BehaviorTreeObserver<AS>,
 {
     type Output = bool;
     fn poll(
@@ -72,8 +73,8 @@ where
     }
 }
 
-pub struct AsyncBehaviorTree<A, R, O> {
-    state: AsyncBehaviorTreeState<A, R, O>,
+pub struct AsyncBehaviorTree<AS, R, O> {
+    state: AsyncBehaviorTreeState<AS, R, O>,
     ctx: AsyncActionContextOwned<R>,
     delta: Rc<Cell<f64>>,
 
@@ -81,16 +82,17 @@ pub struct AsyncBehaviorTree<A, R, O> {
     control: Rc<Cell<Control>>,
 }
 
-impl<A, R, O> AsyncBehaviorTree<A, R, O> {
-    pub fn from_behavior_with_observer(
+impl<AS, R, O> AsyncBehaviorTree<AS, R, O> {
+    pub fn from_behavior_with_observer<A>(
         behavior: Behavior<A>,
         runner: R,
         delta: std::rc::Rc<std::cell::Cell<f64>>,
         observer: Rc<O>,
     ) -> (Self, AsyncBehaviorTreeController, AsyncBehaviorStateTree)
     where
-        A: BehaviorTreeAsyncAction<R>,
-        O: BehaviorTreeObserver<A>,
+        A: ActionToActionState<AS>,
+        AS: AsyncBehaviorActionState<R>,
+        O: BehaviorTreeObserver<AS>,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
         let mut id = 0;
@@ -113,14 +115,15 @@ impl<A, R, O> AsyncBehaviorTree<A, R, O> {
     }
 }
 
-impl<A, R> AsyncBehaviorTree<A, R, ()> {
-    pub fn from_behavior(
+impl<AS, R> AsyncBehaviorTree<AS, R, ()> {
+    pub fn from_behavior<A>(
         behavior: Behavior<A>,
         runner: R,
         delta: std::rc::Rc<std::cell::Cell<f64>>,
     ) -> (Self, AsyncBehaviorTreeController)
     where
-        A: BehaviorTreeAsyncAction<R>,
+        A: ActionToActionState<AS>,
+        AS: AsyncBehaviorActionState<R>,
     {
         let ctx = AsyncActionContextOwned::new(runner, delta.get());
         let state = AsyncBehaviorState::from_behavior(behavior, ctx.create_ctx());
@@ -136,10 +139,10 @@ impl<A, R> AsyncBehaviorTree<A, R, ()> {
     }
 }
 
-impl<A, R, O> std::future::Future for AsyncBehaviorTree<A, R, O>
+impl<AS, R, O> std::future::Future for AsyncBehaviorTree<AS, R, O>
 where
-    A: BehaviorTreeAsyncAction<R>,
-    O: BehaviorTreeObserver<A>,
+    AS: AsyncBehaviorActionState<R>,
+    O: BehaviorTreeObserver<AS>,
 {
     type Output = Option<bool>;
     fn poll(
@@ -164,8 +167,8 @@ where
     }
 }
 
-impl<A> BehaviorTreeObserver<A> for () {
-    fn action_name(_action: &A) -> &'static str {
+impl<AS> BehaviorTreeObserver<AS> for () {
+    fn action_name(_action: &AS) -> &'static str {
         ""
     }
     fn init(&self, _capacity: usize) {}

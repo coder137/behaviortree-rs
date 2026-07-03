@@ -88,7 +88,11 @@ pub trait BehaviorTreeAsyncHandler<'a> {
     fn future(self, future: impl std::future::Future<Output = bool> + 'a) -> Self::Output;
 }
 
-pub trait BehaviorTreeAsyncAction<R> {
+pub trait ActionToActionState<AS> {
+    fn to_state(self) -> AS;
+}
+
+pub trait AsyncBehaviorActionState<R> {
     fn make_future<'a, H>(&self, ctx: AsyncActionContext<R>, handler: H) -> H::Output
     where
         H: BehaviorTreeAsyncHandler<'a>;
@@ -96,8 +100,8 @@ pub trait BehaviorTreeAsyncAction<R> {
     fn reset(&self, ctx: AsyncActionContext<R>);
 }
 
-pub trait BehaviorTreeObserver<A> {
-    fn action_name(action: &A) -> &'static str;
+pub trait BehaviorTreeObserver<AS> {
+    fn action_name(action_state: &AS) -> &'static str;
 
     /// Ids are assigned from 0 -> capacity
     ///
