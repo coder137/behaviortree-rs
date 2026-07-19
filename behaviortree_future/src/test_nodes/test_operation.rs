@@ -54,7 +54,7 @@ impl TestOperation {
 }
 
 impl ActionToActionState<TestOperation, TestOperationRunner> for TestOperation {
-    fn to_state(self) -> TestOperation {
+    fn to_state(self, _runner: &mut TestOperationRunner) -> TestOperation {
         self
     }
 }

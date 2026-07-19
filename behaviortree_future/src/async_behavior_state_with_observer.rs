@@ -51,7 +51,7 @@ pub enum AsyncBehaviorStateWithObserver<AS, R, O> {
 impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
     pub fn from_behavior<A>(
         behavior: Behavior<A>,
-        ctx: AsyncActionContext<R>,
+        mut ctx: AsyncActionContext<R>,
         observer: Rc<O>,
         id: &mut usize,
     ) -> (Self, AsyncBehaviorStateTree)
@@ -65,7 +65,10 @@ impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
         let parent_o = (observer.clone(), parent_id);
         match behavior {
             Behavior::Action(action) => {
-                let action_state = action.to_state();
+                let action_state = ctx.runner_ref_mut(|r| {
+                    //
+                    action.to_state(r)
+                });
                 let action_name = O::action_name(&action_state);
                 let state_tree = AsyncBehaviorStateTree::Action(action_name, parent_o.1);
                 let state = Self::Action(AsyncAction::new(action_state, ctx), parent_o);

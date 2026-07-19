@@ -17,14 +17,17 @@ pub enum AsyncBehaviorState<AS, R> {
 }
 
 impl<AS, R> AsyncBehaviorState<AS, R> {
-    pub fn from_behavior<A>(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
+    pub fn from_behavior<A>(behavior: Behavior<A>, mut ctx: AsyncActionContext<R>) -> Self
     where
         A: ActionToActionState<AS, R>,
         AS: AsyncBehaviorActionState<R>,
     {
         match behavior {
             Behavior::Action(action) => {
-                let action_state = action.to_state();
+                let action_state = ctx.runner_ref_mut(|r| {
+                    //
+                    action.to_state(r)
+                });
                 Self::Action(AsyncAction::new(action_state, ctx))
             }
             Behavior::Invert(behavior) => {

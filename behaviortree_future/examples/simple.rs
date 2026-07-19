@@ -48,7 +48,7 @@ impl Action {
 }
 
 impl ActionToActionState<Action, ActionRunner> for Action {
-    fn to_state(self) -> Action {
+    fn to_state(self, _runner: &mut ActionRunner) -> Action {
         self
     }
 }

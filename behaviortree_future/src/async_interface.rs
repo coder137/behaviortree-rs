@@ -92,7 +92,7 @@ pub trait ActionToActionState<AS, R>
 where
     AS: AsyncBehaviorActionState<R>,
 {
-    fn to_state(self) -> AS;
+    fn to_state(self, runner: &mut R) -> AS;
 }
 
 pub trait AsyncBehaviorActionState<R> {
