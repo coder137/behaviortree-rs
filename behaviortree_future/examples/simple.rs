@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use behaviortree_future::{
-    ActionToActionState, AsyncActionContext, AsyncBehaviorActionState, AsyncBehaviorTree, Behavior,
-    BehaviorTreeAsyncHandler, BehaviorTreeObserver, Status,
+    ActionToActionState, AsyncBehaviorActionState, AsyncBehaviorTree, Behavior,
+    BehaviorTreeAsyncHandler, BehaviorTreeObserver, Delta, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -21,15 +21,21 @@ pub enum Action {
     Div,
 }
 
-impl Action {
-    pub async fn add(
+pub enum ActionState {
+    Add {
         i1: usize,
         i2: usize,
         o: usize,
-        ctx: AsyncActionContext<ActionRunner>,
-    ) -> bool {
-        let memory = ctx.runner_ref(|r| r.memory.clone());
-        let sum = memory.run(|s| {
+        runner: ActionRunner,
+    },
+    Sub,
+    Mul,
+    Div,
+}
+
+impl ActionState {
+    pub async fn add(i1: usize, i2: usize, o: usize, runner: ActionRunner) -> bool {
+        let sum = runner.memory.run(|s| {
             let a = s[i1];
             let b = s[i2];
             a + b
@@ -39,7 +45,7 @@ impl Action {
         yield_now().await;
         // yield_now().await;
 
-        memory.run(|mut s| {
+        runner.memory.run(|mut s| {
             println!("SUM: {sum}");
             s[o] = sum;
         });
@@ -47,26 +53,38 @@ impl Action {
     }
 }
 
-impl ActionToActionState<Action, ActionRunner> for Action {
-    fn to_state(self, _runner: &mut ActionRunner) -> Action {
-        self
+impl ActionToActionState<ActionState, ActionRunner> for Action {
+    fn to_state(self, _delta: Rc<Delta>, runner: &mut ActionRunner) -> ActionState {
+        match self {
+            Self::Add { i1, i2, o } => ActionState::Add {
+                i1,
+                i2,
+                o,
+                runner: runner.clone(),
+            },
+            Self::Sub => ActionState::Sub,
+            Self::Mul => ActionState::Mul,
+            Self::Div => ActionState::Div,
+        }
     }
 }
 
-impl AsyncBehaviorActionState<ActionRunner> for Action {
-    fn make_future<'a, H>(&self, ctx: AsyncActionContext<ActionRunner>, handler: H) -> H::Output
+impl AsyncBehaviorActionState for ActionState {
+    fn make_future<'a, H>(&self, handler: H) -> H::Output
     where
         H: BehaviorTreeAsyncHandler<'a>,
     {
-        match *self {
-            Action::Add { i1, i2, o } => handler.future(Self::add(i1, i2, o, ctx)),
-            Action::Sub => handler.future(async move { true }),
-            Action::Mul => handler.future(async move { true }),
-            Action::Div => handler.future(async move { true }),
+        match self {
+            Self::Add { i1, i2, o, runner } => {
+                handler.future(Self::add(*i1, *i2, *o, runner.clone()))
+            }
+            Self::Sub => handler.future(async move { true }),
+            Self::Mul => handler.future(async move { true }),
+            Self::Div => handler.future(async move { true }),
         }
     }
 
-    fn reset(&self, ctx: AsyncActionContext<ActionRunner>) {}
+    fn reset(&self) {}
 }
 
 #[derive(Clone)]
@@ -139,13 +157,13 @@ pub struct MyObserver {
     map: RefCell<HashMap<usize, Option<Status>>>,
 }
 
-impl BehaviorTreeObserver<Action> for MyObserver {
-    fn action_name(action: &Action) -> &'static str {
-        match action {
-            Action::Add { .. } => "Add",
-            Action::Sub => "Sub",
-            Action::Mul => "Mul",
-            Action::Div => "Div",
+impl BehaviorTreeObserver<ActionState> for MyObserver {
+    fn action_name(action_state: &ActionState) -> &'static str {
+        match action_state {
+            ActionState::Add { .. } => "Add",
+            ActionState::Sub => "Sub",
+            ActionState::Mul => "Mul",
+            ActionState::Div => "Div",
         }
     }
 
@@ -191,7 +209,7 @@ fn main() -> anyhow::Result<()> {
         }),
     ]);
 
-    let runner = ActionRunner {
+    let mut runner = ActionRunner {
         memory: memory.clone(),
     };
 
@@ -205,7 +223,7 @@ fn main() -> anyhow::Result<()> {
 
     let (bt, _bt_controller, _bt_state_tree) = AsyncBehaviorTree::from_behavior_with_observer(
         behavior.clone(),
-        runner,
+        &mut runner,
         delta.into(),
         observer,
     );

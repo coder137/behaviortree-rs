@@ -1,8 +1,6 @@
 use reusable_box_future::ReusableLocalBoxFuture;
 
-use crate::{
-    AsyncActionContext, AsyncBehaviorActionState, BehaviorTreeAsyncHandler, BehaviorTreeReset,
-};
+use crate::{AsyncBehaviorActionState, BehaviorTreeAsyncHandler, BehaviorTreeReset};
 
 struct CreateReusableLocalBoxFutureHandler;
 impl BehaviorTreeAsyncHandler<'static> for CreateReusableLocalBoxFutureHandler {
@@ -29,11 +27,11 @@ pub struct AsyncAction<AS> {
 }
 
 impl<AS> AsyncAction<AS> {
-    pub fn new<R>(action_state: AS, ctx: AsyncActionContext<R>) -> Self
+    pub fn new(action_state: AS) -> Self
     where
-        AS: AsyncBehaviorActionState<R>,
+        AS: AsyncBehaviorActionState,
     {
-        let future = action_state.make_future(ctx, CreateReusableLocalBoxFutureHandler);
+        let future = action_state.make_future(CreateReusableLocalBoxFutureHandler);
         Self {
             action_state,
             future,
@@ -41,14 +39,14 @@ impl<AS> AsyncAction<AS> {
     }
 }
 
-impl<AS, R> BehaviorTreeReset<R> for AsyncAction<AS>
+impl<AS> BehaviorTreeReset for AsyncAction<AS>
 where
-    AS: AsyncBehaviorActionState<R>,
+    AS: AsyncBehaviorActionState,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        self.action_state.reset(ctx);
+    fn reset(&mut self) {
+        self.action_state.reset();
         self.action_state
-            .make_future(ctx, UpdateReusableLocalBoxFutureHandler(&mut self.future));
+            .make_future(UpdateReusableLocalBoxFutureHandler(&mut self.future));
     }
 }
 
@@ -65,10 +63,12 @@ impl<AS> std::future::Future for AsyncAction<AS> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::{
-        AsyncActionContextOwned,
+        Behavior, Delta,
         async_behavior_state::AsyncBehaviorState,
-        behavior_nodes::{AsyncAction, AsyncTimes},
+        behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -76,13 +76,13 @@ mod tests {
     fn test_action_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_with_dhat_pre");
-            let action = TestOperation::Yield(true);
-            let action = AsyncAction::new(action, ctx.create_ctx());
+            let behavior = Behavior::Action(TestOperation::Yield(true));
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
             action
         };
 
@@ -105,16 +105,15 @@ mod tests {
     #[test]
     fn test_action_reset_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
-        let delta = executor.delta().inner();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, delta.get());
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_reset_with_dhat_pre");
-            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
-            let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2, ctx.create_ctx()));
+            let behavior = Behavior::Action(TestOperation::Yield(true));
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2));
             action
         };
 

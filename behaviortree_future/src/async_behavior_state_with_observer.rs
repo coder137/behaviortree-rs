@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::{
-    ActionToActionState, AsyncActionContext, AsyncBehaviorActionState, Behavior,
-    BehaviorTreeObserver, BehaviorTreeReset, Status,
+    ActionToActionState, AsyncBehaviorActionState, Behavior, BehaviorTreeObserver,
+    BehaviorTreeReset, Delta, Status,
     behavior_nodes::{
         AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
     },
@@ -20,44 +20,45 @@ pub enum AsyncBehaviorStateTree {
 }
 
 #[pin_project::pin_project(project = AsyncBehaviorStateWithObserverProj)]
-pub enum AsyncBehaviorStateWithObserver<AS, R, O> {
+pub enum AsyncBehaviorStateWithObserver<AS, O> {
     Action(#[pin] AsyncAction<AS>, (Rc<O>, usize)),
     Invert(
-        #[pin] AsyncInvert<AsyncBehaviorStateWithObserver<AS, R, O>>,
+        #[pin] AsyncInvert<AsyncBehaviorStateWithObserver<AS, O>>,
         (Rc<O>, usize),
     ),
     Sequence(
-        #[pin] AsyncSequence<AsyncBehaviorStateWithObserver<AS, R, O>, R>,
+        #[pin] AsyncSequence<AsyncBehaviorStateWithObserver<AS, O>>,
         (Rc<O>, usize),
     ),
     Select(
-        #[pin] AsyncSelect<AsyncBehaviorStateWithObserver<AS, R, O>, R>,
+        #[pin] AsyncSelect<AsyncBehaviorStateWithObserver<AS, O>>,
         (Rc<O>, usize),
     ),
     Loop(
-        #[pin] AsyncLoop<AsyncBehaviorStateWithObserver<AS, R, O>, R>,
+        #[pin] AsyncLoop<AsyncBehaviorStateWithObserver<AS, O>>,
         (Rc<O>, usize),
     ),
     Times(
-        #[pin] AsyncTimes<AsyncBehaviorStateWithObserver<AS, R, O>, R>,
+        #[pin] AsyncTimes<AsyncBehaviorStateWithObserver<AS, O>>,
         (Rc<O>, usize),
     ),
     Subtree(
-        #[pin] AsyncSubtree<AsyncBehaviorStateWithObserver<AS, R, O>>,
+        #[pin] AsyncSubtree<AsyncBehaviorStateWithObserver<AS, O>>,
         (Rc<O>, usize),
     ),
 }
 
-impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
-    pub fn from_behavior<A>(
+impl<AS, O> AsyncBehaviorStateWithObserver<AS, O> {
+    pub fn from_behavior<A, R>(
         behavior: Behavior<A>,
-        mut ctx: AsyncActionContext<R>,
+        delta: Rc<Delta>,
+        runner: &mut R,
         observer: Rc<O>,
         id: &mut usize,
     ) -> (Self, AsyncBehaviorStateTree)
     where
         A: ActionToActionState<AS, R>,
-        AS: AsyncBehaviorActionState<R>,
+        AS: AsyncBehaviorActionState,
         O: BehaviorTreeObserver<AS>,
     {
         let parent_id = *id;
@@ -65,18 +66,15 @@ impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
         let parent_o = (observer.clone(), parent_id);
         match behavior {
             Behavior::Action(action) => {
-                let action_state = ctx.runner_ref_mut(|r| {
-                    //
-                    action.to_state(r)
-                });
+                let action_state = action.to_state(delta, runner);
                 let action_name = O::action_name(&action_state);
                 let state_tree = AsyncBehaviorStateTree::Action(action_name, parent_o.1);
-                let state = Self::Action(AsyncAction::new(action_state, ctx), parent_o);
+                let state = Self::Action(AsyncAction::new(action_state), parent_o);
                 (state, state_tree)
             }
             Behavior::Invert(behavior) => {
                 let (child_state, child_state_tree) =
-                    Self::from_behavior(*behavior, ctx, observer, id);
+                    Self::from_behavior(*behavior, delta, runner, observer, id);
                 let state_tree =
                     AsyncBehaviorStateTree::Invert(parent_o.1, child_state_tree.into());
                 let state = Self::Invert(AsyncInvert::new(child_state), parent_o);
@@ -84,40 +82,40 @@ impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
             }
             Behavior::Sequence(behaviors) => {
                 let (children_state, children_state_tree): (
-                    Vec<AsyncBehaviorStateWithObserver<AS, R, O>>,
+                    Vec<AsyncBehaviorStateWithObserver<AS, O>>,
                     Vec<AsyncBehaviorStateTree>,
                 ) = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, ctx, observer.clone(), id))
+                    .map(|b| Self::from_behavior(b, delta.clone(), runner, observer.clone(), id))
                     .unzip();
                 let children_state_tree = std::rc::Rc::from(children_state_tree);
                 let state_tree = AsyncBehaviorStateTree::Sequence(parent_o.1, children_state_tree);
-                let state = Self::Sequence(AsyncSequence::new(children_state, ctx), parent_o);
+                let state = Self::Sequence(AsyncSequence::new(children_state), parent_o);
                 (state, state_tree)
             }
             Behavior::Select(behaviors) => {
                 let (children_state, children_state_tree): (
-                    Vec<AsyncBehaviorStateWithObserver<AS, R, O>>,
+                    Vec<AsyncBehaviorStateWithObserver<AS, O>>,
                     Vec<AsyncBehaviorStateTree>,
                 ) = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, ctx, observer.clone(), id))
+                    .map(|b| Self::from_behavior(b, delta.clone(), runner, observer.clone(), id))
                     .unzip();
                 let children_state_tree = std::rc::Rc::from(children_state_tree);
                 let state_tree = AsyncBehaviorStateTree::Select(parent_o.1, children_state_tree);
-                let state = Self::Select(AsyncSelect::new(children_state, ctx), parent_o);
+                let state = Self::Select(AsyncSelect::new(children_state), parent_o);
                 (state, state_tree)
             }
             Behavior::Loop(behavior) => {
                 let (child_state, child_state_tree) =
-                    Self::from_behavior(*behavior, ctx, observer, id);
+                    Self::from_behavior(*behavior, delta, runner, observer, id);
                 let state_tree = AsyncBehaviorStateTree::Loop(parent_o.1, child_state_tree.into());
-                let state = Self::Loop(AsyncLoop::new(child_state, ctx), parent_o);
+                let state = Self::Loop(AsyncLoop::new(child_state), parent_o);
                 (state, state_tree)
             }
             Behavior::Subtree(name, behavior) => {
                 let (child_state, child_state_tree) =
-                    Self::from_behavior(*behavior, ctx, observer, id);
+                    Self::from_behavior(*behavior, delta, runner, observer, id);
                 let state_tree = AsyncBehaviorStateTree::Subtree(
                     name.into(),
                     parent_o.1,
@@ -130,13 +128,13 @@ impl<AS, R, O> AsyncBehaviorStateWithObserver<AS, R, O> {
     }
 }
 
-impl<AS, R, O> BehaviorTreeReset<R> for AsyncBehaviorStateWithObserver<AS, R, O>
+impl<AS, O> BehaviorTreeReset for AsyncBehaviorStateWithObserver<AS, O>
 where
-    AS: AsyncBehaviorActionState<R>,
+    AS: AsyncBehaviorActionState,
     O: BehaviorTreeObserver<AS>,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        let (r, observer): (&mut dyn BehaviorTreeReset<R>, &mut (Rc<O>, usize)) = match self {
+    fn reset(&mut self) {
+        let (r, observer): (&mut dyn BehaviorTreeReset, &mut (Rc<O>, usize)) = match self {
             AsyncBehaviorStateWithObserver::Action(a, o) => (a, o),
             AsyncBehaviorStateWithObserver::Invert(a, o) => (a, o),
             AsyncBehaviorStateWithObserver::Sequence(a, o) => (a, o),
@@ -145,14 +143,14 @@ where
             AsyncBehaviorStateWithObserver::Times(a, o) => (a, o),
             AsyncBehaviorStateWithObserver::Subtree(a, o) => (a, o),
         };
-        r.reset(ctx);
+        r.reset();
         observer.0.update(observer.1, None);
     }
 }
 
-impl<AS, R, O> std::future::Future for AsyncBehaviorStateWithObserver<AS, R, O>
+impl<AS, O> std::future::Future for AsyncBehaviorStateWithObserver<AS, O>
 where
-    AS: AsyncBehaviorActionState<R>,
+    AS: AsyncBehaviorActionState,
     O: BehaviorTreeObserver<AS>,
 {
     type Output = bool;

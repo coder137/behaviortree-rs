@@ -1,6 +1,6 @@
-use crate::{
-    ActionToActionState, AsyncActionContext, AsyncBehaviorActionState, BehaviorTreeAsyncHandler,
-};
+use std::rc::Rc;
+
+use crate::{ActionToActionState, AsyncBehaviorActionState, BehaviorTreeAsyncHandler, Delta};
 
 #[derive(Debug, Clone)]
 pub enum TestOperation {
@@ -9,30 +9,31 @@ pub enum TestOperation {
     ConsumeDelta(bool),
 }
 
-impl TestOperation {}
+pub enum TestOperationState {
+    Add(u32, u32, bool, u32, Rc<Delta>, TestOperationRunner),
+    Yield(bool),
+    ConsumeDelta(bool, Rc<Delta>, TestOperationRunner),
+}
 
-impl TestOperation {
+impl TestOperationState {
     pub async fn this_add(
         a: u32,
         b: u32,
         retval: bool,
         times: u32,
-        ctx: AsyncActionContext<TestOperationRunner>,
+        delta: Rc<Delta>,
+        runner: TestOperationRunner,
     ) -> bool {
         for _t in 0..times {
-            let delta = ctx.peek_delta();
-            ctx.runner_ref(|r| {
-                r.set_delta(delta);
-            });
+            let d = delta.get();
+            runner.set_delta(d);
             yield_now().await;
         }
 
         let c = a + b;
-        let delta = ctx.peek_delta();
-        ctx.runner_ref(|r| {
-            r.set_num(c);
-            r.set_delta(delta);
-        });
+        let delta = delta.get();
+        runner.set_num(c);
+        runner.set_delta(delta);
         retval
     }
 
@@ -43,46 +44,56 @@ impl TestOperation {
 
     pub async fn this_consume_delta(
         retval: bool,
-        mut ctx: AsyncActionContext<TestOperationRunner>,
+        delta: Rc<Delta>,
+        runner: TestOperationRunner,
     ) -> bool {
-        let delta = ctx.consume_delta();
-        ctx.runner_ref(|r| {
-            r.set_delta(delta);
-        });
+        let d = delta.get();
+        runner.set_delta(d);
         retval
     }
 }
 
-impl ActionToActionState<TestOperation, TestOperationRunner> for TestOperation {
-    fn to_state(self, _runner: &mut TestOperationRunner) -> TestOperation {
-        self
-    }
-}
-
-impl AsyncBehaviorActionState<TestOperationRunner> for TestOperation {
-    fn make_future<'a, H>(
-        &self,
-        ctx: AsyncActionContext<TestOperationRunner>,
-        handler: H,
-    ) -> H::Output
-    where
-        H: BehaviorTreeAsyncHandler<'a>,
-    {
-        match *self {
-            TestOperation::Add(a, b, retval, times) => {
-                handler.future(Self::this_add(a, b, retval, times, ctx))
+impl ActionToActionState<TestOperationState, TestOperationRunner> for TestOperation {
+    fn to_state(self, delta: Rc<Delta>, runner: &mut TestOperationRunner) -> TestOperationState {
+        match self {
+            Self::Add(a, b, retval, times) => {
+                TestOperationState::Add(a, b, retval, times, delta, runner.clone())
             }
-            TestOperation::Yield(retval) => handler.future(Self::this_yield(retval)),
-            TestOperation::ConsumeDelta(retval) => {
-                handler.future(Self::this_consume_delta(retval, ctx))
+            Self::Yield(retval) => TestOperationState::Yield(retval),
+            Self::ConsumeDelta(retval) => {
+                TestOperationState::ConsumeDelta(retval, delta, runner.clone())
             }
         }
     }
-
-    fn reset(&self, ctx: AsyncActionContext<TestOperationRunner>) {}
 }
 
-#[derive(Debug)]
+impl AsyncBehaviorActionState for TestOperationState {
+    fn make_future<'a, H>(&self, handler: H) -> H::Output
+    where
+        H: BehaviorTreeAsyncHandler<'a>,
+    {
+        match self {
+            Self::Add(a, b, retval, times, delta, runner) => handler.future(Self::this_add(
+                *a,
+                *b,
+                *retval,
+                *times,
+                delta.clone(),
+                runner.clone(),
+            )),
+            Self::Yield(retval) => handler.future(Self::this_yield(*retval)),
+            Self::ConsumeDelta(retval, delta, runner) => handler.future(Self::this_consume_delta(
+                *retval,
+                delta.clone(),
+                runner.clone(),
+            )),
+        }
+    }
+
+    fn reset(&self) {}
+}
+
+#[derive(Debug, Clone)]
 pub struct TestOperationRunner {
     pub num: std::rc::Rc<std::cell::Cell<u32>>,
     pub delta: std::rc::Rc<std::cell::Cell<f64>>,
