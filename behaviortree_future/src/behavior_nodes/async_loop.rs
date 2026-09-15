@@ -1,34 +1,32 @@
-use crate::{AsyncActionContext, BehaviorTreeReset};
+use crate::BehaviorTreeReset;
 
-pub struct AsyncLoop<C, R> {
+pub struct AsyncLoop<C> {
     child: Box<C>,
     completed: bool,
-    ctx: AsyncActionContext<R>,
 }
 
-impl<C, R> AsyncLoop<C, R> {
-    pub fn new(child: C, ctx: AsyncActionContext<R>) -> Self {
+impl<C> AsyncLoop<C> {
+    pub fn new(child: C) -> Self {
         Self {
             child: Box::new(child),
             completed: false,
-            ctx,
         }
     }
 }
 
-impl<C, R> BehaviorTreeReset<R> for AsyncLoop<C, R>
+impl<C> BehaviorTreeReset for AsyncLoop<C>
 where
-    C: BehaviorTreeReset<R>,
+    C: BehaviorTreeReset,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+    fn reset(&mut self) {
         self.completed = false;
-        self.child.reset(ctx);
+        self.child.reset();
     }
 }
 
-impl<C, R> std::future::Future for AsyncLoop<C, R>
+impl<C> std::future::Future for AsyncLoop<C>
 where
-    C: std::future::Future<Output = bool> + BehaviorTreeReset<R> + Unpin,
+    C: std::future::Future<Output = bool> + BehaviorTreeReset + Unpin,
 {
     type Output = C::Output;
     fn poll(
@@ -38,7 +36,7 @@ where
         let bt = self.as_mut().get_mut();
         if bt.completed {
             bt.completed = false;
-            bt.child.reset(bt.ctx);
+            bt.child.reset();
         }
 
         let child = std::pin::Pin::new(&mut bt.child);
@@ -55,12 +53,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use tokio_util::sync::CancellationToken;
 
     use crate::{
-        AsyncActionContextOwned, BehaviorTreeReset,
+        Behavior, BehaviorTreeReset, Delta,
         async_behavior_state::AsyncBehaviorState,
-        behavior_nodes::{AsyncAction, AsyncLoop},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -68,15 +67,15 @@ mod tests {
     fn test_async_loop_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::default();
-        let inner = runner.num.clone();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_async_loop_with_dhat_pre");
-            let action = AsyncAction::new(TestOperation::Add(1, 2, true, 1), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
-            let action = AsyncLoop::new(action, ctx.create_ctx());
+            Behavior::Action(TestOperation::Add(1, 2, true, 1));
+            let behavior =
+                Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
             action
         };
 
@@ -96,11 +95,11 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 3);
+        assert_eq!(runner.num.get(), 3);
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 6);
+        assert_eq!(runner.num.get(), 6);
 
         cancel.cancel();
         executor.tick(16.67, None);
@@ -113,16 +112,15 @@ mod tests {
 
         let reset = std::rc::Rc::new(std::cell::Cell::new(false));
 
-        let runner = TestOperationRunner::default();
-        let inner = runner.num.clone();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let mut action = {
             let _profiler = DhatTester::new("test_async_loop_reset_with_dhat_pre");
-            let action = AsyncAction::new(TestOperation::Add(1, 2, true, 1), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
-            let action = AsyncLoop::new(action, ctx.create_ctx());
-            let action = AsyncBehaviorState::Loop(action);
+            Behavior::Action(TestOperation::Add(1, 2, true, 1));
+            let behavior =
+                Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
             action
         };
 
@@ -131,7 +129,7 @@ mod tests {
             let mut action = std::pin::Pin::new(&mut action);
             if reset_clone.get() {
                 reset_clone.set(false);
-                action.reset(ctx.create_ctx());
+                action.reset();
             }
             action.poll(cx)
         });
@@ -152,23 +150,23 @@ mod tests {
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 3);
+        assert_eq!(runner.num.get(), 3);
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 6);
+        assert_eq!(runner.num.get(), 6);
 
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 6);
+        assert_eq!(runner.num.get(), 6);
         reset.set(true);
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 9);
+        assert_eq!(runner.num.get(), 9);
 
         executor.tick(16.67, None);
         executor.tick(16.67, None);
-        assert_eq!(inner.get(), 12);
+        assert_eq!(runner.num.get(), 12);
 
         cancel.cancel();
         executor.tick(16.67, None);

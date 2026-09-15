@@ -1,40 +1,38 @@
-use crate::{AsyncActionContext, BehaviorTreeReset};
+use crate::BehaviorTreeReset;
 
-pub struct AsyncTimes<C, R> {
+pub struct AsyncTimes<C> {
     child: Box<C>,
     current_times: u64,
     reset: bool,
 
     times: u64,
-    ctx: AsyncActionContext<R>,
 }
 
-impl<C, R> AsyncTimes<C, R> {
-    pub fn new(child: C, times: u64, ctx: AsyncActionContext<R>) -> Self {
+impl<C> AsyncTimes<C> {
+    pub fn new(child: C, times: u64) -> Self {
         Self {
             child: Box::new(child),
             current_times: 0,
             reset: false,
             times,
-            ctx,
         }
     }
 }
 
-impl<C, R> BehaviorTreeReset<R> for AsyncTimes<C, R>
+impl<C> BehaviorTreeReset for AsyncTimes<C>
 where
-    C: BehaviorTreeReset<R>,
+    C: BehaviorTreeReset,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
+    fn reset(&mut self) {
         self.current_times = 0;
         self.reset = false;
-        self.child.reset(ctx);
+        self.child.reset();
     }
 }
 
-impl<C, R> std::future::Future for AsyncTimes<C, R>
+impl<C> std::future::Future for AsyncTimes<C>
 where
-    C: std::future::Future<Output = bool> + BehaviorTreeReset<R> + Unpin,
+    C: std::future::Future<Output = bool> + BehaviorTreeReset + Unpin,
 {
     type Output = C::Output;
     fn poll(
@@ -49,7 +47,7 @@ where
 
         if bt.reset {
             bt.reset = false;
-            bt.child.reset(bt.ctx);
+            bt.child.reset();
         }
 
         let child = std::pin::Pin::new(&mut bt.child);
@@ -71,25 +69,28 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use ticked_async_executor::TickedAsyncExecutor;
 
     use crate::{
-        AsyncActionContextOwned,
+        Behavior, Delta,
         async_behavior_state::AsyncBehaviorState,
-        behavior_nodes::{AsyncAction, AsyncTimes},
+        behavior_nodes::AsyncTimes,
         test_nodes::{TestOperation, TestOperationRunner},
     };
 
     #[test]
     fn test_times_0() {
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 10.0);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
-        let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-        let action = AsyncBehaviorState::Action(action);
-        let future = AsyncTimes::new(action, 0, ctx.create_ctx());
+        let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
+        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let future = AsyncTimes::new(action, 0);
 
-        let mut executor = TickedAsyncExecutor::default();
+        let mut executor: TickedAsyncExecutor<fn(ticked_async_executor::TaskState)> =
+            TickedAsyncExecutor::default();
         executor
             .spawn_local((), async move {
                 let status = future.await;
@@ -99,16 +100,17 @@ mod tests {
 
         executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 0);
+        assert_eq!(runner.num.get(), 0);
     }
 
     #[test]
     fn test_times_1() {
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 10.0);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
-        let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-        let action = AsyncBehaviorState::Action(action);
-        let future = AsyncTimes::new(action, 1, ctx.create_ctx());
+        let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
+        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let future = AsyncTimes::new(action, 1);
 
         let mut executor = TickedAsyncExecutor::default();
         executor
@@ -119,19 +121,18 @@ mod tests {
             .detach();
 
         executor.tick(10.0, None);
-        assert_eq!(executor.num_tasks(), 1);
-        executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 0);
+        assert_eq!(runner.num.get(), 3);
     }
 
     #[test]
     fn test_times_2() {
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 10.0);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
-        let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-        let action = AsyncBehaviorState::Action(action);
-        let future = AsyncTimes::new(action, 2, ctx.create_ctx());
+        let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
+        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let future = AsyncTimes::new(action, 2);
 
         let mut executor = TickedAsyncExecutor::default();
         executor
@@ -143,27 +144,23 @@ mod tests {
 
         executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(10.0, None);
-        assert_eq!(executor.num_tasks(), 1);
+        assert_eq!(runner.num.get(), 3);
 
         executor.tick(10.0, None);
-        assert_eq!(executor.num_tasks(), 1);
-        executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 0);
+        assert_eq!(runner.num.get(), 6);
     }
 
     #[test]
     fn test_times_reset() {
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 10.0);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
-        let action = AsyncBehaviorState::Action(AsyncAction::new(
-            TestOperation::Yield(true),
-            ctx.create_ctx(),
-        ));
-        let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 1, ctx.create_ctx()));
+        let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 1));
+        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 1));
 
-        let future = AsyncBehaviorState::Times(AsyncTimes::new(action, 2, ctx.create_ctx()));
+        let future = AsyncBehaviorState::Times(AsyncTimes::new(action, 2));
 
         let mut executor = TickedAsyncExecutor::default();
         executor
@@ -175,12 +172,18 @@ mod tests {
 
         executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 1);
-        executor.tick(10.0, None);
-        assert_eq!(executor.num_tasks(), 1);
+        assert_eq!(runner.num.get(), 0);
 
         executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 1);
+        assert_eq!(runner.num.get(), 3);
+
+        executor.tick(10.0, None);
+        assert_eq!(executor.num_tasks(), 1);
+        assert_eq!(runner.num.get(), 3);
+
         executor.tick(10.0, None);
         assert_eq!(executor.num_tasks(), 0);
+        assert_eq!(runner.num.get(), 6);
     }
 }

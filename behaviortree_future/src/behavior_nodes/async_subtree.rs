@@ -1,4 +1,4 @@
-use crate::{AsyncActionContext, BehaviorTreeReset};
+use crate::BehaviorTreeReset;
 
 pub struct AsyncSubtree<C> {
     child: Box<C>,
@@ -12,12 +12,12 @@ impl<C> AsyncSubtree<C> {
     }
 }
 
-impl<C, R> BehaviorTreeReset<R> for AsyncSubtree<C>
+impl<C> BehaviorTreeReset for AsyncSubtree<C>
 where
-    C: BehaviorTreeReset<R>,
+    C: BehaviorTreeReset,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        self.child.reset(ctx);
+    fn reset(&mut self) {
+        self.child.reset();
     }
 }
 

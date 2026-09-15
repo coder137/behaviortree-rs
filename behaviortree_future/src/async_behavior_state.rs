@@ -1,64 +1,70 @@
+use std::rc::Rc;
+
 use crate::{
-    AsyncActionContext, Behavior, BehaviorTreeAsyncAction, BehaviorTreeReset,
+    ActionToActionState, AsyncBehaviorActionState, Behavior, BehaviorTreeReset, Delta,
     behavior_nodes::{
         AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
     },
 };
 
 #[pin_project::pin_project(project = AsyncBehaviorStateProj)]
-pub enum AsyncBehaviorState<A, R> {
-    Action(#[pin] AsyncAction<A>),
-    Invert(#[pin] AsyncInvert<AsyncBehaviorState<A, R>>),
-    Sequence(#[pin] AsyncSequence<AsyncBehaviorState<A, R>, R>),
-    Select(#[pin] AsyncSelect<AsyncBehaviorState<A, R>, R>),
-    Loop(#[pin] AsyncLoop<AsyncBehaviorState<A, R>, R>),
-    Times(#[pin] AsyncTimes<AsyncBehaviorState<A, R>, R>),
-    Subtree(#[pin] AsyncSubtree<AsyncBehaviorState<A, R>>),
+pub enum AsyncBehaviorState<AS> {
+    Action(#[pin] AsyncAction<AS>),
+    Invert(#[pin] AsyncInvert<AsyncBehaviorState<AS>>),
+    Sequence(#[pin] AsyncSequence<AsyncBehaviorState<AS>>),
+    Select(#[pin] AsyncSelect<AsyncBehaviorState<AS>>),
+    Loop(#[pin] AsyncLoop<AsyncBehaviorState<AS>>),
+    Times(#[pin] AsyncTimes<AsyncBehaviorState<AS>>),
+    Subtree(#[pin] AsyncSubtree<AsyncBehaviorState<AS>>),
 }
 
-impl<A, R> AsyncBehaviorState<A, R> {
-    pub fn from_behavior(behavior: Behavior<A>, ctx: AsyncActionContext<R>) -> Self
+impl<AS> AsyncBehaviorState<AS> {
+    pub fn from_behavior<A, R>(behavior: Behavior<A>, delta: Rc<Delta>, runner: &mut R) -> Self
     where
-        A: BehaviorTreeAsyncAction<R>,
+        A: ActionToActionState<AS, R>,
+        AS: AsyncBehaviorActionState,
     {
         match behavior {
-            Behavior::Action(action) => Self::Action(AsyncAction::new(action, ctx)),
+            Behavior::Action(action) => {
+                let action_state = action.to_state(delta, runner);
+                Self::Action(AsyncAction::new(action_state))
+            }
             Behavior::Invert(behavior) => {
-                let child = Self::from_behavior(*behavior, ctx);
+                let child = Self::from_behavior(*behavior, delta, runner);
                 Self::Invert(AsyncInvert::new(child))
             }
             Behavior::Sequence(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, ctx))
+                    .map(|b| Self::from_behavior(b, delta.clone(), runner))
                     .collect::<Vec<_>>();
-                Self::Sequence(AsyncSequence::new(children, ctx))
+                Self::Sequence(AsyncSequence::new(children))
             }
             Behavior::Select(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, ctx))
+                    .map(|b| Self::from_behavior(b, delta.clone(), runner))
                     .collect::<Vec<_>>();
-                Self::Select(AsyncSelect::new(children, ctx))
+                Self::Select(AsyncSelect::new(children))
             }
             Behavior::Loop(behavior) => {
-                let child = Self::from_behavior(*behavior, ctx);
-                Self::Loop(AsyncLoop::new(child, ctx))
+                let child = Self::from_behavior(*behavior, delta, runner);
+                Self::Loop(AsyncLoop::new(child))
             }
             Behavior::Subtree(_name, behavior) => {
-                let child = Self::from_behavior(*behavior, ctx);
+                let child = Self::from_behavior(*behavior, delta, runner);
                 Self::Subtree(AsyncSubtree::new(child))
             }
         }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncBehaviorState<A, R>
+impl<AS> BehaviorTreeReset for AsyncBehaviorState<AS>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    AS: AsyncBehaviorActionState,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        let r: &mut dyn BehaviorTreeReset<R> = match self {
+    fn reset(&mut self) {
+        let r: &mut dyn BehaviorTreeReset = match self {
             AsyncBehaviorState::Action(a) => a,
             AsyncBehaviorState::Invert(a) => a,
             AsyncBehaviorState::Sequence(a) => a,
@@ -67,13 +73,13 @@ where
             AsyncBehaviorState::Times(a) => a,
             AsyncBehaviorState::Subtree(a) => a,
         };
-        r.reset(ctx);
+        r.reset();
     }
 }
 
-impl<A, R> std::future::Future for AsyncBehaviorState<A, R>
+impl<AS> std::future::Future for AsyncBehaviorState<AS>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    AS: AsyncBehaviorActionState,
 {
     type Output = bool;
     fn poll(
@@ -96,16 +102,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::test_nodes::{TestOperation, TestOperationRunner};
+    use crate::test_nodes::TestOperationState;
 
     use super::*;
 
     #[test]
     fn test_trait_assumptions() {
         // Trait: Unpin
-        static_assertions::assert_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Unpin);
+        static_assertions::assert_impl_all!(AsyncBehaviorState<TestOperationState>: Unpin);
 
         // Trait: !Send
-        static_assertions::assert_not_impl_all!(AsyncBehaviorState<TestOperation, TestOperationRunner>: Send);
+        static_assertions::assert_not_impl_all!(AsyncBehaviorState<TestOperationState>: Send);
     }
 }

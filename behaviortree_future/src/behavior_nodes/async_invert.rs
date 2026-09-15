@@ -1,4 +1,4 @@
-use crate::{AsyncActionContext, BehaviorTreeReset};
+use crate::BehaviorTreeReset;
 
 pub struct AsyncInvert<C> {
     child: Box<C>,
@@ -12,12 +12,12 @@ impl<C> AsyncInvert<C> {
     }
 }
 
-impl<C, R> BehaviorTreeReset<R> for AsyncInvert<C>
+impl<C> BehaviorTreeReset for AsyncInvert<C>
 where
-    C: BehaviorTreeReset<R>,
+    C: BehaviorTreeReset,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        self.child.reset(ctx);
+    fn reset(&mut self) {
+        self.child.reset();
     }
 }
 
@@ -38,10 +38,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::*;
 
     use crate::{
-        AsyncActionContextOwned,
+        ActionToActionState, Behavior, Delta,
         async_behavior_state::AsyncBehaviorState,
         behavior_nodes::{AsyncAction, AsyncTimes},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
@@ -51,14 +53,13 @@ mod tests {
     fn test_invert_success_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_invert_success_with_dhat_pre");
-            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
-            let action = AsyncInvert::new(action);
+            let behavior = Behavior::Invert(Behavior::Action(TestOperation::Yield(true)).into());
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
             action
         };
 
@@ -82,14 +83,13 @@ mod tests {
     fn test_invert_failure_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_invert_failure_with_dhat_pre");
-            let action = AsyncAction::new(TestOperation::Yield(false), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
-            let action = AsyncInvert::new(action);
+            let behavior = Behavior::Invert(Behavior::Action(TestOperation::Yield(false)).into());
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
             action
         };
 
@@ -113,19 +113,21 @@ mod tests {
     fn test_invert_reset_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_invert_reset_with_dhat_pre");
             // action
-            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
+            let action = TestOperation::Yield(true);
+            let action = action.to_state(delta, &mut runner);
+            let action = AsyncAction::new(action);
             let action = AsyncBehaviorState::Action(action);
             // invert
             let action = AsyncInvert::new(action.into());
             let action = AsyncBehaviorState::Invert(action);
             // times
-            let action = AsyncTimes::new(action, 2, ctx.create_ctx());
+            let action = AsyncTimes::new(action, 2);
             action
         };
 

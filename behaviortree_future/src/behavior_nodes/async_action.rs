@@ -1,8 +1,6 @@
 use reusable_box_future::ReusableLocalBoxFuture;
 
-use crate::{
-    AsyncActionContext, BehaviorTreeAsyncAction, BehaviorTreeAsyncHandler, BehaviorTreeReset,
-};
+use crate::{AsyncBehaviorActionState, BehaviorTreeAsyncHandler, BehaviorTreeReset};
 
 struct CreateReusableLocalBoxFutureHandler;
 impl BehaviorTreeAsyncHandler<'static> for CreateReusableLocalBoxFutureHandler {
@@ -21,35 +19,38 @@ impl<'a> BehaviorTreeAsyncHandler<'static> for UpdateReusableLocalBoxFutureHandl
 }
 
 #[pin_project::pin_project]
-pub struct AsyncAction<A> {
-    action: A,
+pub struct AsyncAction<AS> {
+    action_state: AS,
     // state
     #[pin]
     future: reusable_box_future::ReusableLocalBoxFuture<bool>,
 }
 
-impl<A> AsyncAction<A> {
-    pub fn new<R>(action: A, ctx: AsyncActionContext<R>) -> Self
+impl<AS> AsyncAction<AS> {
+    pub fn new(action_state: AS) -> Self
     where
-        A: BehaviorTreeAsyncAction<R>,
+        AS: AsyncBehaviorActionState,
     {
-        let future = action.make_future(ctx, CreateReusableLocalBoxFutureHandler);
-        Self { action, future }
+        let future = action_state.make_future(CreateReusableLocalBoxFutureHandler);
+        Self {
+            action_state,
+            future,
+        }
     }
 }
 
-impl<A, R> BehaviorTreeReset<R> for AsyncAction<A>
+impl<AS> BehaviorTreeReset for AsyncAction<AS>
 where
-    A: BehaviorTreeAsyncAction<R>,
+    AS: AsyncBehaviorActionState,
 {
-    fn reset(&mut self, ctx: AsyncActionContext<R>) {
-        self.action.reset(ctx);
-        self.action
-            .make_future(ctx, UpdateReusableLocalBoxFutureHandler(&mut self.future));
+    fn reset(&mut self) {
+        self.action_state.reset();
+        self.action_state
+            .make_future(UpdateReusableLocalBoxFutureHandler(&mut self.future));
     }
 }
 
-impl<A> std::future::Future for AsyncAction<A> {
+impl<AS> std::future::Future for AsyncAction<AS> {
     type Output = bool;
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -62,10 +63,12 @@ impl<A> std::future::Future for AsyncAction<A> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::{
-        AsyncActionContextOwned,
+        Behavior, Delta,
         async_behavior_state::AsyncBehaviorState,
-        behavior_nodes::{AsyncAction, AsyncTimes},
+        behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -73,13 +76,13 @@ mod tests {
     fn test_action_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, 16.67);
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_with_dhat_pre");
-            let action = TestOperation::Yield(true);
-            let action = AsyncAction::new(action, ctx.create_ctx());
+            let behavior = Behavior::Action(TestOperation::Yield(true));
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
             action
         };
 
@@ -102,16 +105,15 @@ mod tests {
     #[test]
     fn test_action_reset_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
-        let delta = executor.delta().inner();
 
-        let runner = TestOperationRunner::default();
-        let ctx = AsyncActionContextOwned::new(runner, delta.get());
+        let mut runner = TestOperationRunner::default();
+        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_reset_with_dhat_pre");
-            let action = AsyncAction::new(TestOperation::Yield(true), ctx.create_ctx());
-            let action = AsyncBehaviorState::Action(action);
-            let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2, ctx.create_ctx()));
+            let behavior = Behavior::Action(TestOperation::Yield(true));
+            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2));
             action
         };
 
