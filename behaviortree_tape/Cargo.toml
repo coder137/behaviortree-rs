@@ -1,0 +1,17 @@
+[package]
+name = "behaviortree_tape"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+pin-project = "1.1"
+reusable-box-future = "0.2.0"
+
+petgraph = "0.8.3"
+
+[dev-dependencies]
+# Async
+ticked_async_executor = { version = "0.4" }
+tokio = { version = "1.52", features = ["full"] }
+tokio-util = { version = "0.7" }
