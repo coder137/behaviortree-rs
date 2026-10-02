@@ -24,13 +24,34 @@ where
     fn to_state(self, runner: &mut R) -> AS;
 }
 
-pub trait BehaviorObserver<AS> {
-    fn action_name(action_state: &AS) -> &'static str;
-
+pub trait BehaviorObserver {
     /// Ids are assigned from 0 -> capacity
     ///
     /// When init is called we have [0..=capacity] nodes have status: `None`
     fn init(&self, capacity: usize);
 
     fn update(&self, id: usize, status: Option<Status>);
+}
+
+pub(crate) trait BehaviorObserverBuilder<A> {
+    type Node;
+
+    fn action(action: &A, id: usize) -> Self::Node;
+    fn invert(id: usize, child: Self::Node) -> Self::Node;
+    fn sequence(id: usize, children: Vec<Self::Node>) -> Self::Node;
+    fn select(id: usize, children: Vec<Self::Node>) -> Self::Node;
+    fn r#loop(id: usize, child: Self::Node) -> Self::Node;
+    // fn subtree(name: Rc<String>, id: usize, child: Self::Node) -> Self::Node;
+}
+
+pub trait ActionName {
+    fn action_name(&self) -> &'static str;
+}
+
+impl BehaviorObserver for () {
+    #[inline(always)]
+    fn init(&self, _capacity: usize) {}
+
+    #[inline(always)]
+    fn update(&self, _id: usize, _status: Option<Status>) {}
 }

@@ -1,4 +1,7 @@
-use crate::{BehaviorActionState, BehaviorFutureHandler, IntoBehaviorActionState};
+use crate::{
+    ActionName, BehaviorActionState, BehaviorFutureHandler, BehaviorObserver,
+    IntoBehaviorActionState, Status,
+};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum TestOperation {
@@ -74,6 +77,25 @@ impl BehaviorActionState for TestOperationState {
     }
 
     fn reset(&self) {}
+}
+
+impl ActionName for TestOperation {
+    fn action_name(&self) -> &'static str {
+        match self {
+            TestOperation::Add(_, _, _, _) => "Add",
+            TestOperation::Yield(_) => "Yield",
+        }
+    }
+}
+
+pub struct TestOperationObserver {}
+
+impl BehaviorObserver for TestOperationObserver {
+    fn init(&self, _capacity: usize) {}
+
+    fn update(&self, id: usize, status: Option<Status>) {
+        println!("Update: {} {:?}", id, status);
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -1,6 +1,9 @@
 use std::{cell::Cell, rc::Rc};
 
-use crate::{Behavior, BehaviorActionState, IntoBehaviorActionState, Tape, TapeFuture};
+use crate::{
+    ActionName, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
+    IntoBehaviorActionState, Tape,
+};
 
 #[derive(Clone, Copy)]
 enum Control {
@@ -40,12 +43,12 @@ impl AsyncBehaviorTreeController {
     }
 }
 
-pub struct AsyncBehaviorTree<AS> {
-    future: TapeFuture<AS>,
+pub struct AsyncBehaviorTree<AS, O> {
+    future: Tape<AS, O>,
     control: Rc<Cell<Control>>,
 }
 
-impl<AS> AsyncBehaviorTree<AS> {
+impl<AS> AsyncBehaviorTree<AS, ()> {
     pub fn from_behavior<A, R>(
         behavior: Behavior<A>,
         runner: &mut R,
@@ -59,11 +62,34 @@ impl<AS> AsyncBehaviorTree<AS> {
             control: control.clone(),
         };
 
-        let future = TapeFuture::new(behavior, runner);
+        let future = Tape::new(behavior, runner);
         let bt = Self { future, control };
         (bt, controller)
     }
+}
 
+impl<AS, O> AsyncBehaviorTree<AS, Rc<O>> {
+    pub fn from_behavior_with_observer<A, R>(
+        behavior: Behavior<A>,
+        runner: &mut R,
+        observer: Rc<O>,
+    ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
+    where
+        A: IntoBehaviorActionState<AS, R> + ActionName,
+        AS: BehaviorActionState,
+    {
+        let control = Rc::new(Cell::new(Control::None));
+        let controller = AsyncBehaviorTreeController {
+            control: control.clone(),
+        };
+
+        let (future, observer_tree) = Tape::new_with_observer(behavior, runner, observer);
+        let bt = Self { future, control };
+        (bt, controller, observer_tree)
+    }
+}
+
+impl<AS, O> AsyncBehaviorTree<AS, O> {
     pub fn to_flat_graph(&self) -> String {
         let graph = self.future.to_flat_graph();
         let dot = petgraph::dot::Dot::with_config(&graph, &[]);
@@ -71,9 +97,10 @@ impl<AS> AsyncBehaviorTree<AS> {
     }
 }
 
-impl<AS> std::future::Future for AsyncBehaviorTree<AS>
+impl<AS, O> std::future::Future for AsyncBehaviorTree<AS, O>
 where
     AS: BehaviorActionState,
+    O: BehaviorObserver + Unpin,
 {
     type Output = Option<bool>;
     fn poll(

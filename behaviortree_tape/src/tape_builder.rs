@@ -1,4 +1,6 @@
-use crate::{AsyncAction, Behavior, BehaviorActionState, IntoBehaviorActionState, Tape};
+use crate::{
+    AsyncAction, Behavior, BehaviorActionState, BehaviorObserverBuilder, IntoBehaviorActionState,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockType {
@@ -26,7 +28,7 @@ pub enum BlockType {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Block {
     pub block_id: usize,
     pub block_type: BlockType,
@@ -47,13 +49,20 @@ impl<AS> TapeBuilder<AS> {
         }
     }
 
-    pub fn compile<A, R>(&mut self, behavior: Behavior<A>, runner: &mut R) -> (usize, usize)
+    pub(crate) fn compile<A, R, O: BehaviorObserverBuilder<A>>(
+        &mut self,
+        behavior: Behavior<A>,
+        runner: &mut R,
+    ) -> (usize, usize, O::Node)
     where
         A: IntoBehaviorActionState<AS, R>,
         AS: BehaviorActionState,
     {
         match behavior {
             Behavior::Action(action) => {
+                let block_id = self.reserve_block_id();
+                let observer_node = O::action(&action, block_id);
+
                 // ACTION
                 let action_state = action.to_state(runner);
                 let async_action = AsyncAction::new(action_state);
@@ -61,19 +70,19 @@ impl<AS> TapeBuilder<AS> {
                 self.action_sections.push(async_action);
 
                 // ACTION BLOCK
-                let block_id = self.reserve_block_id();
                 let action_block_idx = self.reserve_block(block_id);
                 self.block_sections[action_block_idx].block_type = BlockType::Action {
                     action_idx,
                     next: None,
                 };
-                (action_block_idx, action_block_idx)
+
+                (action_block_idx, action_block_idx, observer_node)
             }
             Behavior::Invert(behavior) => {
                 // CREATE
                 let block_id = self.reserve_block_id();
                 let invert_start_idx = self.reserve_block(block_id);
-                let (start, end) = self.compile(*behavior, runner);
+                let (start, end, child_observer_node) = self.compile::<A, R, O>(*behavior, runner);
                 let invert_end_idx = self.reserve_block(block_id);
 
                 // UPDATE
@@ -82,7 +91,9 @@ impl<AS> TapeBuilder<AS> {
                 self.update_end_block(end, (invert_end_idx, invert_end_idx));
                 self.block_sections[invert_end_idx].block_type =
                     BlockType::InvertEnd { next: None };
-                (invert_start_idx, invert_end_idx)
+
+                let observer_node = O::invert(block_id, child_observer_node);
+                (invert_start_idx, invert_end_idx, observer_node)
             }
             Behavior::Sequence(behaviors) => {
                 // CREATE
@@ -90,35 +101,37 @@ impl<AS> TapeBuilder<AS> {
                 let sequence_start_idx = self.reserve_block(block_id);
                 let child_idxs = behaviors
                     .into_iter()
-                    .map(|behavior| self.compile(behavior, runner))
+                    .map(|behavior| self.compile::<A, R, O>(behavior, runner))
                     .collect::<Vec<_>>();
                 let sequence_end_idx = self.reserve_block(block_id);
 
                 // UPDATE
-                let first_idx = 0;
-                let first = child_idxs[first_idx];
-                self.block_sections[sequence_start_idx].block_type =
-                    BlockType::SequenceStart { next: first.0 };
+                self.block_sections[sequence_start_idx].block_type = BlockType::SequenceStart {
+                    next: child_idxs[0].0,
+                };
 
                 for s in child_idxs.windows(2) {
-                    let current = s[0];
-                    let next = s[1];
-                    self.update_end_block(current.1, (next.0, sequence_end_idx));
+                    self.update_end_block(s[0].1, (s[1].0, sequence_end_idx));
                 }
 
                 let last_idx = child_idxs.len() - 1;
-                let last = child_idxs[last_idx];
-                self.update_end_block(last.1, (sequence_end_idx, sequence_end_idx));
+                self.update_end_block(child_idxs[last_idx].1, (sequence_end_idx, sequence_end_idx));
                 self.block_sections[sequence_end_idx].block_type =
                     BlockType::SequenceEnd { next: None };
-                (sequence_start_idx, sequence_end_idx)
+
+                let children_observer_nodes = child_idxs
+                    .into_iter()
+                    .map(|(_, _, child_observer_node)| child_observer_node)
+                    .collect::<Vec<_>>();
+                let observer_node = O::sequence(block_id, children_observer_nodes);
+                (sequence_start_idx, sequence_end_idx, observer_node)
             }
             Behavior::Select(behaviors) => todo!(),
             Behavior::Loop(behavior) => {
                 // CREATE
                 let block_id = self.reserve_block_id();
                 let loop_start_idx = self.reserve_block(block_id);
-                let (start, end) = self.compile(*behavior, runner);
+                let (start, end, child_observer_node) = self.compile::<A, R, O>(*behavior, runner);
                 let loop_end_idx = self.reserve_block(block_id);
 
                 // UPDATE
@@ -128,7 +141,9 @@ impl<AS> TapeBuilder<AS> {
                 self.block_sections[loop_end_idx].block_type = BlockType::LoopEnd {
                     next: loop_start_idx,
                 };
-                (loop_start_idx, loop_end_idx)
+
+                let observer_node = O::r#loop(block_id, child_observer_node);
+                (loop_start_idx, loop_end_idx, observer_node)
             }
             Behavior::Subtree(_, behavior) => todo!(),
         }

@@ -165,16 +165,7 @@ pub struct MyObserver {
     map: RefCell<HashMap<usize, Option<Status>>>,
 }
 
-impl BehaviorObserver<ActionState> for MyObserver {
-    fn action_name(action_state: &ActionState) -> &'static str {
-        match action_state {
-            ActionState::Add { .. } => "Add",
-            ActionState::Sub => "Sub",
-            ActionState::Mul => "Mul",
-            ActionState::Div => "Div",
-        }
-    }
-
+impl BehaviorObserver for MyObserver {
     fn init(&self, capacity: usize) {
         let mut m = self.map.borrow_mut();
         m.extend((0..capacity).into_iter().map(|i| (i, None)));

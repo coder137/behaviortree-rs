@@ -19,5 +19,11 @@ pub use tape::*;
 mod async_behavior_tree;
 pub use async_behavior_tree::*;
 
+mod observer_tree;
+pub use observer_tree::*;
+
+mod observer_builder;
+pub use observer_builder::*;
+
 #[cfg(test)]
 mod test_nodes;
