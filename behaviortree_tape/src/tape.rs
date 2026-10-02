@@ -16,6 +16,7 @@ pub struct Tape<AS, O> {
     pc: usize,
     action_started: bool,
     current_status: bool,
+    loop_end_yield: bool,
 }
 
 impl<AS> Tape<AS, ()> {
@@ -36,6 +37,7 @@ impl<AS> Tape<AS, ()> {
             pc: start,
             action_started: false,
             current_status: false,
+            loop_end_yield: true,
         }
     }
 }
@@ -65,6 +67,7 @@ where
             pc: start,
             action_started: false,
             current_status: false,
+            loop_end_yield: true,
         };
         (this, observer_tree)
     }
@@ -73,7 +76,9 @@ where
         self.reset_blocks_from(self.entry, self.exit);
         // Reset state
         self.pc = self.entry;
+        self.action_started = false;
         self.current_status = false;
+        self.loop_end_yield = true;
     }
 
     fn reset_blocks_from(&mut self, start: usize, end: usize) {
@@ -320,11 +325,18 @@ where
                     self.pc = next;
                 }
                 BlockType::LoopEnd { next } => {
-                    self.observer
-                        .update(block.block_id, Some(Status::from(self.current_status)));
-                    let current = self.pc;
-                    self.reset_blocks_from(next, current);
-                    self.pc = next;
+                    if self.loop_end_yield {
+                        self.loop_end_yield = false;
+                        cx.waker().wake_by_ref();
+                        break std::task::Poll::Pending;
+                    } else {
+                        self.loop_end_yield = true;
+                        self.observer
+                            .update(block.block_id, Some(Status::from(self.current_status)));
+                        let current = self.pc;
+                        self.reset_blocks_from(next, current);
+                        self.pc = next;
+                    }
                 }
             }
         }
