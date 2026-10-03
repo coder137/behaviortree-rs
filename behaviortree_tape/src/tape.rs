@@ -1,7 +1,7 @@
 use crate::{
     ActionName, AsyncAction, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
     BehaviorTreeReset, Block, BlockType, DefaultObserver, IntoBehaviorActionState, NoObserver,
-    Status, TapeBuilder,
+    RootBehavior, Status, TapeBuilder,
 };
 
 pub struct Tape<AS, O> {
@@ -20,14 +20,14 @@ pub struct Tape<AS, O> {
 }
 
 impl<AS> Tape<AS, ()> {
-    pub fn new<A, R>(behavior: Behavior<A>, runner: &mut R) -> Self
+    pub fn new<A, R>(root_behavior: RootBehavior<A>, runner: &mut R) -> Self
     where
         A: IntoBehaviorActionState<AS, R>,
         AS: BehaviorActionState,
     {
         let mut tape_builder = TapeBuilder::new();
         let (start, end, _observertree) =
-            tape_builder.compile::<A, R, NoObserver>(behavior, runner);
+            tape_builder.root_compile::<A, R, NoObserver>(root_behavior, runner);
         Self {
             entry: start,
             exit: end,
@@ -47,7 +47,7 @@ where
     AS: BehaviorActionState,
 {
     pub fn new_with_observer<A, R>(
-        behavior: Behavior<A>,
+        root_behavior: RootBehavior<A>,
         runner: &mut R,
         observer: O,
     ) -> (Self, BehaviorObserverTree)
@@ -57,7 +57,7 @@ where
     {
         let mut tape_builder = TapeBuilder::new();
         let (start, end, observer_tree) =
-            tape_builder.compile::<A, R, DefaultObserver>(behavior, runner);
+            tape_builder.root_compile::<A, R, DefaultObserver>(root_behavior, runner);
         let this = Self {
             entry: start,
             exit: end,
@@ -357,7 +357,7 @@ mod tests {
         let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
 
         let mut runner = TestOperationRunner::new(0);
-        let tape = Tape::<TestOperationState, ()>::new(behavior, &mut runner);
+        let tape = Tape::<TestOperationState, ()>::new(RootBehavior::Once(behavior), &mut runner);
 
         let graph = tape.to_flat_graph();
         let dot = petgraph::dot::Dot::with_config(&graph, &[]);
@@ -373,7 +373,7 @@ mod tests {
         let behavior = Behavior::Invert(behavior.into());
 
         let mut runner = TestOperationRunner::new(0);
-        let tape = Tape::<TestOperationState, ()>::new(behavior, &mut runner);
+        let tape = Tape::<TestOperationState, ()>::new(RootBehavior::Once(behavior), &mut runner);
 
         let graph = tape.to_flat_graph();
         let dot = petgraph::dot::Dot::with_config(&graph, &[]);
@@ -391,7 +391,7 @@ mod tests {
         // let behavior = Behavior::Invert(behavior.into());
 
         let mut runner = TestOperationRunner::new(0);
-        let tape = Tape::<TestOperationState, ()>::new(behavior, &mut runner);
+        let tape = Tape::<TestOperationState, ()>::new(RootBehavior::Once(behavior), &mut runner);
 
         let graph = tape.to_flat_graph();
         let dot = petgraph::dot::Dot::with_config(&graph, &[]);
@@ -409,14 +409,13 @@ mod tests {
             Behavior::Action(TestOperation::Add(5, 6, true, 1)),
         ]);
         let behavior = Behavior::Invert(behavior.into());
-        let behavior = Behavior::Loop(behavior.into());
 
         let mut runner = TestOperationRunner::new(0);
 
         let observer = TestOperationObserver {};
         let (tape, observer_tree) =
             Tape::<TestOperationState, TestOperationObserver>::new_with_observer(
-                behavior,
+                RootBehavior::Loop(behavior),
                 &mut runner,
                 observer,
             );

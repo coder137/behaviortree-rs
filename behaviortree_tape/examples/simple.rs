@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use behaviortree_tape::{
     AsyncBehaviorTree, Behavior, BehaviorActionState, BehaviorFutureHandler, BehaviorObserver,
-    IntoBehaviorActionState, Status,
+    IntoBehaviorActionState, RootBehavior, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -214,9 +214,8 @@ fn main() -> Result<(), ()> {
 
     let mut executor = TickedAsyncExecutor::default();
 
-    let behavior: Behavior<Action> = Behavior::Loop(behavior.into()).into();
-
-    let (bt, _bt_controller) = AsyncBehaviorTree::from_behavior(behavior.clone(), &mut runner);
+    let (bt, _bt_controller) =
+        AsyncBehaviorTree::from_behavior(RootBehavior::Loop(behavior.clone()), &mut runner);
 
     let flat_graph = bt.to_flat_graph();
     println!("{}", flat_graph);

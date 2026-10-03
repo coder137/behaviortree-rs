@@ -1,8 +1,8 @@
 use std::{cell::Cell, rc::Rc};
 
 use crate::{
-    ActionName, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
-    IntoBehaviorActionState, Tape,
+    ActionName, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
+    IntoBehaviorActionState, RootBehavior, Tape,
 };
 
 #[derive(Clone, Copy)]
@@ -44,13 +44,13 @@ impl AsyncBehaviorTreeController {
 }
 
 pub struct AsyncBehaviorTree<AS, O> {
-    future: Tape<AS, O>,
+    tape: Tape<AS, O>,
     control: Rc<Cell<Control>>,
 }
 
 impl<AS> AsyncBehaviorTree<AS, ()> {
     pub fn from_behavior<A, R>(
-        behavior: Behavior<A>,
+        root_behavior: RootBehavior<A>,
         runner: &mut R,
     ) -> (Self, AsyncBehaviorTreeController)
     where
@@ -62,15 +62,15 @@ impl<AS> AsyncBehaviorTree<AS, ()> {
             control: control.clone(),
         };
 
-        let future = Tape::new(behavior, runner);
-        let bt = Self { future, control };
+        let tape = Tape::new(root_behavior, runner);
+        let bt = Self { tape, control };
         (bt, controller)
     }
 }
 
 impl<AS, O> AsyncBehaviorTree<AS, Rc<O>> {
     pub fn from_behavior_with_observer<A, R>(
-        behavior: Behavior<A>,
+        root_behavior: RootBehavior<A>,
         runner: &mut R,
         observer: Rc<O>,
     ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
@@ -83,15 +83,15 @@ impl<AS, O> AsyncBehaviorTree<AS, Rc<O>> {
             control: control.clone(),
         };
 
-        let (future, observer_tree) = Tape::new_with_observer(behavior, runner, observer);
-        let bt = Self { future, control };
+        let (tape, observer_tree) = Tape::new_with_observer(root_behavior, runner, observer);
+        let bt = Self { tape, control };
         (bt, controller, observer_tree)
     }
 }
 
 impl<AS, O> AsyncBehaviorTree<AS, O> {
     pub fn to_flat_graph(&self) -> String {
-        let graph = self.future.to_flat_graph();
+        let graph = self.tape.to_flat_graph();
         let dot = petgraph::dot::Dot::with_config(&graph, &[]);
         format!("{}", dot)
     }
@@ -112,20 +112,23 @@ where
             Control::None => {}
             Control::Reset => {
                 bt.control.replace(Control::None);
-                bt.future.reset();
+                bt.tape.reset();
             }
             Control::Shutdown => {
                 return std::task::Poll::Ready(None);
             }
         }
-        let state = std::pin::Pin::new(&mut bt.future);
+        let state = std::pin::Pin::new(&mut bt.tape);
         state.poll(cx).map(Some)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::test_nodes::{TestOperation, TestOperationRunner};
+    use crate::{
+        Behavior,
+        test_nodes::{TestOperation, TestOperationRunner},
+    };
 
     use super::*;
 
@@ -138,8 +141,10 @@ mod tests {
         let bt = {
             // let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_pre");
             let behavior = TestOperation::Add(1, 2, true, 1);
-            let (bt, _bt_controller) =
-                AsyncBehaviorTree::from_behavior(Behavior::Action(behavior), &mut runner);
+            let (bt, _bt_controller) = AsyncBehaviorTree::from_behavior(
+                RootBehavior::Once(Behavior::Action(behavior)),
+                &mut runner,
+            );
             bt
         };
 

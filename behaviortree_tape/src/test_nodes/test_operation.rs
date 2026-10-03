@@ -17,7 +17,7 @@ pub enum TestOperationState {
 impl std::fmt::Debug for TestOperationState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Add(arg0, arg1, arg2, arg3, arg5) => f
+            Self::Add(arg0, arg1, arg2, arg3, _arg5) => f
                 .debug_tuple("Add")
                 .field(arg0)
                 .field(arg1)
