@@ -76,19 +76,7 @@ where
     where
         O: BehaviorObserver,
     {
-        self.reset_blocks_from(self.entry, self.exit);
-        // Reset state
-        self.pc = self.entry;
-        self.action_started = false;
-        self.current_status = true;
-        self.yield_once = true;
-    }
-
-    fn reset_blocks_from(&mut self, start: usize, end: usize)
-    where
-        O: BehaviorObserver,
-    {
-        let mut pc = start;
+        let mut pc = self.entry;
         loop {
             let block = &self.block_sections[pc];
             self.observer.update(block.block_id, None);
@@ -101,11 +89,16 @@ where
                 }
                 _ => {}
             }
-            if pc == end {
+            if pc == self.exit {
                 break;
             }
             pc = pc + 1;
         }
+        // Reset state
+        self.pc = self.entry;
+        self.action_started = false;
+        self.current_status = true;
+        self.yield_once = true;
     }
 }
 
