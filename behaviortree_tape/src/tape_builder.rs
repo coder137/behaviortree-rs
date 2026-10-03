@@ -27,11 +27,10 @@ pub enum BlockType {
     SelectEnd {
         next: Option<(usize, usize)>,
     },
-    // Part of root behavior
-    LoopStart {
+    Yield {
         next: usize,
     },
-    LoopEnd {
+    Reset {
         next: usize,
     },
 }
@@ -73,20 +72,17 @@ impl<AS> TapeBuilder<AS> {
             }
             RootBehavior::Loop(behavior) => {
                 let block_id = self.reserve_block_id();
-                let loop_start_idx = self.reserve_block(block_id);
                 let (start, end, child_observer_node) = self.compile::<A, R, O>(behavior, runner);
-                let loop_end_idx = self.reserve_block(block_id);
+                let yield_block_idx = self.reserve_block(block_id);
+                let reset_block_idx = self.reserve_block(block_id);
 
                 // UPDATE
-                self.block_sections[loop_start_idx].block_type =
-                    BlockType::LoopStart { next: start };
-                self.update_end_block(end, (loop_end_idx, loop_end_idx));
-                self.block_sections[loop_end_idx].block_type = BlockType::LoopEnd {
-                    next: loop_start_idx,
+                self.update_end_block(end, (yield_block_idx, yield_block_idx));
+                self.block_sections[yield_block_idx].block_type = BlockType::Yield {
+                    next: reset_block_idx,
                 };
-
-                let observer_node = O::r#loop(block_id, child_observer_node);
-                (loop_start_idx, loop_end_idx, observer_node)
+                self.block_sections[reset_block_idx].block_type = BlockType::Reset { next: start };
+                (start, reset_block_idx, child_observer_node)
             }
         }
     }
@@ -209,7 +205,7 @@ impl<AS> TapeBuilder<AS> {
                 let observer_node = O::select(block_id, child_observer_nodes);
                 (select_start_idx, select_end_idx, observer_node)
             }
-            Behavior::Subtree(_, behavior) => todo!(),
+            Behavior::Subtree(_, _behavior) => todo!(),
         }
     }
 

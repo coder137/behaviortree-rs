@@ -16,7 +16,7 @@ pub struct Tape<AS, O> {
     pc: usize,
     action_started: bool,
     current_status: bool,
-    loop_end_yield: bool,
+    yield_once: bool,
 }
 
 impl<AS> Tape<AS, ()> {
@@ -37,7 +37,7 @@ impl<AS> Tape<AS, ()> {
             pc: start,
             action_started: false,
             current_status: true,
-            loop_end_yield: true,
+            yield_once: true,
         }
     }
 }
@@ -67,25 +67,31 @@ where
             pc: start,
             action_started: false,
             current_status: true,
-            loop_end_yield: true,
+            yield_once: true,
         };
         (this, observer_tree)
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self)
+    where
+        O: BehaviorObserver,
+    {
         self.reset_blocks_from(self.entry, self.exit);
         // Reset state
         self.pc = self.entry;
         self.action_started = false;
         self.current_status = true;
-        self.loop_end_yield = true;
+        self.yield_once = true;
     }
 
-    fn reset_blocks_from(&mut self, start: usize, end: usize) {
+    fn reset_blocks_from(&mut self, start: usize, end: usize)
+    where
+        O: BehaviorObserver,
+    {
         let mut pc = start;
         loop {
             let block = &self.block_sections[pc];
-            // println!("PC: {} RESET: {:?}", pc, block);
+            self.observer.update(block.block_id, None);
             match block.block_type {
                 BlockType::Action {
                     action_idx,
@@ -112,41 +118,44 @@ impl<AS, O> Tape<AS, O> {
         let mut graph = petgraph::graph::DiGraph::<_, _>::new();
         for (index, block) in self.block_sections.iter().enumerate() {
             match block.block_type {
-                BlockType::Action { action_idx, next } => {
+                BlockType::Action {
+                    action_idx,
+                    next: _,
+                } => {
                     let action = &self.action_sections[action_idx];
                     let node_index = graph.add_node(action.debug());
                     nodes.insert(index, node_index);
                 }
-                BlockType::InvertStart { next } => {
+                BlockType::InvertStart { next: _ } => {
                     let node_index = graph.add_node("InvertStart".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::InvertEnd { next } => {
+                BlockType::InvertEnd { next: _ } => {
                     let node_index = graph.add_node("InvertEnd".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::SequenceStart { next } => {
+                BlockType::SequenceStart { next: _ } => {
                     let node_index = graph.add_node("SequenceStart".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::SequenceEnd { next } => {
+                BlockType::SequenceEnd { next: _ } => {
                     let node_index = graph.add_node("SequenceEnd".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::SelectStart { next } => {
+                BlockType::SelectStart { next: _ } => {
                     let node_index = graph.add_node("SelectStart".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::SelectEnd { next } => {
+                BlockType::SelectEnd { next: _ } => {
                     let node_index = graph.add_node("SelectEnd".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::LoopStart { next } => {
-                    let node_index = graph.add_node("LoopStart".to_string());
+                BlockType::Yield { next: _ } => {
+                    let node_index = graph.add_node("Yield".to_string());
                     nodes.insert(index, node_index);
                 }
-                BlockType::LoopEnd { next } => {
-                    let node_index = graph.add_node("LoopEnd".to_string());
+                BlockType::Reset { next: _ } => {
+                    let node_index = graph.add_node("Reset".to_string());
                     nodes.insert(index, node_index);
                 }
             }
@@ -154,7 +163,10 @@ impl<AS, O> Tape<AS, O> {
 
         for (index, block) in self.block_sections.iter().enumerate() {
             match block.block_type {
-                BlockType::Action { action_idx, next } => {
+                BlockType::Action {
+                    action_idx: _,
+                    next,
+                } => {
                     if let Some(next) = next {
                         let (on_success_index, on_failure_index) = next;
                         let this_node_index = nodes[&index];
@@ -244,12 +256,12 @@ impl<AS, O> Tape<AS, O> {
                         }
                     }
                 }
-                BlockType::LoopStart { next } => {
+                BlockType::Yield { next } => {
                     let this_node_index = nodes[&index];
                     let next_node_index = nodes[&next];
                     graph.add_edge(this_node_index, next_node_index, "");
                 }
-                BlockType::LoopEnd { next } => {
+                BlockType::Reset { next } => {
                     let this_node_index = nodes[&index];
                     let next_node_index = nodes[&next];
                     graph.add_edge(this_node_index, next_node_index, "");
@@ -375,23 +387,21 @@ where
                         }
                     }
                 }
-                BlockType::LoopStart { next } => {
-                    self.observer.update(block.block_id, Some(Status::Running));
-                    self.pc = next;
-                }
-                BlockType::LoopEnd { next } => {
-                    if self.loop_end_yield {
-                        self.loop_end_yield = false;
+                BlockType::Yield { next } => {
+                    println!("Yield");
+                    if self.yield_once {
+                        self.yield_once = false;
                         cx.waker().wake_by_ref();
                         break std::task::Poll::Pending;
                     } else {
-                        self.loop_end_yield = true;
-                        self.observer
-                            .update(block.block_id, Some(Status::from(self.current_status)));
-                        let current = self.pc;
-                        self.reset_blocks_from(next, current);
+                        self.yield_once = true;
                         self.pc = next;
                     }
+                }
+                BlockType::Reset { next } => {
+                    println!("Reset");
+                    self.reset();
+                    self.pc = next;
                 }
             }
         }
@@ -473,7 +483,7 @@ mod tests {
         let observer = TestOperationObserver {};
         let (tape, observer_tree) =
             Tape::<TestOperationState, TestOperationObserver>::new_with_observer(
-                RootBehavior::Once(behavior),
+                RootBehavior::Loop(behavior),
                 &mut runner,
                 observer,
             );
@@ -492,7 +502,7 @@ mod tests {
             })
             .detach();
 
-        for i in 0..10 {
+        for _i in 0..10 {
             // println!("BEFORE: {}", i);
             executor.tick(1.0, None);
             // println!("AFTER: {}", i);
