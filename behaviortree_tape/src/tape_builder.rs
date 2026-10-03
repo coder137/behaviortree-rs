@@ -135,31 +135,36 @@ impl<AS> TapeBuilder<AS> {
                 // CREATE
                 let block_id = self.reserve_block_id();
                 let sequence_start_idx = self.reserve_block(block_id);
-                let child_idxs = behaviors
+                let (child_idxs, child_observer_nodes): (Vec<_>, Vec<_>) = behaviors
                     .into_iter()
-                    .map(|behavior| self.compile::<A, R, O>(behavior, runner))
-                    .collect::<Vec<_>>();
+                    .map(|behavior| {
+                        //
+                        let (s, e, t) = self.compile::<A, R, O>(behavior, runner);
+                        ((s, e), t)
+                    })
+                    .unzip();
                 let sequence_end_idx = self.reserve_block(block_id);
 
                 // UPDATE
                 self.block_sections[sequence_start_idx].block_type = BlockType::SequenceStart {
-                    next: child_idxs[0].0,
+                    next: child_idxs.first().map_or(sequence_end_idx, |c| c.0),
                 };
 
-                for s in child_idxs.windows(2) {
-                    self.update_end_block(s[0].1, (s[1].0, sequence_end_idx));
+                let current_iter = child_idxs.iter().map(|c| c.1);
+                let next_iter = child_idxs
+                    .iter()
+                    .skip(1)
+                    .map(|c| c.0)
+                    .chain([sequence_end_idx]);
+
+                for (current, next) in current_iter.zip(next_iter) {
+                    self.update_end_block(current, (next, sequence_end_idx));
                 }
 
-                let last_idx = child_idxs.len() - 1;
-                self.update_end_block(child_idxs[last_idx].1, (sequence_end_idx, sequence_end_idx));
                 self.block_sections[sequence_end_idx].block_type =
                     BlockType::SequenceEnd { next: None };
 
-                let children_observer_nodes = child_idxs
-                    .into_iter()
-                    .map(|(_, _, child_observer_node)| child_observer_node)
-                    .collect::<Vec<_>>();
-                let observer_node = O::sequence(block_id, children_observer_nodes);
+                let observer_node = O::sequence(block_id, child_observer_nodes);
                 (sequence_start_idx, sequence_end_idx, observer_node)
             }
             Behavior::Select(behaviors) => todo!(),

@@ -1,5 +1,5 @@
 use crate::{
-    ActionName, AsyncAction, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
+    ActionName, AsyncAction, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
     BehaviorTreeReset, Block, BlockType, DefaultObserver, IntoBehaviorActionState, NoObserver,
     RootBehavior, Status, TapeBuilder,
 };
@@ -36,7 +36,7 @@ impl<AS> Tape<AS, ()> {
             observer: (),
             pc: start,
             action_started: false,
-            current_status: false,
+            current_status: true,
             loop_end_yield: true,
         }
     }
@@ -66,7 +66,7 @@ where
             observer,
             pc: start,
             action_started: false,
-            current_status: false,
+            current_status: true,
             loop_end_yield: true,
         };
         (this, observer_tree)
@@ -77,7 +77,7 @@ where
         // Reset state
         self.pc = self.entry;
         self.action_started = false;
-        self.current_status = false;
+        self.current_status = true;
         self.loop_end_yield = true;
     }
 
@@ -104,16 +104,17 @@ where
 }
 
 impl<AS, O> Tape<AS, O> {
-    pub fn to_flat_graph(&self) -> petgraph::graph::DiGraph<String, &str> {
+    pub fn to_flat_graph(&self) -> petgraph::graph::DiGraph<String, &str>
+    where
+        AS: std::fmt::Debug,
+    {
         let mut nodes = std::collections::HashMap::new();
         let mut graph = petgraph::graph::DiGraph::<_, _>::new();
         for (index, block) in self.block_sections.iter().enumerate() {
             match block.block_type {
                 BlockType::Action { action_idx, next } => {
                     let action = &self.action_sections[action_idx];
-                    // let name = action.name();
-                    let name = "Action";
-                    let node_index = graph.add_node(name.to_string());
+                    let node_index = graph.add_node(action.debug());
                     nodes.insert(index, node_index);
                 }
                 BlockType::InvertStart { next } => {
@@ -345,8 +346,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::test_nodes::{
-        TestOperation, TestOperationObserver, TestOperationRunner, TestOperationState,
+    use crate::{
+        Behavior,
+        test_nodes::{
+            TestOperation, TestOperationObserver, TestOperationRunner, TestOperationState,
+        },
     };
     use ticked_async_executor::TickedAsyncExecutor;
 
@@ -430,7 +434,7 @@ mod tests {
         executor
             .spawn_local((), async move {
                 let status = tape.await;
-                // println!("Status: {status}");
+                println!("Status: {status}");
             })
             .detach();
 

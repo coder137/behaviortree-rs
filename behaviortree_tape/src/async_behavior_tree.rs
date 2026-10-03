@@ -90,7 +90,10 @@ impl<AS, O> AsyncBehaviorTree<AS, Rc<O>> {
 }
 
 impl<AS, O> AsyncBehaviorTree<AS, O> {
-    pub fn to_flat_graph(&self) -> String {
+    pub fn to_flat_graph(&self) -> String
+    where
+        AS: std::fmt::Debug,
+    {
         let graph = self.tape.to_flat_graph();
         let dot = petgraph::dot::Dot::with_config(&graph, &[]);
         format!("{}", dot)

@@ -33,6 +33,27 @@ pub enum ActionState {
     Div,
 }
 
+impl std::fmt::Debug for ActionState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add {
+                i1,
+                i2,
+                o,
+                runner: _,
+            } => f
+                .debug_struct("Add")
+                .field("i1", i1)
+                .field("i2", i2)
+                .field("o", o)
+                .finish(),
+            Self::Sub => write!(f, "Sub"),
+            Self::Mul => write!(f, "Mul"),
+            Self::Div => write!(f, "Div"),
+        }
+    }
+}
+
 impl ActionState {
     pub async fn add(i1: usize, i2: usize, o: usize, runner: ActionRunner) -> bool {
         let sum = runner.memory.run(|s| {

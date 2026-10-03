@@ -50,14 +50,14 @@ where
     }
 }
 
-// impl<AS> AsyncAction<AS>
-// where
-//     AS: AsyncBehaviorActionStateName,
-// {
-//     pub fn name(&self) -> Cow<'static, str> {
-//         self.action_state.name()
-//     }
-// }
+impl<AS> AsyncAction<AS> {
+    pub fn debug(&self) -> String
+    where
+        AS: std::fmt::Debug,
+    {
+        format!("{:?}", self.action_state)
+    }
+}
 
 impl<AS> std::future::Future for AsyncAction<AS> {
     type Output = bool;
