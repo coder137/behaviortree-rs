@@ -21,6 +21,12 @@ pub enum BlockType {
     SequenceEnd {
         next: Option<(usize, usize)>,
     },
+    SelectStart {
+        next: usize,
+    },
+    SelectEnd {
+        next: Option<(usize, usize)>,
+    },
     // Part of root behavior
     LoopStart {
         next: usize,
@@ -167,7 +173,42 @@ impl<AS> TapeBuilder<AS> {
                 let observer_node = O::sequence(block_id, child_observer_nodes);
                 (sequence_start_idx, sequence_end_idx, observer_node)
             }
-            Behavior::Select(behaviors) => todo!(),
+            Behavior::Select(behaviors) => {
+                // CREATE
+                let block_id = self.reserve_block_id();
+                let select_start_idx = self.reserve_block(block_id);
+                let (child_idxs, child_observer_nodes): (Vec<_>, Vec<_>) = behaviors
+                    .into_iter()
+                    .map(|behavior| {
+                        //
+                        let (s, e, t) = self.compile::<A, R, O>(behavior, runner);
+                        ((s, e), t)
+                    })
+                    .unzip();
+                let select_end_idx = self.reserve_block(block_id);
+
+                // UPDATE
+                self.block_sections[select_start_idx].block_type = BlockType::SelectStart {
+                    next: child_idxs.first().map_or(select_end_idx, |c| c.0),
+                };
+
+                let current_iter = child_idxs.iter().map(|c| c.1);
+                let next_iter = child_idxs
+                    .iter()
+                    .skip(1)
+                    .map(|c| c.0)
+                    .chain([select_end_idx]);
+
+                for (current, next) in current_iter.zip(next_iter) {
+                    self.update_end_block(current, (select_end_idx, next));
+                }
+
+                self.block_sections[select_end_idx].block_type =
+                    BlockType::SelectEnd { next: None };
+
+                let observer_node = O::select(block_id, child_observer_nodes);
+                (select_start_idx, select_end_idx, observer_node)
+            }
             Behavior::Subtree(_, behavior) => todo!(),
         }
     }
@@ -203,6 +244,9 @@ impl<AS> TapeBuilder<AS> {
                 *next = Some(to);
             }
             BlockType::SequenceEnd { next } => {
+                *next = Some(to);
+            }
+            BlockType::SelectEnd { next } => {
                 *next = Some(to);
             }
             _ => unreachable!("Should be unreachable for block_type: {:?}", block_type),

@@ -133,6 +133,14 @@ impl<AS, O> Tape<AS, O> {
                     let node_index = graph.add_node("SequenceEnd".to_string());
                     nodes.insert(index, node_index);
                 }
+                BlockType::SelectStart { next } => {
+                    let node_index = graph.add_node("SelectStart".to_string());
+                    nodes.insert(index, node_index);
+                }
+                BlockType::SelectEnd { next } => {
+                    let node_index = graph.add_node("SelectEnd".to_string());
+                    nodes.insert(index, node_index);
+                }
                 BlockType::LoopStart { next } => {
                     let node_index = graph.add_node("LoopStart".to_string());
                     nodes.insert(index, node_index);
@@ -194,6 +202,30 @@ impl<AS, O> Tape<AS, O> {
                     graph.add_edge(this_node_index, next_node_index, "");
                 }
                 BlockType::SequenceEnd { next } => {
+                    //
+                    if let Some(next) = next {
+                        let (on_success_index, on_failure_index) = next;
+                        let this_node_index = nodes[&index];
+                        let on_success_node_index = nodes[&on_success_index];
+                        let on_failure_node_index = nodes[&on_failure_index];
+                        if on_success_index == on_failure_index {
+                            graph.add_edge(
+                                this_node_index,
+                                on_success_node_index,
+                                "success/failure",
+                            );
+                        } else {
+                            graph.add_edge(this_node_index, on_success_node_index, "success");
+                            graph.add_edge(this_node_index, on_failure_node_index, "failure");
+                        }
+                    }
+                }
+                BlockType::SelectStart { next } => {
+                    let this_node_index = nodes[&index];
+                    let next_node_index = nodes[&next];
+                    graph.add_edge(this_node_index, next_node_index, "");
+                }
+                BlockType::SelectEnd { next } => {
                     //
                     if let Some(next) = next {
                         let (on_success_index, on_failure_index) = next;
@@ -321,6 +353,28 @@ where
                         }
                     }
                 }
+                BlockType::SelectStart { next } => {
+                    self.observer.update(block.block_id, Some(Status::Running));
+                    self.pc = next;
+                }
+                BlockType::SelectEnd { next } => {
+                    //
+                    self.observer
+                        .update(block.block_id, Some(Status::from(self.current_status)));
+                    //
+                    match next {
+                        Some((on_success, on_failure)) => {
+                            if self.current_status {
+                                self.pc = on_success;
+                            } else {
+                                self.pc = on_failure;
+                            }
+                        }
+                        None => {
+                            break std::task::Poll::Ready(self.current_status);
+                        }
+                    }
+                }
                 BlockType::LoopStart { next } => {
                     self.observer.update(block.block_id, Some(Status::Running));
                     self.pc = next;
@@ -407,10 +461,10 @@ mod tests {
 
     #[test]
     fn test_invert_sequence() {
-        let behavior = Behavior::Sequence(vec![
-            Behavior::Action(TestOperation::Add(1, 2, true, 1)),
+        let behavior = Behavior::Select(vec![
+            Behavior::Action(TestOperation::Add(1, 2, false, 1)),
             Behavior::Action(TestOperation::Add(3, 4, false, 1)),
-            Behavior::Action(TestOperation::Add(5, 6, true, 1)),
+            Behavior::Action(TestOperation::Add(5, 6, false, 1)),
         ]);
         let behavior = Behavior::Invert(behavior.into());
 
@@ -419,7 +473,7 @@ mod tests {
         let observer = TestOperationObserver {};
         let (tape, observer_tree) =
             Tape::<TestOperationState, TestOperationObserver>::new_with_observer(
-                RootBehavior::Loop(behavior),
+                RootBehavior::Once(behavior),
                 &mut runner,
                 observer,
             );
