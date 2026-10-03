@@ -40,7 +40,6 @@ pub(crate) trait BehaviorObserverBuilder<A> {
     fn invert(id: usize, child: Self::Node) -> Self::Node;
     fn sequence(id: usize, children: Vec<Self::Node>) -> Self::Node;
     fn select(id: usize, children: Vec<Self::Node>) -> Self::Node;
-    fn r#loop(id: usize, child: Self::Node) -> Self::Node;
     // fn subtree(name: Rc<String>, id: usize, child: Self::Node) -> Self::Node;
 }
 
