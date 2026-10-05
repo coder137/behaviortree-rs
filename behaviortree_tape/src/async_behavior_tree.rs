@@ -68,11 +68,11 @@ impl<AS> AsyncBehaviorTree<AS, ()> {
     }
 }
 
-impl<AS, O> AsyncBehaviorTree<AS, Rc<O>> {
+impl<AS, O> AsyncBehaviorTree<AS, O> {
     pub fn from_behavior_with_observer<A, R>(
         root_behavior: RootBehavior<A>,
         runner: &mut R,
-        observer: Rc<O>,
+        observer: O,
     ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
     where
         A: IntoBehaviorActionState<AS, R> + ActionName,
@@ -87,9 +87,15 @@ impl<AS, O> AsyncBehaviorTree<AS, Rc<O>> {
         let bt = Self { tape, control };
         (bt, controller, observer_tree)
     }
-}
 
-impl<AS, O> AsyncBehaviorTree<AS, O> {
+    pub fn reset(&mut self)
+    where
+        AS: BehaviorActionState,
+        O: BehaviorObserver,
+    {
+        self.tape.reset();
+    }
+
     pub fn to_flat_graph(&self) -> String
     where
         AS: std::fmt::Debug,
