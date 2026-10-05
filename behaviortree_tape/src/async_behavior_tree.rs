@@ -77,6 +77,7 @@ impl<AS, O> AsyncBehaviorTree<AS, O> {
     where
         A: IntoBehaviorActionState<AS, R> + ActionName,
         AS: BehaviorActionState,
+        O: BehaviorObserver,
     {
         let control = Rc::new(Cell::new(Control::None));
         let controller = AsyncBehaviorTreeController {

@@ -6,9 +6,9 @@ use crate::{
 
 pub struct Tape<AS, O> {
     entry: usize,
-    exit: usize,
     block_sections: Vec<Block>,
     action_sections: Vec<AsyncAction<AS>>,
+    unique_blocks: usize,
 
     observer: O,
 
@@ -26,13 +26,13 @@ impl<AS> Tape<AS, ()> {
         AS: BehaviorActionState,
     {
         let mut tape_builder = TapeBuilder::new();
-        let (start, end, _observertree) =
+        let (start, _end, _observertree) =
             tape_builder.root_compile::<A, R, NoObserver>(root_behavior, runner);
         Self {
             entry: start,
-            exit: end,
             block_sections: tape_builder.block_sections,
             action_sections: tape_builder.action_sections,
+            unique_blocks: tape_builder.block_alloc_id,
             observer: (),
             pc: start,
             action_started: false,
@@ -54,15 +54,17 @@ where
     where
         A: IntoBehaviorActionState<AS, R> + ActionName,
         AS: BehaviorActionState,
+        O: BehaviorObserver,
     {
         let mut tape_builder = TapeBuilder::new();
-        let (start, end, observer_tree) =
+        let (start, _end, observer_tree) =
             tape_builder.root_compile::<A, R, DefaultObserver>(root_behavior, runner);
+        observer.init(tape_builder.block_alloc_id);
         let this = Self {
             entry: start,
-            exit: end,
             block_sections: tape_builder.block_sections,
             action_sections: tape_builder.action_sections,
+            unique_blocks: tape_builder.block_alloc_id,
             observer,
             pc: start,
             action_started: false,
@@ -76,24 +78,14 @@ where
     where
         O: BehaviorObserver,
     {
-        let mut pc = self.entry;
-        loop {
-            let block = &self.block_sections[pc];
-            self.observer.update(block.block_id, None);
-            match block.block_type {
-                BlockType::Action {
-                    action_idx,
-                    next: _,
-                } => {
-                    self.action_sections[action_idx].reset();
-                }
-                _ => {}
-            }
-            if pc == self.exit {
-                break;
-            }
-            pc = pc + 1;
+        for block_id in 0..self.unique_blocks {
+            println!("RESET: {block_id}");
+            self.observer.update(block_id, None);
         }
+        for action in self.action_sections.iter_mut() {
+            action.reset();
+        }
+
         // Reset state
         self.pc = self.entry;
         self.action_started = false;
