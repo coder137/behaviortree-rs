@@ -79,7 +79,6 @@ where
         O: BehaviorObserver,
     {
         for block_id in 0..self.unique_blocks {
-            println!("RESET: {block_id}");
             self.observer.update(block_id, None);
         }
         for action in self.action_sections.iter_mut() {
@@ -271,7 +270,6 @@ where
     ) -> std::task::Poll<Self::Output> {
         loop {
             let block = self.block_sections[self.pc];
-            // println!("PC: {} RUN: {:?}", self.pc, block);
             match block.block_type {
                 BlockType::Action { action_idx, next } => {
                     if !self.action_started {
@@ -373,7 +371,6 @@ where
                     }
                 }
                 BlockType::Yield { next } => {
-                    println!("Yield");
                     if self.yield_once {
                         self.yield_once = false;
                         cx.waker().wake_by_ref();
@@ -384,7 +381,6 @@ where
                     }
                 }
                 BlockType::Reset { next } => {
-                    println!("Reset");
                     self.reset();
                     self.pc = next;
                 }
