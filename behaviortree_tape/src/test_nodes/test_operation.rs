@@ -91,7 +91,9 @@ impl ActionName for TestOperation {
 pub struct TestOperationObserver {}
 
 impl BehaviorObserver for TestOperationObserver {
-    fn init(&self, _capacity: usize) {}
+    fn init(&self, capacity: usize) {
+        println!("Init: {}", capacity);
+    }
 
     fn update(&self, id: usize, status: Option<Status>) {
         println!("Update: {} {:?}", id, status);

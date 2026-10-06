@@ -61,6 +61,8 @@ impl<AS> AsyncAction<AS> {
 
 impl<AS> std::future::Future for AsyncAction<AS> {
     type Output = bool;
+
+    #[inline(always)]
     fn poll(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,

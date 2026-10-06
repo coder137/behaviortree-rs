@@ -18,6 +18,9 @@ impl<A> BehaviorObserverBuilder<A> for NoObserver {
 
     #[inline(always)]
     fn select(_id: usize, _children: Vec<Self::Node>) -> Self::Node {}
+
+    #[inline(always)]
+    fn subtree(_name: std::rc::Rc<str>, _id: usize, _child: Self::Node) -> Self::Node {}
 }
 
 pub struct DefaultObserver;
@@ -43,5 +46,10 @@ impl<A: ActionName> BehaviorObserverBuilder<A> for DefaultObserver {
     #[inline(always)]
     fn select(id: usize, children: Vec<Self::Node>) -> Self::Node {
         BehaviorObserverTree::Select(id, children.into())
+    }
+
+    #[inline(always)]
+    fn subtree(name: std::rc::Rc<str>, id: usize, child: Self::Node) -> Self::Node {
+        BehaviorObserverTree::Subtree(name, id, child.into())
     }
 }

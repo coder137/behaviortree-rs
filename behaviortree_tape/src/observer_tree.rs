@@ -8,5 +8,5 @@ pub enum BehaviorObserverTree {
     Select(usize, Rc<[BehaviorObserverTree]>),
     Loop(usize, Rc<BehaviorObserverTree>),
     Times(usize, Rc<BehaviorObserverTree>),
-    Subtree(Rc<String>, usize, Rc<BehaviorObserverTree>),
+    Subtree(Rc<str>, usize, Rc<BehaviorObserverTree>),
 }

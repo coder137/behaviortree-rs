@@ -27,6 +27,13 @@ pub enum BlockType {
     SelectEnd {
         next: Option<(usize, usize)>,
     },
+    SubtreeStart {
+        next: usize,
+    },
+    SubtreeEnd {
+        next: Option<(usize, usize)>,
+    },
+    // TODO, can combine both of these into 1 block
     Yield {
         next: usize,
     },
@@ -205,7 +212,24 @@ impl<AS> TapeBuilder<AS> {
                 let observer_node = O::select(block_id, child_observer_nodes);
                 (select_start_idx, select_end_idx, observer_node)
             }
-            Behavior::Subtree(_, _behavior) => todo!(),
+            Behavior::Subtree(name, behavior) => {
+                // CREATE
+                let block_id = self.reserve_block_id();
+                let subtree_start_idx = self.reserve_block(block_id);
+                let (start, end, child_observer_node) = self.compile::<A, R, O>(*behavior, runner);
+                let subtree_end_idx = self.reserve_block(block_id);
+
+                // UPDATE
+                self.block_sections[subtree_start_idx].block_type =
+                    BlockType::SubtreeStart { next: start };
+                self.update_end_block(end, (subtree_end_idx, subtree_end_idx));
+                self.block_sections[subtree_end_idx].block_type =
+                    BlockType::SubtreeEnd { next: None };
+
+                let observer_node =
+                    O::subtree(std::rc::Rc::from(name), block_id, child_observer_node);
+                (subtree_start_idx, subtree_end_idx, observer_node)
+            }
         }
     }
 
@@ -243,6 +267,9 @@ impl<AS> TapeBuilder<AS> {
                 *next = Some(to);
             }
             BlockType::SelectEnd { next } => {
+                *next = Some(to);
+            }
+            BlockType::SubtreeEnd { next } => {
                 *next = Some(to);
             }
             _ => unreachable!("Should be unreachable for block_type: {:?}", block_type),

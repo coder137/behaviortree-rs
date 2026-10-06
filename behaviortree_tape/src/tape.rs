@@ -134,6 +134,14 @@ impl<AS, O> Tape<AS, O> {
                     let node_index = graph.add_node("SelectEnd".to_string());
                     nodes.insert(index, node_index);
                 }
+                BlockType::SubtreeStart { next: _ } => {
+                    let node_index = graph.add_node("SubtreeStart".to_string());
+                    nodes.insert(index, node_index);
+                }
+                BlockType::SubtreeEnd { next: _ } => {
+                    let node_index = graph.add_node("SubtreeEnd".to_string());
+                    nodes.insert(index, node_index);
+                }
                 BlockType::Yield { next: _ } => {
                     let node_index = graph.add_node("Yield".to_string());
                     nodes.insert(index, node_index);
@@ -222,6 +230,30 @@ impl<AS, O> Tape<AS, O> {
                     graph.add_edge(this_node_index, next_node_index, "");
                 }
                 BlockType::SelectEnd { next } => {
+                    //
+                    if let Some(next) = next {
+                        let (on_success_index, on_failure_index) = next;
+                        let this_node_index = nodes[&index];
+                        let on_success_node_index = nodes[&on_success_index];
+                        let on_failure_node_index = nodes[&on_failure_index];
+                        if on_success_index == on_failure_index {
+                            graph.add_edge(
+                                this_node_index,
+                                on_success_node_index,
+                                "success/failure",
+                            );
+                        } else {
+                            graph.add_edge(this_node_index, on_success_node_index, "success");
+                            graph.add_edge(this_node_index, on_failure_node_index, "failure");
+                        }
+                    }
+                }
+                BlockType::SubtreeStart { next } => {
+                    let this_node_index = nodes[&index];
+                    let next_node_index = nodes[&next];
+                    graph.add_edge(this_node_index, next_node_index, "");
+                }
+                BlockType::SubtreeEnd { next } => {
                     //
                     if let Some(next) = next {
                         let (on_success_index, on_failure_index) = next;
@@ -370,6 +402,30 @@ where
                         }
                     }
                 }
+                BlockType::SubtreeStart { next } => {
+                    //
+                    self.observer.update(block.block_id, Some(Status::Running));
+                    //
+                    self.pc = next;
+                }
+                BlockType::SubtreeEnd { next } => {
+                    //
+                    self.observer
+                        .update(block.block_id, Some(Status::from(self.current_status)));
+                    //
+                    match next {
+                        Some((on_success, on_failure)) => {
+                            if self.current_status {
+                                self.pc = on_success;
+                            } else {
+                                self.pc = on_failure;
+                            }
+                        }
+                        None => {
+                            break std::task::Poll::Ready(self.current_status);
+                        }
+                    }
+                }
                 BlockType::Yield { next } => {
                     if self.yield_once {
                         self.yield_once = false;
@@ -455,8 +511,9 @@ mod tests {
         let behavior = Behavior::Select(vec![
             Behavior::Action(TestOperation::Add(1, 2, false, 1)),
             Behavior::Action(TestOperation::Add(3, 4, false, 1)),
-            Behavior::Action(TestOperation::Add(5, 6, false, 1)),
+            Behavior::Action(TestOperation::Add(5, 6, true, 1)),
         ]);
+        let behavior = Behavior::Subtree("AddMany".into(), behavior.into());
         let behavior = Behavior::Invert(behavior.into());
 
         let mut runner = TestOperationRunner::new(0);
