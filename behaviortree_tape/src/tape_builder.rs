@@ -1,6 +1,6 @@
 use crate::{
-    AsyncAction, Behavior, BehaviorActionState, BehaviorObserverBuilder, IntoBehaviorActionState,
-    RootBehavior,
+    Behavior, BehaviorActionState, BehaviorObserverBuilder, IntoBehaviorActionState, RootBehavior,
+    async_action::AsyncAction,
 };
 
 #[derive(Debug, Clone, Copy)]

@@ -2,7 +2,7 @@ use std::{cell::Cell, rc::Rc};
 
 use crate::{
     ActionName, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
-    IntoBehaviorActionState, RootBehavior, Tape,
+    IntoBehaviorActionState, RootBehavior, tape::Tape,
 };
 
 #[derive(Clone, Copy)]
@@ -17,12 +17,14 @@ pub struct AsyncBehaviorTreeController {
     control: Rc<Cell<Control>>,
 }
 
-///
 /// State transitions
+///
 /// None -> Reset
+///
 /// None -> Shutdown
 ///
 /// Reset -> None
+///
 /// Reset -> Shutdown
 ///
 /// Shutdown -> Shutdown

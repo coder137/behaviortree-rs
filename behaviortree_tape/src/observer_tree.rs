@@ -6,7 +6,5 @@ pub enum BehaviorObserverTree {
     Invert(usize, Rc<BehaviorObserverTree>),
     Sequence(usize, Rc<[BehaviorObserverTree]>),
     Select(usize, Rc<[BehaviorObserverTree]>),
-    Loop(usize, Rc<BehaviorObserverTree>),
-    Times(usize, Rc<BehaviorObserverTree>),
     Subtree(Rc<str>, usize, Rc<BehaviorObserverTree>),
 }

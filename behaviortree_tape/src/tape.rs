@@ -1,7 +1,9 @@
 use crate::{
-    ActionName, AsyncAction, BehaviorActionState, BehaviorObserver, BehaviorObserverTree,
-    BehaviorTreeReset, Block, BlockType, DefaultObserver, IntoBehaviorActionState, NoObserver,
-    RootBehavior, Status, TapeBuilder,
+    ActionName, BehaviorActionState, BehaviorObserver, BehaviorObserverTree, BehaviorTreeReset,
+    IntoBehaviorActionState, RootBehavior, Status,
+    async_action::AsyncAction,
+    observer_builder::{DefaultObserver, NoObserver},
+    tape_builder::{Block, BlockType, TapeBuilder},
 };
 
 pub struct Tape<AS, O> {
