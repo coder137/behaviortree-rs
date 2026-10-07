@@ -1,24 +1,4 @@
-use std::{cell::Cell, rc::Rc};
-
 use crate::Status;
-
-pub struct Delta(Cell<f64>);
-
-impl Delta {
-    pub fn get(&self) -> f64 {
-        self.0.get()
-    }
-
-    pub(crate) fn update(&self, delta: f64) {
-        self.0.set(delta);
-    }
-}
-
-impl Default for Delta {
-    fn default() -> Self {
-        Self(Cell::new(0.0))
-    }
-}
 
 pub(crate) trait BehaviorTreeReset {
     fn reset(&mut self);
@@ -33,7 +13,7 @@ pub trait ActionToActionState<AS, R>
 where
     AS: AsyncBehaviorActionState,
 {
-    fn to_state(self, delta: Rc<Delta>, runner: &mut R) -> AS;
+    fn to_state(self, runner: &mut R) -> AS;
 }
 
 pub trait AsyncBehaviorActionState {

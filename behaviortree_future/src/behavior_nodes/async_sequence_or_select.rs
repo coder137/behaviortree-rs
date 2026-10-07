@@ -143,10 +143,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use crate::{
-        Behavior, Delta,
+        Behavior,
         async_behavior_state::AsyncBehaviorState,
         behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
@@ -159,12 +157,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_success_simple_with_dhat_pre");
             let behavior = Behavior::Sequence(vec![Behavior::Action(TestOperation::Yield(true))]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -193,7 +190,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_success_with_dhat_pre");
@@ -201,7 +197,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -226,7 +222,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_running_with_success_with_dhat_pre");
@@ -234,7 +229,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 1)),
                 Behavior::Action(TestOperation::Add(1, 2, true, 1)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -268,7 +263,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_failure_with_dhat_pre");
@@ -277,7 +271,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -302,7 +296,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_sequence_success_reset_with_dhat_pre");
@@ -312,7 +305,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
                 Behavior::Action(TestOperation::Yield(true)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             let action = AsyncTimes::new(action, 2);
             action
         };
@@ -362,12 +355,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_select_failure_simple_with_dhat_pre");
             let behavior = Behavior::Select(vec![Behavior::Action(TestOperation::Yield(false))]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -391,7 +383,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_select_failure_with_dhat_pre");
@@ -399,7 +390,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -421,7 +412,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_select_running_with_failure_with_dhat_pre");
@@ -429,7 +419,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 1)),
                 Behavior::Action(TestOperation::Add(1, 2, false, 1)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -459,7 +449,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_select_success_with_dhat_pre");
@@ -468,7 +457,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -493,7 +482,6 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_select_failure_reset_with_dhat_pre");
@@ -503,7 +491,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
                 Behavior::Action(TestOperation::Yield(false)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             let action = AsyncTimes::new(action, 2);
             action
         };

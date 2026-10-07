@@ -69,12 +69,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use ticked_async_executor::TickedAsyncExecutor;
 
     use crate::{
-        Behavior, Delta,
+        Behavior,
         async_behavior_state::AsyncBehaviorState,
         behavior_nodes::AsyncTimes,
         test_nodes::{TestOperation, TestOperationRunner},
@@ -83,10 +81,9 @@ mod tests {
     #[test]
     fn test_times_0() {
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
-        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
         let future = AsyncTimes::new(action, 0);
 
         let mut executor: TickedAsyncExecutor<fn(ticked_async_executor::TaskState)> =
@@ -106,10 +103,9 @@ mod tests {
     #[test]
     fn test_times_1() {
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
-        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
         let future = AsyncTimes::new(action, 1);
 
         let mut executor = TickedAsyncExecutor::default();
@@ -128,10 +124,9 @@ mod tests {
     #[test]
     fn test_times_2() {
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 0));
-        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
         let future = AsyncTimes::new(action, 2);
 
         let mut executor = TickedAsyncExecutor::default();
@@ -154,10 +149,9 @@ mod tests {
     #[test]
     fn test_times_reset() {
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 1));
-        let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+        let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
         let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 1));
 
         let future = AsyncBehaviorState::Times(AsyncTimes::new(action, 2));

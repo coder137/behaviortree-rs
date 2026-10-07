@@ -63,10 +63,8 @@ impl<AS> std::future::Future for AsyncAction<AS> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use crate::{
-        Behavior, Delta,
+        Behavior,
         async_behavior_state::AsyncBehaviorState,
         behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
@@ -77,12 +75,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_with_dhat_pre");
             let behavior = Behavior::Action(TestOperation::Yield(true));
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -107,12 +104,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_reset_with_dhat_pre");
             let behavior = Behavior::Action(TestOperation::Yield(true));
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2));
             action
         };

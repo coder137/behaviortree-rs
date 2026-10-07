@@ -53,12 +53,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use tokio_util::sync::CancellationToken;
 
     use crate::{
-        Behavior, BehaviorTreeReset, Delta,
+        Behavior, BehaviorTreeReset,
         async_behavior_state::AsyncBehaviorState,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -68,14 +66,13 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_async_loop_with_dhat_pre");
             Behavior::Action(TestOperation::Add(1, 2, true, 1));
             let behavior =
                 Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -113,14 +110,13 @@ mod tests {
         let reset = std::rc::Rc::new(std::cell::Cell::new(false));
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let mut action = {
             let _profiler = DhatTester::new("test_async_loop_reset_with_dhat_pre");
             Behavior::Action(TestOperation::Add(1, 2, true, 1));
             let behavior =
                 Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 

@@ -1,7 +1,5 @@
-use std::rc::Rc;
-
 use crate::{
-    ActionToActionState, AsyncBehaviorActionState, Behavior, BehaviorTreeReset, Delta,
+    ActionToActionState, AsyncBehaviorActionState, Behavior, BehaviorTreeReset,
     behavior_nodes::{
         AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
     },
@@ -19,40 +17,40 @@ pub enum AsyncBehaviorState<AS> {
 }
 
 impl<AS> AsyncBehaviorState<AS> {
-    pub fn from_behavior<A, R>(behavior: Behavior<A>, delta: Rc<Delta>, runner: &mut R) -> Self
+    pub fn from_behavior<A, R>(behavior: Behavior<A>, runner: &mut R) -> Self
     where
         A: ActionToActionState<AS, R>,
         AS: AsyncBehaviorActionState,
     {
         match behavior {
             Behavior::Action(action) => {
-                let action_state = action.to_state(delta, runner);
+                let action_state = action.to_state(runner);
                 Self::Action(AsyncAction::new(action_state))
             }
             Behavior::Invert(behavior) => {
-                let child = Self::from_behavior(*behavior, delta, runner);
+                let child = Self::from_behavior(*behavior, runner);
                 Self::Invert(AsyncInvert::new(child))
             }
             Behavior::Sequence(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, delta.clone(), runner))
+                    .map(|b| Self::from_behavior(b, runner))
                     .collect::<Vec<_>>();
                 Self::Sequence(AsyncSequence::new(children))
             }
             Behavior::Select(behaviors) => {
                 let children = behaviors
                     .into_iter()
-                    .map(|b| Self::from_behavior(b, delta.clone(), runner))
+                    .map(|b| Self::from_behavior(b, runner))
                     .collect::<Vec<_>>();
                 Self::Select(AsyncSelect::new(children))
             }
             Behavior::Loop(behavior) => {
-                let child = Self::from_behavior(*behavior, delta, runner);
+                let child = Self::from_behavior(*behavior, runner);
                 Self::Loop(AsyncLoop::new(child))
             }
             Behavior::Subtree(_name, behavior) => {
-                let child = Self::from_behavior(*behavior, delta, runner);
+                let child = Self::from_behavior(*behavior, runner);
                 Self::Subtree(AsyncSubtree::new(child))
             }
         }

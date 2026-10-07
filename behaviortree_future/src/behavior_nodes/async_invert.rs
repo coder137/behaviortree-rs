@@ -38,12 +38,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use super::*;
 
     use crate::{
-        ActionToActionState, Behavior, Delta,
+        ActionToActionState, Behavior,
         async_behavior_state::AsyncBehaviorState,
         behavior_nodes::{AsyncAction, AsyncTimes},
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
@@ -54,12 +52,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_invert_success_with_dhat_pre");
             let behavior = Behavior::Invert(Behavior::Action(TestOperation::Yield(true)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -84,12 +81,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_invert_failure_with_dhat_pre");
             let behavior = Behavior::Invert(Behavior::Action(TestOperation::Yield(false)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
             action
         };
 
@@ -114,13 +110,12 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_invert_reset_with_dhat_pre");
             // action
             let action = TestOperation::Yield(true);
-            let action = action.to_state(delta, &mut runner);
+            let action = action.to_state(&mut runner);
             let action = AsyncAction::new(action);
             let action = AsyncBehaviorState::Action(action);
             // invert

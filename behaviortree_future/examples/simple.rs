@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use behaviortree_future::{
     ActionToActionState, AsyncBehaviorActionState, AsyncBehaviorTree, Behavior,
-    BehaviorTreeAsyncHandler, BehaviorTreeObserver, Delta, Status,
+    BehaviorTreeAsyncHandler, BehaviorTreeObserver, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -54,7 +54,7 @@ impl ActionState {
 }
 
 impl ActionToActionState<ActionState, ActionRunner> for Action {
-    fn to_state(self, _delta: Rc<Delta>, runner: &mut ActionRunner) -> ActionState {
+    fn to_state(self, runner: &mut ActionRunner) -> ActionState {
         match self {
             Self::Add { i1, i2, o } => ActionState::Add {
                 i1,
@@ -214,19 +214,14 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut executor = TickedAsyncExecutor::default();
-    let delta = executor.delta().inner();
 
     let observer = Rc::new(MyObserver {
         map: RefCell::new(HashMap::default()),
     });
     let behavior: Behavior<Action> = Behavior::Loop(behavior.into()).into();
 
-    let (bt, _bt_controller, _bt_state_tree) = AsyncBehaviorTree::from_behavior_with_observer(
-        behavior.clone(),
-        &mut runner,
-        delta.into(),
-        observer,
-    );
+    let (bt, _bt_controller, _bt_state_tree) =
+        AsyncBehaviorTree::from_behavior_with_observer(behavior.clone(), &mut runner, observer);
     println!("Observer: {:#?}", _bt_state_tree);
 
     let cancel = CancellationToken::new();
