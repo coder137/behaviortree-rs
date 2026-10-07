@@ -49,3 +49,8 @@ jobs:
         working-directory: ${{github.workspace}}/behaviortree_future
         run: |
           cargo make ci
+      
+      - name: behaviortree_tape package
+        working-directory: ${{github.workspace}}/behaviortree_tape
+        run: |
+          cargo make ci
