@@ -38,12 +38,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     use crate::{
-        ActionToActionState, Behavior,
-        async_behavior_state::AsyncBehaviorState,
-        behavior_nodes::{AsyncAction, AsyncTimes},
+        Behavior,
+        async_behavior::AsyncBehavior,
+        behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -56,7 +55,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_invert_success_with_dhat_pre");
             let behavior = Behavior::Invert(Behavior::Action(TestOperation::Yield(true)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -85,7 +84,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_invert_failure_with_dhat_pre");
             let behavior = Behavior::Invert(Behavior::Action(TestOperation::Yield(false)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -113,15 +112,9 @@ mod tests {
 
         let action = {
             let _profiler = DhatTester::new("test_invert_reset_with_dhat_pre");
-            // action
-            let action = TestOperation::Yield(true);
-            let action = action.to_state(&mut runner);
-            let action = AsyncAction::new(action);
-            let action = AsyncBehaviorState::Action(action);
-            // invert
-            let action = AsyncInvert::new(action.into());
-            let action = AsyncBehaviorState::Invert(action);
-            // times
+            let behavior = Behavior::Action(TestOperation::Yield(true));
+            let behavior = Behavior::Invert(behavior.into());
+            let action = AsyncBehavior::new(behavior, &mut runner);
             let action = AsyncTimes::new(action, 2);
             action
         };

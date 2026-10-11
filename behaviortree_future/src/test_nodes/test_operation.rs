@@ -1,4 +1,4 @@
-use crate::{ActionToActionState, AsyncBehaviorActionState, BehaviorTreeAsyncHandler};
+use crate::{BehaviorActionState, BehaviorFutureHandler, IntoBehaviorActionState};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum TestOperation {
@@ -34,7 +34,7 @@ impl TestOperationState {
     }
 }
 
-impl ActionToActionState<TestOperationState, TestOperationRunner> for TestOperation {
+impl IntoBehaviorActionState<TestOperationState, TestOperationRunner> for TestOperation {
     fn to_state(self, runner: &mut TestOperationRunner) -> TestOperationState {
         match self {
             Self::Add(a, b, retval, times) => {
@@ -45,10 +45,10 @@ impl ActionToActionState<TestOperationState, TestOperationRunner> for TestOperat
     }
 }
 
-impl AsyncBehaviorActionState for TestOperationState {
+impl BehaviorActionState for TestOperationState {
     fn make_future<'a, H>(&self, handler: H) -> H::Output
     where
-        H: BehaviorTreeAsyncHandler<'a>,
+        H: BehaviorFutureHandler<'a>,
     {
         match self {
             Self::Add(a, b, retval, times, runner) => {
@@ -64,7 +64,6 @@ impl AsyncBehaviorActionState for TestOperationState {
 #[derive(Debug, Clone)]
 pub struct TestOperationRunner {
     pub num: std::rc::Rc<std::cell::Cell<u32>>,
-    pub delta: std::rc::Rc<std::cell::Cell<f64>>,
 }
 
 impl Default for TestOperationRunner {
@@ -77,7 +76,6 @@ impl TestOperationRunner {
     pub fn new(num: u32) -> Self {
         Self {
             num: std::rc::Rc::new(std::cell::Cell::new(num)),
-            delta: std::rc::Rc::new(std::cell::Cell::new(0.0)),
         }
     }
 

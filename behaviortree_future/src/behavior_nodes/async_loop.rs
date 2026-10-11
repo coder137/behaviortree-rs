@@ -57,7 +57,7 @@ mod tests {
 
     use crate::{
         Behavior, BehaviorTreeReset,
-        async_behavior_state::AsyncBehaviorState,
+        async_behavior::AsyncBehavior,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -72,7 +72,7 @@ mod tests {
             Behavior::Action(TestOperation::Add(1, 2, true, 1));
             let behavior =
                 Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -116,7 +116,7 @@ mod tests {
             Behavior::Action(TestOperation::Add(1, 2, true, 1));
             let behavior =
                 Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 

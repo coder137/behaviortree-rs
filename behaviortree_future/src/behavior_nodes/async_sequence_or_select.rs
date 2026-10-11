@@ -145,7 +145,7 @@ where
 mod tests {
     use crate::{
         Behavior,
-        async_behavior_state::AsyncBehaviorState,
+        async_behavior::AsyncBehavior,
         behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -161,7 +161,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_sequence_success_simple_with_dhat_pre");
             let behavior = Behavior::Sequence(vec![Behavior::Action(TestOperation::Yield(true))]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -197,7 +197,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -229,7 +229,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 1)),
                 Behavior::Action(TestOperation::Add(1, 2, true, 1)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -271,7 +271,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -305,7 +305,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
                 Behavior::Action(TestOperation::Yield(true)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             let action = AsyncTimes::new(action, 2);
             action
         };
@@ -359,7 +359,7 @@ mod tests {
         let action = {
             let _profiler = DhatTester::new("test_select_failure_simple_with_dhat_pre");
             let behavior = Behavior::Select(vec![Behavior::Action(TestOperation::Yield(false))]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -390,7 +390,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -419,7 +419,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 1)),
                 Behavior::Action(TestOperation::Add(1, 2, false, 1)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -457,7 +457,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, true, 0)),
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -491,7 +491,7 @@ mod tests {
                 Behavior::Action(TestOperation::Add(1, 2, false, 0)),
                 Behavior::Action(TestOperation::Yield(false)),
             ]);
-            let action = AsyncBehaviorState::from_behavior(behavior, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             let action = AsyncTimes::new(action, 2);
             action
         };

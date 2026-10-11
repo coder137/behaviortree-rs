@@ -1,15 +1,16 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use crate::ActionToActionState;
-use crate::AsyncBehaviorActionState;
-use crate::AsyncBehaviorStateTree;
+use crate::ActionName;
 use crate::Behavior;
-use crate::BehaviorTreeObserver;
+use crate::BehaviorActionState;
+use crate::BehaviorObserver;
+use crate::BehaviorObserverRunner;
+use crate::BehaviorObserverTree;
 use crate::BehaviorTreeReset;
-use crate::Status;
-use crate::async_behavior_state::AsyncBehaviorState;
-use crate::async_behavior_state_with_observer::AsyncBehaviorStateWithObserver;
+use crate::IntoBehaviorActionState;
+use crate::async_behavior::AsyncBehavior;
+use crate::observer_builder::AsyncBehaviorObserver;
 
 #[derive(Clone, Copy)]
 enum Control {
@@ -33,87 +34,9 @@ impl AsyncBehaviorTreeController {
     }
 }
 
-#[pin_project::pin_project(project = AsyncBehaviorTreeStateProj)]
-enum AsyncBehaviorTreeState<AS, O> {
-    Default(#[pin] AsyncBehaviorState<AS>),
-    Observer(#[pin] AsyncBehaviorStateWithObserver<AS, O>),
-}
-
-impl<AS, O> BehaviorTreeReset for AsyncBehaviorTreeState<AS, O>
-where
-    AS: AsyncBehaviorActionState,
-    O: BehaviorTreeObserver<AS>,
-{
-    fn reset(&mut self) {
-        let r: &mut dyn BehaviorTreeReset = match self {
-            AsyncBehaviorTreeState::Default(a) => a,
-            AsyncBehaviorTreeState::Observer(a) => a,
-        };
-        r.reset();
-    }
-}
-
-impl<AS, O> std::future::Future for AsyncBehaviorTreeState<AS, O>
-where
-    AS: AsyncBehaviorActionState,
-    O: BehaviorTreeObserver<AS>,
-{
-    type Output = bool;
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let this = self.project();
-        let future: std::pin::Pin<&mut dyn std::future::Future<Output = bool>> = match this {
-            AsyncBehaviorTreeStateProj::Default(a) => a,
-            AsyncBehaviorTreeStateProj::Observer(a) => a,
-        };
-        future.poll(cx)
-    }
-}
-
 pub struct AsyncBehaviorTree<AS, O> {
-    state: AsyncBehaviorTreeState<AS, O>,
-
-    // control
+    state: AsyncBehavior<AS, O>,
     control: Rc<Cell<Control>>,
-}
-
-impl<AS, O> AsyncBehaviorTree<AS, O> {
-    pub fn from_behavior_with_observer<A, R>(
-        behavior: Behavior<A>,
-        runner: &mut R,
-        observer: Rc<O>,
-    ) -> (Self, AsyncBehaviorTreeController, AsyncBehaviorStateTree)
-    where
-        A: ActionToActionState<AS, R>,
-        AS: AsyncBehaviorActionState,
-        O: BehaviorTreeObserver<AS>,
-    {
-        let mut id = 0;
-        let (state, state_tree) = AsyncBehaviorStateWithObserver::from_behavior(
-            behavior,
-            runner,
-            observer.clone(),
-            &mut id,
-        );
-        observer.init(id);
-        let control = Rc::new(Cell::new(Control::None));
-        let behaviortree = Self {
-            state: AsyncBehaviorTreeState::Observer(state),
-            control: control.clone(),
-        };
-        let behaviortree_controller = AsyncBehaviorTreeController { control };
-        (behaviortree, behaviortree_controller, state_tree)
-    }
-
-    pub fn reset(&mut self)
-    where
-        AS: AsyncBehaviorActionState,
-        O: BehaviorTreeObserver<AS>,
-    {
-        self.state.reset();
-    }
 }
 
 impl<AS> AsyncBehaviorTree<AS, ()> {
@@ -122,13 +45,13 @@ impl<AS> AsyncBehaviorTree<AS, ()> {
         runner: &mut R,
     ) -> (Self, AsyncBehaviorTreeController)
     where
-        A: ActionToActionState<AS, R>,
-        AS: AsyncBehaviorActionState,
+        A: IntoBehaviorActionState<AS, R>,
+        AS: BehaviorActionState,
     {
-        let state = AsyncBehaviorState::from_behavior(behavior, runner);
+        let state = AsyncBehavior::new(behavior, runner);
         let control = Rc::new(Cell::new(Control::None));
         let behaviortree = Self {
-            state: AsyncBehaviorTreeState::Default(state),
+            state,
             control: control.clone(),
         };
         let behaviortree_controller = AsyncBehaviorTreeController { control };
@@ -136,10 +59,34 @@ impl<AS> AsyncBehaviorTree<AS, ()> {
     }
 }
 
+impl<AS, O> AsyncBehaviorTree<AS, AsyncBehaviorObserver<O>>
+where
+    O: BehaviorObserver,
+{
+    pub fn from_behavior_with_observer<A, R>(
+        behavior: Behavior<A>,
+        runner: &mut R,
+        observer: O,
+    ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
+    where
+        A: IntoBehaviorActionState<AS, R> + ActionName,
+        AS: BehaviorActionState,
+    {
+        let (state, tree) = AsyncBehavior::new_with_observer(behavior, runner, observer);
+        let control = Rc::new(Cell::new(Control::None));
+        let behaviortree = Self {
+            state,
+            control: control.clone(),
+        };
+        let behaviortree_controller = AsyncBehaviorTreeController { control };
+        (behaviortree, behaviortree_controller, tree)
+    }
+}
+
 impl<AS, O> std::future::Future for AsyncBehaviorTree<AS, O>
 where
-    AS: AsyncBehaviorActionState,
-    O: BehaviorTreeObserver<AS>,
+    AS: BehaviorActionState,
+    O: BehaviorObserverRunner + Unpin,
 {
     type Output = Option<bool>;
     fn poll(
@@ -160,14 +107,6 @@ where
         let state = std::pin::Pin::new(&mut bt.state);
         state.poll(cx).map(Some)
     }
-}
-
-impl<AS> BehaviorTreeObserver<AS> for () {
-    fn action_name(_action: &AS) -> &'static str {
-        ""
-    }
-    fn init(&self, _capacity: usize) {}
-    fn update(&self, _id: usize, _status: Option<Status>) {}
 }
 
 #[cfg(test)]
@@ -207,7 +146,6 @@ mod tests {
 
         let mut runner = TestOperationRunner::default();
         let inner = runner.num.clone();
-        let inner_delta = runner.delta.clone();
 
         let action = {
             let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_pre");
@@ -230,32 +168,25 @@ mod tests {
             .detach();
 
         executor.tick(10.0, None);
-        assert_eq!(inner_delta.get(), 10.0);
 
         executor.tick(20.0, None);
         assert_eq!(inner.get(), 3);
-        assert_eq!(inner_delta.get(), 20.0);
 
         // Reset takes place
         executor.tick(30.0, None);
-        assert_eq!(inner_delta.get(), 30.0);
 
         executor.tick(40.0, None);
         assert_eq!(inner.get(), 6);
-        assert_eq!(inner_delta.get(), 40.0);
 
         //Reset takes place
         executor.tick(50.0, None);
-        assert_eq!(inner_delta.get(), 50.0);
 
         executor.tick(60.0, None);
         assert_eq!(inner.get(), 9);
-        assert_eq!(inner_delta.get(), 60.0);
 
         // shutdown gracefully
         cancel.cancel();
         executor.tick(70.0, None);
-        assert_eq!(inner_delta.get(), 70.0);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -265,7 +196,6 @@ mod tests {
 
         let mut runner = TestOperationRunner::default();
         let inner = runner.num.clone();
-        let inner_delta = runner.delta.clone();
 
         let (bt, bt_controller) = {
             let _profiler =
@@ -288,32 +218,25 @@ mod tests {
             .detach();
 
         executor.tick(10.0, None);
-        assert_eq!(inner_delta.get(), 10.0);
 
         executor.tick(20.0, None);
         assert_eq!(inner.get(), 3);
-        assert_eq!(inner_delta.get(), 20.0);
 
         // Reset takes place
         executor.tick(30.0, None);
-        assert_eq!(inner_delta.get(), 30.0);
 
         executor.tick(40.0, None);
         assert_eq!(inner.get(), 6);
-        assert_eq!(inner_delta.get(), 40.0);
 
         //Reset takes place
         executor.tick(50.0, None);
-        assert_eq!(inner_delta.get(), 50.0);
 
         executor.tick(60.0, None);
         assert_eq!(inner.get(), 9);
-        assert_eq!(inner_delta.get(), 60.0);
 
         // shutdown gracefully
         bt_controller.shutdown();
         executor.tick(70.0, None);
-        assert_eq!(inner_delta.get(), 60.0);
         assert_eq!(executor.num_tasks(), 0);
     }
 
@@ -323,7 +246,6 @@ mod tests {
 
         let mut runner = TestOperationRunner::default();
         let inner = runner.num.clone();
-        let inner_delta = runner.delta.clone();
 
         let (bt, bt_controller) = {
             let _profiler =
@@ -345,23 +267,19 @@ mod tests {
             .detach();
 
         executor.tick(10.0, None);
-        assert_eq!(inner_delta.get(), 10.0);
 
         bt_controller.reset();
 
         executor.tick(20.0, None);
         assert_eq!(inner.get(), 0);
-        assert_eq!(inner_delta.get(), 20.0);
 
         bt_controller.reset();
 
         executor.tick(30.0, None);
         assert_eq!(inner.get(), 0);
-        assert_eq!(inner_delta.get(), 30.0);
 
         executor.tick(40.0, None);
         assert_eq!(inner.get(), 3);
-        assert_eq!(inner_delta.get(), 40.0);
 
         assert_eq!(executor.num_tasks(), 0);
     }
