@@ -64,6 +64,13 @@ impl<O> DefaultObserver<O> {
             observer: Rc::new(observer),
         }
     }
+
+    pub fn transmit_init(&self)
+    where
+        O: BehaviorObserver,
+    {
+        self.observer.init(self.id);
+    }
 }
 
 impl<O: BehaviorObserver> BehaviorObserverRunner for AsyncBehaviorObserver<O> {

@@ -86,6 +86,7 @@ impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>> {
     {
         let mut default_observer_builder = DefaultObserver::new(observer);
         let (this, tree) = Self::from_behavior(behavior, runner, &mut default_observer_builder);
+        default_observer_builder.transmit_init();
         (this, tree)
     }
 }
