@@ -36,7 +36,7 @@ impl TestOperationState {
 
 impl IntoBehaviorActionState<TestOperationRunner> for TestOperation {
     type State = TestOperationState;
-    fn to_state(self, runner: &mut TestOperationRunner) -> TestOperationState {
+    fn to_state(self, runner: &mut TestOperationRunner) -> Self::State {
         match self {
             Self::Add(a, b, retval, times) => {
                 TestOperationState::Add(a, b, retval, times, runner.clone())
