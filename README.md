@@ -17,19 +17,26 @@ Different strategies for running behavior trees
     - Improvement over `behaviortree`: Wakes the parent only after action future wakes up
     - Improvement over `async_behaviortree`: Dynamic memory allocation during creation / reset via `reusable-box-future`, but not during runtime.
   - Flaws:
-    - Memory allocation is not contiguous (needs arena allocation)
-    - Needs Runner and Action (ex: `Behavior<Action>`) to be `Clone`
+    - Memory allocation is not contiguous
+    - Recursive implementation (can cause stack overflow for very deep trees)
+- `behaviortree_tape`
+  - Improvements:
+    - Improvement over `behaviortree_future`: Memory allocation is contiguous and traversal is linear (vector)
+  - Flaws:
+    - Redundant blocks for observer profiling causes performance impacts
+    - Proof of concept (use `behaviortree_future` for now)
 
 # Roadmap
 
-- [ ] Behavior Nodes
-  - [ ] Action
-  - [ ] Decorator
+- Behavior Nodes
+  - [x] Action
+  - Decorator
     - [x] Invert
     - [ ] ForceSuccess
     - [ ] ForceFailure
-  - [ ] Control
+  - Control
     - [x] Sequence
     - [x] Select
+    - [ ] Times
     - [ ] ReactiveSequence
     - [ ] ReactiveSelect

@@ -64,8 +64,9 @@ impl ActionState {
     }
 }
 
-impl IntoBehaviorActionState<ActionState, ActionRunner> for Action {
-    fn to_state(self, runner: &mut ActionRunner) -> ActionState {
+impl IntoBehaviorActionState<ActionRunner> for Action {
+    type State = ActionState;
+    fn to_state(self, runner: &mut ActionRunner) -> Self::State {
         match self {
             Self::Add { i1, i2, o } => ActionState::Add {
                 i1,

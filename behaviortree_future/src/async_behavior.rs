@@ -18,8 +18,8 @@ pub(crate) enum AsyncBehaviorState<AS, O> {
 
 impl<AS, O> std::future::Future for AsyncBehaviorState<AS, O>
 where
-    O: BehaviorObserverRunner + Unpin,
     AS: BehaviorActionState,
+    O: BehaviorObserverRunner + Unpin,
 {
     type Output = bool;
 
@@ -41,8 +41,8 @@ where
 
 impl<AS, O> BehaviorTreeReset for AsyncBehaviorState<AS, O>
 where
-    O: BehaviorObserverRunner + Unpin,
     AS: BehaviorActionState,
+    O: BehaviorObserverRunner + Unpin,
 {
     #[inline(always)]
     fn reset(&mut self) {
@@ -65,7 +65,7 @@ pub(crate) struct AsyncBehavior<AS, O> {
 impl<AS> AsyncBehavior<AS, ()> {
     pub fn new<A, R>(behavior: Behavior<A>, runner: &mut R) -> Self
     where
-        A: IntoBehaviorActionState<AS, R>,
+        A: IntoBehaviorActionState<R, State = AS>,
         AS: BehaviorActionState,
     {
         let (this, _tree) = Self::from_behavior(behavior, runner, &mut NoObserverBuilder);
@@ -80,7 +80,7 @@ impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>> {
         observer: O,
     ) -> (Self, BehaviorObserverTree)
     where
-        A: IntoBehaviorActionState<AS, R> + ActionName,
+        A: IntoBehaviorActionState<R, State = AS> + ActionName,
         AS: BehaviorActionState,
         O: BehaviorObserver,
     {
@@ -114,9 +114,9 @@ impl<AS, O> AsyncBehavior<AS, O> {
         observer_builder: &mut OB,
     ) -> (Self, OB::Tree)
     where
-        OB: BehaviorObserverBuilder<A, Observer = O>,
-        A: IntoBehaviorActionState<AS, R>,
+        A: IntoBehaviorActionState<R, State = AS>,
         AS: BehaviorActionState,
+        OB: BehaviorObserverBuilder<A, Observer = O>,
     {
         let this_id = observer_builder.new_id();
         let (state, tree) = match behavior {
@@ -133,10 +133,7 @@ impl<AS, O> AsyncBehavior<AS, O> {
                 (state, tree)
             }
             Behavior::Sequence(behaviors) => {
-                let (children, children_tree): (
-                    Vec<AsyncBehavior<AS, OB::Observer>>,
-                    Vec<OB::Tree>,
-                ) = behaviors
+                let (children, children_tree): (Vec<Self>, Vec<OB::Tree>) = behaviors
                     .into_iter()
                     .map(|b| Self::from_behavior(b, runner, observer_builder))
                     .unzip();
@@ -145,10 +142,7 @@ impl<AS, O> AsyncBehavior<AS, O> {
                 (state, tree)
             }
             Behavior::Select(behaviors) => {
-                let (children, children_tree): (
-                    Vec<AsyncBehavior<AS, OB::Observer>>,
-                    Vec<OB::Tree>,
-                ) = behaviors
+                let (children, children_tree): (Vec<Self>, Vec<OB::Tree>) = behaviors
                     .into_iter()
                     .map(|b| Self::from_behavior(b, runner, observer_builder))
                     .unzip();
@@ -171,8 +165,8 @@ impl<AS, O> AsyncBehavior<AS, O> {
 
 impl<AS, O> std::future::Future for AsyncBehavior<AS, O>
 where
-    O: BehaviorObserverRunner + Unpin,
     AS: BehaviorActionState,
+    O: BehaviorObserverRunner + Unpin,
 {
     type Output = bool;
     fn poll(
@@ -194,8 +188,8 @@ where
 
 impl<AS, O> BehaviorTreeReset for AsyncBehavior<AS, O>
 where
-    O: BehaviorObserverRunner + Unpin,
     AS: BehaviorActionState,
+    O: BehaviorObserverRunner + Unpin,
 {
     fn reset(&mut self) {
         self.state.reset();

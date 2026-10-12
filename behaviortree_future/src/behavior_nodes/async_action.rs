@@ -21,7 +21,6 @@ impl<'a> BehaviorFutureHandler<'static> for UpdateReusableLocalBoxFutureHandler<
 #[pin_project::pin_project]
 pub struct AsyncAction<AS> {
     action_state: AS,
-    // state
     #[pin]
     future: reusable_box_future::ReusableLocalBoxFuture<bool>,
 }
