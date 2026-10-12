@@ -16,9 +16,9 @@ impl BehaviorObserverRunner for () {
     fn reset(&mut self) {}
 }
 
-pub struct NoObserver;
+pub struct NoObserverBuilder;
 
-impl<A> BehaviorObserverBuilder<A> for NoObserver {
+impl<A> BehaviorObserverBuilder<A> for NoObserverBuilder {
     type Observer = ();
     type Tree = ();
 
@@ -52,12 +52,12 @@ pub struct AsyncBehaviorObserver<O> {
     started: bool,
 }
 
-pub(crate) struct DefaultObserver<O> {
+pub(crate) struct DefaultObserverBuilder<O> {
     id: usize,
     observer: Rc<O>,
 }
 
-impl<O> DefaultObserver<O> {
+impl<O> DefaultObserverBuilder<O> {
     pub fn new(observer: O) -> Self {
         Self {
             id: 0,
@@ -92,7 +92,7 @@ impl<O: BehaviorObserver> BehaviorObserverRunner for AsyncBehaviorObserver<O> {
     }
 }
 
-impl<A: ActionName, O: BehaviorObserver> BehaviorObserverBuilder<A> for DefaultObserver<O> {
+impl<A: ActionName, O: BehaviorObserver> BehaviorObserverBuilder<A> for DefaultObserverBuilder<O> {
     type Observer = AsyncBehaviorObserver<O>;
     type Tree = BehaviorObserverTree;
 

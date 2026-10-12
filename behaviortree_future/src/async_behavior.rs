@@ -4,7 +4,7 @@ use crate::{
     behavior_nodes::{
         AsyncAction, AsyncInvert, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
     },
-    observer_builder::{AsyncBehaviorObserver, DefaultObserver, NoObserver},
+    observer_builder::{AsyncBehaviorObserver, DefaultObserverBuilder, NoObserverBuilder},
 };
 
 pub(crate) enum AsyncBehaviorState<AS, O> {
@@ -68,7 +68,7 @@ impl<AS> AsyncBehavior<AS, ()> {
         A: IntoBehaviorActionState<AS, R>,
         AS: BehaviorActionState,
     {
-        let (this, _tree) = Self::from_behavior(behavior, runner, &mut NoObserver);
+        let (this, _tree) = Self::from_behavior(behavior, runner, &mut NoObserverBuilder);
         this
     }
 }
@@ -84,7 +84,7 @@ impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>> {
         AS: BehaviorActionState,
         O: BehaviorObserver,
     {
-        let mut default_observer_builder = DefaultObserver::new(observer);
+        let mut default_observer_builder = DefaultObserverBuilder::new(observer);
         let (this, tree) = Self::from_behavior(behavior, runner, &mut default_observer_builder);
         default_observer_builder.transmit_init();
         (this, tree)
