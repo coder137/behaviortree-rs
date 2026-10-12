@@ -13,11 +13,9 @@ pub trait BehaviorActionState {
     fn reset(&self);
 }
 
-pub trait IntoBehaviorActionState<AS, R>
-where
-    AS: BehaviorActionState,
-{
-    fn to_state(self, runner: &mut R) -> AS;
+pub trait IntoBehaviorActionState<R> {
+    type State: BehaviorActionState;
+    fn to_state(self, runner: &mut R) -> Self::State;
 }
 
 pub trait ActionName {

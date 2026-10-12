@@ -84,7 +84,7 @@ impl<AS> AsyncBehaviorTree<AS, ()> {
         runner: &mut R,
     ) -> (Self, AsyncBehaviorTreeController)
     where
-        A: IntoBehaviorActionState<AS, R>,
+        A: IntoBehaviorActionState<R, State = AS>,
         AS: BehaviorActionState,
     {
         let state = match root_behavior {
@@ -115,7 +115,7 @@ where
         observer: O,
     ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
     where
-        A: IntoBehaviorActionState<AS, R> + ActionName,
+        A: IntoBehaviorActionState<R, State = AS> + ActionName,
         AS: BehaviorActionState,
     {
         let (state, tree) = match root_behavior {
