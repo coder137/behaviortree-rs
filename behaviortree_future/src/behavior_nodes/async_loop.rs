@@ -1,14 +1,14 @@
 use crate::BehaviorTreeReset;
 
 pub struct AsyncLoop<C> {
-    child: Box<C>,
+    child: C,
     completed: bool,
 }
 
 impl<C> AsyncLoop<C> {
     pub fn new(child: C) -> Self {
         Self {
-            child: Box::new(child),
+            child,
             completed: false,
         }
     }
@@ -53,13 +53,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use tokio_util::sync::CancellationToken;
 
     use crate::{
-        Behavior, BehaviorTreeReset, Delta,
-        async_behavior_state::AsyncBehaviorState,
+        Behavior, BehaviorTreeReset,
+        async_behavior::AsyncBehavior,
+        behavior_nodes::AsyncLoop,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -68,14 +67,12 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_async_loop_with_dhat_pre");
-            Behavior::Action(TestOperation::Add(1, 2, true, 1));
-            let behavior =
-                Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 1));
+            let action = AsyncBehavior::new(behavior, &mut runner);
+            let action = AsyncLoop::new(action);
             action
         };
 
@@ -113,14 +110,12 @@ mod tests {
         let reset = std::rc::Rc::new(std::cell::Cell::new(false));
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let mut action = {
             let _profiler = DhatTester::new("test_async_loop_reset_with_dhat_pre");
-            Behavior::Action(TestOperation::Add(1, 2, true, 1));
-            let behavior =
-                Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 1));
+            let action = AsyncBehavior::new(behavior, &mut runner);
+            let action = AsyncLoop::new(action);
             action
         };
 

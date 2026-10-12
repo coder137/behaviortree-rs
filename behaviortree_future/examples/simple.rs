@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap};
 
 use behaviortree_future::{
-    ActionToActionState, AsyncBehaviorActionState, AsyncBehaviorTree, Behavior,
-    BehaviorTreeAsyncHandler, BehaviorTreeObserver, Delta, Status,
+    ActionName, AsyncBehaviorTree, Behavior, BehaviorActionState, BehaviorFutureHandler,
+    BehaviorObserver, IntoBehaviorActionState, RootBehavior, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -19,6 +19,17 @@ pub enum Action {
     Sub,
     Mul,
     Div,
+}
+
+impl ActionName for Action {
+    fn action_name(&self) -> &'static str {
+        match self {
+            Action::Add { .. } => "Add",
+            Action::Sub => "Sub",
+            Action::Mul => "Mul",
+            Action::Div => "Div",
+        }
+    }
 }
 
 pub enum ActionState {
@@ -53,8 +64,8 @@ impl ActionState {
     }
 }
 
-impl ActionToActionState<ActionState, ActionRunner> for Action {
-    fn to_state(self, _delta: Rc<Delta>, runner: &mut ActionRunner) -> ActionState {
+impl IntoBehaviorActionState<ActionState, ActionRunner> for Action {
+    fn to_state(self, runner: &mut ActionRunner) -> ActionState {
         match self {
             Self::Add { i1, i2, o } => ActionState::Add {
                 i1,
@@ -69,10 +80,10 @@ impl ActionToActionState<ActionState, ActionRunner> for Action {
     }
 }
 
-impl AsyncBehaviorActionState for ActionState {
+impl BehaviorActionState for ActionState {
     fn make_future<'a, H>(&self, handler: H) -> H::Output
     where
-        H: BehaviorTreeAsyncHandler<'a>,
+        H: BehaviorFutureHandler<'a>,
     {
         match self {
             Self::Add { i1, i2, o, runner } => {
@@ -157,16 +168,7 @@ pub struct MyObserver {
     map: RefCell<HashMap<usize, Option<Status>>>,
 }
 
-impl BehaviorTreeObserver<ActionState> for MyObserver {
-    fn action_name(action_state: &ActionState) -> &'static str {
-        match action_state {
-            ActionState::Add { .. } => "Add",
-            ActionState::Sub => "Sub",
-            ActionState::Mul => "Mul",
-            ActionState::Div => "Div",
-        }
-    }
-
+impl BehaviorObserver for MyObserver {
     fn init(&self, capacity: usize) {
         let mut m = self.map.borrow_mut();
         m.extend((0..capacity).into_iter().map(|i| (i, None)));
@@ -214,19 +216,14 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut executor = TickedAsyncExecutor::default();
-    let delta = executor.delta().inner();
 
-    let observer = Rc::new(MyObserver {
+    let observer = MyObserver {
         map: RefCell::new(HashMap::default()),
-    });
-    let behavior: Behavior<Action> = Behavior::Loop(behavior.into()).into();
+    };
+    let behavior = RootBehavior::Loop(behavior);
 
-    let (bt, _bt_controller, _bt_state_tree) = AsyncBehaviorTree::from_behavior_with_observer(
-        behavior.clone(),
-        &mut runner,
-        delta.into(),
-        observer,
-    );
+    let (bt, _bt_controller, _bt_state_tree) =
+        AsyncBehaviorTree::from_behavior_with_observer(behavior.clone(), &mut runner, observer);
     println!("Observer: {:#?}", _bt_state_tree);
 
     let cancel = CancellationToken::new();

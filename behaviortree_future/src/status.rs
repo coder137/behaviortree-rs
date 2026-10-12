@@ -4,3 +4,12 @@ pub enum Status {
     Failure,
     Running,
 }
+
+impl From<bool> for Status {
+    fn from(status: bool) -> Self {
+        match status {
+            true => Status::Success,
+            false => Status::Failure,
+        }
+    }
+}

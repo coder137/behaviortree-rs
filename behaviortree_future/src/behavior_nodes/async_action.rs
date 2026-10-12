@@ -1,9 +1,9 @@
 use reusable_box_future::ReusableLocalBoxFuture;
 
-use crate::{AsyncBehaviorActionState, BehaviorTreeAsyncHandler, BehaviorTreeReset};
+use crate::{BehaviorActionState, BehaviorFutureHandler, BehaviorTreeReset};
 
 struct CreateReusableLocalBoxFutureHandler;
-impl BehaviorTreeAsyncHandler<'static> for CreateReusableLocalBoxFutureHandler {
+impl BehaviorFutureHandler<'static> for CreateReusableLocalBoxFutureHandler {
     type Output = ReusableLocalBoxFuture<bool>;
     fn future(self, future: impl std::future::Future<Output = bool> + 'static) -> Self::Output {
         reusable_box_future::ReusableLocalBoxFuture::new(future)
@@ -11,7 +11,7 @@ impl BehaviorTreeAsyncHandler<'static> for CreateReusableLocalBoxFutureHandler {
 }
 
 struct UpdateReusableLocalBoxFutureHandler<'a>(&'a mut ReusableLocalBoxFuture<bool>);
-impl<'a> BehaviorTreeAsyncHandler<'static> for UpdateReusableLocalBoxFutureHandler<'a> {
+impl<'a> BehaviorFutureHandler<'static> for UpdateReusableLocalBoxFutureHandler<'a> {
     type Output = ();
     fn future(self, future: impl std::future::Future<Output = bool> + 'static) -> Self::Output {
         self.0.set(future);
@@ -29,7 +29,7 @@ pub struct AsyncAction<AS> {
 impl<AS> AsyncAction<AS> {
     pub fn new(action_state: AS) -> Self
     where
-        AS: AsyncBehaviorActionState,
+        AS: BehaviorActionState,
     {
         let future = action_state.make_future(CreateReusableLocalBoxFutureHandler);
         Self {
@@ -41,7 +41,7 @@ impl<AS> AsyncAction<AS> {
 
 impl<AS> BehaviorTreeReset for AsyncAction<AS>
 where
-    AS: AsyncBehaviorActionState,
+    AS: BehaviorActionState,
 {
     fn reset(&mut self) {
         self.action_state.reset();
@@ -63,11 +63,9 @@ impl<AS> std::future::Future for AsyncAction<AS> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use crate::{
-        Behavior, Delta,
-        async_behavior_state::AsyncBehaviorState,
+        Behavior,
+        async_behavior::{AsyncBehavior, AsyncBehaviorState},
         behavior_nodes::AsyncTimes,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
@@ -77,12 +75,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_with_dhat_pre");
             let behavior = Behavior::Action(TestOperation::Yield(true));
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             action
         };
 
@@ -107,12 +104,11 @@ mod tests {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 
         let mut runner = TestOperationRunner::default();
-        let delta = Rc::new(Delta::default());
 
         let action = {
             let _profiler = DhatTester::new("test_action_reset_with_dhat_pre");
             let behavior = Behavior::Action(TestOperation::Yield(true));
-            let action = AsyncBehaviorState::from_behavior(behavior, delta, &mut runner);
+            let action = AsyncBehavior::new(behavior, &mut runner);
             let action = AsyncBehaviorState::Times(AsyncTimes::new(action, 2));
             action
         };
