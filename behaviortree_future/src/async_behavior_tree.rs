@@ -2,14 +2,15 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use crate::ActionName;
-use crate::Behavior;
 use crate::BehaviorActionState;
 use crate::BehaviorObserver;
 use crate::BehaviorObserverRunner;
 use crate::BehaviorObserverTree;
 use crate::BehaviorTreeReset;
 use crate::IntoBehaviorActionState;
+use crate::RootBehavior;
 use crate::async_behavior::AsyncBehavior;
+use crate::behavior_nodes::AsyncLoop;
 use crate::observer_builder::AsyncBehaviorObserver;
 
 #[derive(Clone, Copy)]
@@ -34,21 +35,66 @@ impl AsyncBehaviorTreeController {
     }
 }
 
+enum RootAsyncBehavior<AS, O> {
+    Once(AsyncBehavior<AS, O>),
+    Loop(AsyncLoop<AsyncBehavior<AS, O>>),
+}
+
+impl<AS, O> std::future::Future for RootAsyncBehavior<AS, O>
+where
+    AS: BehaviorActionState,
+    O: BehaviorObserverRunner + Unpin,
+{
+    type Output = bool;
+
+    #[inline(always)]
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        match self.as_mut().get_mut() {
+            RootAsyncBehavior::Once(f) => std::pin::Pin::new(f).poll(cx),
+            RootAsyncBehavior::Loop(f) => std::pin::Pin::new(f).poll(cx),
+        }
+    }
+}
+
+impl<AS, O> BehaviorTreeReset for RootAsyncBehavior<AS, O>
+where
+    O: BehaviorObserverRunner + Unpin,
+    AS: BehaviorActionState,
+{
+    #[inline(always)]
+    fn reset(&mut self) {
+        match self {
+            RootAsyncBehavior::Once(r) => r.reset(),
+            RootAsyncBehavior::Loop(r) => r.reset(),
+        }
+    }
+}
+
 pub struct AsyncBehaviorTree<AS, O> {
-    state: AsyncBehavior<AS, O>,
+    state: RootAsyncBehavior<AS, O>,
     control: Rc<Cell<Control>>,
 }
 
 impl<AS> AsyncBehaviorTree<AS, ()> {
     pub fn from_behavior<A, R>(
-        behavior: Behavior<A>,
+        root_behavior: RootBehavior<A>,
         runner: &mut R,
     ) -> (Self, AsyncBehaviorTreeController)
     where
         A: IntoBehaviorActionState<AS, R>,
         AS: BehaviorActionState,
     {
-        let state = AsyncBehavior::new(behavior, runner);
+        let state = match root_behavior {
+            RootBehavior::Once(behavior) => {
+                RootAsyncBehavior::Once(AsyncBehavior::new(behavior, runner))
+            }
+            RootBehavior::Loop(behavior) => {
+                RootAsyncBehavior::Loop(AsyncLoop::new(AsyncBehavior::new(behavior, runner)))
+            }
+        };
         let control = Rc::new(Cell::new(Control::None));
         let behaviortree = Self {
             state,
@@ -64,7 +110,7 @@ where
     O: BehaviorObserver,
 {
     pub fn from_behavior_with_observer<A, R>(
-        behavior: Behavior<A>,
+        root_behavior: RootBehavior<A>,
         runner: &mut R,
         observer: O,
     ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
@@ -72,7 +118,16 @@ where
         A: IntoBehaviorActionState<AS, R> + ActionName,
         AS: BehaviorActionState,
     {
-        let (state, tree) = AsyncBehavior::new_with_observer(behavior, runner, observer);
+        let (state, tree) = match root_behavior {
+            RootBehavior::Once(behavior) => {
+                let (state, tree) = AsyncBehavior::new_with_observer(behavior, runner, observer);
+                (RootAsyncBehavior::Once(state), tree)
+            }
+            RootBehavior::Loop(behavior) => {
+                let (state, tree) = AsyncBehavior::new_with_observer(behavior, runner, observer);
+                (RootAsyncBehavior::Loop(AsyncLoop::new(state)), tree)
+            }
+        };
         let control = Rc::new(Cell::new(Control::None));
         let behaviortree = Self {
             state,
@@ -111,7 +166,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::test_nodes::{DhatTester, TestOperation, TestOperationRunner};
+    use crate::{
+        Behavior,
+        test_nodes::{DhatTester, TestOperation, TestOperationRunner},
+    };
 
     use super::*;
 
@@ -124,8 +182,10 @@ mod tests {
         let bt = {
             let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let (bt, _bt_controller) =
-                AsyncBehaviorTree::from_behavior(Behavior::Action(action), &mut runner);
+            let (bt, _bt_controller) = AsyncBehaviorTree::from_behavior(
+                RootBehavior::Once(Behavior::Action(action)),
+                &mut runner,
+            );
             bt
         };
 
@@ -151,7 +211,7 @@ mod tests {
             let _profiler = DhatTester::new("test_behaviortree_loop_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
             let (bt, _bt_controller) = AsyncBehaviorTree::from_behavior(
-                Behavior::Loop(Behavior::Action(action).into()),
+                RootBehavior::Loop(Behavior::Action(action).into()),
                 &mut runner,
             );
             bt
@@ -202,7 +262,7 @@ mod tests {
                 DhatTester::new("test_behaviortree_loop_with_early_shutdown_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
             let (bt, bt_controller) = AsyncBehaviorTree::from_behavior(
-                Behavior::Loop(Behavior::Action(action).into()),
+                RootBehavior::Loop(Behavior::Action(action).into()),
                 &mut runner,
             );
             (bt, bt_controller)
@@ -251,8 +311,10 @@ mod tests {
             let _profiler =
                 DhatTester::new("test_behaviortree_no_loop_with_early_reset_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
-            let (bt, bt_controller) =
-                AsyncBehaviorTree::from_behavior(Behavior::Action(action).into(), &mut runner);
+            let (bt, bt_controller) = AsyncBehaviorTree::from_behavior(
+                RootBehavior::Once(Behavior::Action(action)),
+                &mut runner,
+            );
             (bt, bt_controller)
         };
 

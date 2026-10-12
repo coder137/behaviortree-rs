@@ -22,13 +22,13 @@ impl<A> BehaviorObserverBuilder<A> for NoObserver {
     type Observer = ();
     type Tree = ();
 
+    #[inline(always)]
     fn new_id(&mut self) -> usize {
         0
     }
 
-    fn new_observer(&self, _id: usize) -> Self::Observer {
-        ()
-    }
+    #[inline(always)]
+    fn new_observer(&self, _id: usize) -> Self::Observer {}
 
     #[inline(always)]
     fn action(_action: &A, _id: usize) -> Self::Tree {}

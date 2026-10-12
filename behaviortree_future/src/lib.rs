@@ -1,6 +1,9 @@
 mod behavior;
 pub use behavior::*;
 
+mod root_behavior;
+pub use root_behavior::*;
+
 mod status;
 pub use status::*;
 

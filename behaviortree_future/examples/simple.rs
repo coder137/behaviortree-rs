@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use behaviortree_future::{
     ActionName, AsyncBehaviorTree, Behavior, BehaviorActionState, BehaviorFutureHandler,
-    BehaviorObserver, IntoBehaviorActionState, Status,
+    BehaviorObserver, IntoBehaviorActionState, RootBehavior, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -220,7 +220,7 @@ fn main() -> anyhow::Result<()> {
     let observer = MyObserver {
         map: RefCell::new(HashMap::default()),
     };
-    let behavior: Behavior<Action> = Behavior::Loop(behavior.into()).into();
+    let behavior = RootBehavior::Loop(behavior);
 
     let (bt, _bt_controller, _bt_state_tree) =
         AsyncBehaviorTree::from_behavior_with_observer(behavior.clone(), &mut runner, observer);

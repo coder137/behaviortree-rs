@@ -2,7 +2,7 @@ use crate::{
     ActionName, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverBuilder,
     BehaviorObserverRunner, BehaviorObserverTree, BehaviorTreeReset, IntoBehaviorActionState,
     behavior_nodes::{
-        AsyncAction, AsyncInvert, AsyncLoop, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
+        AsyncAction, AsyncInvert, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
     },
     observer_builder::{AsyncBehaviorObserver, DefaultObserver, NoObserver},
 };
@@ -12,7 +12,6 @@ pub(crate) enum AsyncBehaviorState<AS, O> {
     Invert(AsyncInvert<AsyncBehavior<AS, O>>),
     Sequence(AsyncSequence<AsyncBehavior<AS, O>>),
     Select(AsyncSelect<AsyncBehavior<AS, O>>),
-    Loop(AsyncLoop<AsyncBehavior<AS, O>>),
     Times(AsyncTimes<AsyncBehavior<AS, O>>),
     Subtree(AsyncSubtree<AsyncBehavior<AS, O>>),
 }
@@ -34,7 +33,6 @@ where
             AsyncBehaviorState::Invert(f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Sequence(f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Select(f) => std::pin::Pin::new(f).poll(cx),
-            AsyncBehaviorState::Loop(f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Times(f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Subtree(f) => std::pin::Pin::new(f).poll(cx),
         }
@@ -53,7 +51,6 @@ where
             AsyncBehaviorState::Invert(r) => r.reset(),
             AsyncBehaviorState::Sequence(r) => r.reset(),
             AsyncBehaviorState::Select(r) => r.reset(),
-            AsyncBehaviorState::Loop(r) => r.reset(),
             AsyncBehaviorState::Times(r) => r.reset(),
             AsyncBehaviorState::Subtree(r) => r.reset(),
         }
@@ -156,12 +153,6 @@ impl<AS, O> AsyncBehavior<AS, O> {
                     .unzip();
                 let tree = OB::select(this_id, children_tree);
                 let state = AsyncBehaviorState::Select(AsyncSelect::new(children));
-                (state, tree)
-            }
-            Behavior::Loop(behavior) => {
-                let (child, child_tree) = Self::from_behavior(*behavior, runner, observer_builder);
-                let state = AsyncBehaviorState::Loop(AsyncLoop::new(child));
-                let tree = OB::subtree("loop".into(), this_id, child_tree);
                 (state, tree)
             }
             Behavior::Subtree(name, behavior) => {

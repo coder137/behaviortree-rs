@@ -1,14 +1,14 @@
 use crate::BehaviorTreeReset;
 
 pub struct AsyncLoop<C> {
-    child: Box<C>,
+    child: C,
     completed: bool,
 }
 
 impl<C> AsyncLoop<C> {
     pub fn new(child: C) -> Self {
         Self {
-            child: Box::new(child),
+            child,
             completed: false,
         }
     }
@@ -58,6 +58,7 @@ mod tests {
     use crate::{
         Behavior, BehaviorTreeReset,
         async_behavior::AsyncBehavior,
+        behavior_nodes::AsyncLoop,
         test_nodes::{DhatTester, TestOperation, TestOperationRunner},
     };
 
@@ -69,10 +70,9 @@ mod tests {
 
         let action = {
             let _profiler = DhatTester::new("test_async_loop_with_dhat_pre");
-            Behavior::Action(TestOperation::Add(1, 2, true, 1));
-            let behavior =
-                Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
+            let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 1));
             let action = AsyncBehavior::new(behavior, &mut runner);
+            let action = AsyncLoop::new(action);
             action
         };
 
@@ -113,10 +113,9 @@ mod tests {
 
         let mut action = {
             let _profiler = DhatTester::new("test_async_loop_reset_with_dhat_pre");
-            Behavior::Action(TestOperation::Add(1, 2, true, 1));
-            let behavior =
-                Behavior::Loop(Behavior::Action(TestOperation::Add(1, 2, true, 1)).into());
+            let behavior = Behavior::Action(TestOperation::Add(1, 2, true, 1));
             let action = AsyncBehavior::new(behavior, &mut runner);
+            let action = AsyncLoop::new(action);
             action
         };
 
