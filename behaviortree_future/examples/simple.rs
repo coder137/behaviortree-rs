@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use behaviortree_future::{
-    ActionName, AsyncBehaviorTree, Behavior, BehaviorActionState, BehaviorFutureHandler,
-    BehaviorObserver, IntoBehaviorActionState, RootBehavior, Status,
+    ActionName, AsyncBehaviorTree, Behavior, BehaviorActionState, BehaviorObserver,
+    IntoBehaviorActionState, RootBehavior, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
 use tokio_util::sync::CancellationToken;
@@ -32,7 +32,24 @@ impl ActionName for Action {
     }
 }
 
-pub enum ActionState {
+impl IntoBehaviorActionState<ActionRunner> for Action {
+    type State = ActionLocalState;
+    fn to_state(self, runner: &mut ActionRunner) -> Self::State {
+        match self {
+            Self::Add { i1, i2, o } => ActionLocalState::Add {
+                i1,
+                i2,
+                o,
+                runner: runner.clone(),
+            },
+            Self::Sub => ActionLocalState::Sub,
+            Self::Mul => ActionLocalState::Mul,
+            Self::Div => ActionLocalState::Div,
+        }
+    }
+}
+
+pub enum ActionLocalState {
     Add {
         i1: usize,
         i2: usize,
@@ -44,7 +61,7 @@ pub enum ActionState {
     Div,
 }
 
-impl ActionState {
+impl ActionLocalState {
     pub async fn add(i1: usize, i2: usize, o: usize, runner: ActionRunner) -> bool {
         let sum = runner.memory.run(|s| {
             let a = s[i1];
@@ -54,7 +71,6 @@ impl ActionState {
 
         yield_now().await;
         yield_now().await;
-        // yield_now().await;
 
         runner.memory.run(|mut s| {
             println!("SUM: {sum}");
@@ -64,39 +80,28 @@ impl ActionState {
     }
 }
 
-impl IntoBehaviorActionState<ActionRunner> for Action {
-    type State = ActionState;
-    fn to_state(self, runner: &mut ActionRunner) -> Self::State {
-        match self {
-            Self::Add { i1, i2, o } => ActionState::Add {
-                i1,
-                i2,
-                o,
-                runner: runner.clone(),
-            },
-            Self::Sub => ActionState::Sub,
-            Self::Mul => ActionState::Mul,
-            Self::Div => ActionState::Div,
-        }
-    }
-}
+impl BehaviorActionState for ActionLocalState {
+    type F = reusable_box_future::ReusableLocalBoxFuture<bool>;
 
-impl BehaviorActionState for ActionState {
-    fn make_future<'a, H>(&self, handler: H) -> H::Output
-    where
-        H: BehaviorFutureHandler<'a>,
-    {
+    fn create_future(&self) -> Self::F {
         match self {
             Self::Add { i1, i2, o, runner } => {
-                handler.future(Self::add(*i1, *i2, *o, runner.clone()))
+                Self::F::new(Self::add(*i1, *i2, *o, runner.clone()))
             }
-            Self::Sub => handler.future(async move { true }),
-            Self::Mul => handler.future(async move { true }),
-            Self::Div => handler.future(async move { true }),
+            Self::Sub => Self::F::new(async move { true }),
+            Self::Mul => Self::F::new(async move { true }),
+            Self::Div => Self::F::new(async move { true }),
         }
     }
 
-    fn reset(&self) {}
+    fn reset_future(&self, future: &mut Self::F) {
+        match self {
+            Self::Add { i1, i2, o, runner } => future.set(Self::add(*i1, *i2, *o, runner.clone())),
+            Self::Sub => future.set(async move { true }),
+            Self::Mul => future.set(async move { true }),
+            Self::Div => future.set(async move { true }),
+        }
+    }
 }
 
 #[derive(Clone)]

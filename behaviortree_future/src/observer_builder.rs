@@ -52,6 +52,25 @@ pub struct AsyncBehaviorObserver<O> {
     started: bool,
 }
 
+impl<O: BehaviorObserver> BehaviorObserverRunner for AsyncBehaviorObserver<O> {
+    fn start(&mut self) {
+        if !self.started {
+            self.started = true;
+            self.observer.update(self.id, Some(Status::Running));
+        }
+    }
+
+    fn end(&mut self, status: bool) {
+        let status = Status::from(status);
+        self.observer.update(self.id, Some(status));
+    }
+
+    fn reset(&mut self) {
+        self.started = false;
+        self.observer.update(self.id, None);
+    }
+}
+
 pub(crate) struct DefaultObserverBuilder<O> {
     id: usize,
     observer: Rc<O>,
@@ -70,25 +89,6 @@ impl<O> DefaultObserverBuilder<O> {
         O: BehaviorObserver,
     {
         self.observer.init(self.id);
-    }
-}
-
-impl<O: BehaviorObserver> BehaviorObserverRunner for AsyncBehaviorObserver<O> {
-    fn start(&mut self) {
-        if !self.started {
-            self.started = true;
-            self.observer.update(self.id, Some(Status::Running));
-        }
-    }
-
-    fn end(&mut self, status: bool) {
-        let status = Status::from(status);
-        self.observer.update(self.id, Some(status));
-    }
-
-    fn reset(&mut self) {
-        self.started = false;
-        self.observer.update(self.id, None);
     }
 }
 

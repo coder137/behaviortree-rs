@@ -1,4 +1,4 @@
-use crate::{BehaviorActionState, BehaviorFutureHandler, IntoBehaviorActionState};
+use crate::{BehaviorActionState, IntoBehaviorActionState};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum TestOperation {
@@ -6,12 +6,12 @@ pub enum TestOperation {
     Yield(bool),
 }
 
-pub enum TestOperationState {
+pub enum TestOperationLocalState {
     Add(u32, u32, bool, u32, TestOperationRunner),
     Yield(bool),
 }
 
-impl TestOperationState {
+impl TestOperationLocalState {
     pub async fn this_add(
         a: u32,
         b: u32,
@@ -35,31 +35,37 @@ impl TestOperationState {
 }
 
 impl IntoBehaviorActionState<TestOperationRunner> for TestOperation {
-    type State = TestOperationState;
+    type State = TestOperationLocalState;
     fn to_state(self, runner: &mut TestOperationRunner) -> Self::State {
         match self {
             Self::Add(a, b, retval, times) => {
-                TestOperationState::Add(a, b, retval, times, runner.clone())
+                TestOperationLocalState::Add(a, b, retval, times, runner.clone())
             }
-            Self::Yield(retval) => TestOperationState::Yield(retval),
+            Self::Yield(retval) => TestOperationLocalState::Yield(retval),
         }
     }
 }
 
-impl BehaviorActionState for TestOperationState {
-    fn make_future<'a, H>(&self, handler: H) -> H::Output
-    where
-        H: BehaviorFutureHandler<'a>,
-    {
+impl BehaviorActionState for TestOperationLocalState {
+    type F = reusable_box_future::ReusableLocalBoxFuture<bool>;
+
+    fn create_future(&self) -> Self::F {
         match self {
-            Self::Add(a, b, retval, times, runner) => {
-                handler.future(Self::this_add(*a, *b, *retval, *times, runner.clone()))
+            TestOperationLocalState::Add(a, b, retval, times, runner) => {
+                Self::F::new(Self::this_add(*a, *b, *retval, *times, runner.clone()))
             }
-            Self::Yield(retval) => handler.future(Self::this_yield(*retval)),
+            TestOperationLocalState::Yield(retval) => Self::F::new(Self::this_yield(*retval)),
         }
     }
 
-    fn reset(&self) {}
+    fn reset_future(&self, future: &mut Self::F) {
+        match self {
+            TestOperationLocalState::Add(a, b, retval, times, runner) => {
+                future.set(Self::this_add(*a, *b, *retval, *times, runner.clone()))
+            }
+            TestOperationLocalState::Yield(retval) => future.set(Self::this_yield(*retval)),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

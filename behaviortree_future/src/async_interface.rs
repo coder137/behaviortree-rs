@@ -1,20 +1,14 @@
 use crate::Status;
 
-pub trait BehaviorFutureHandler<'a> {
-    type Output;
-    fn future(self, future: impl std::future::Future<Output = bool> + 'a) -> Self::Output;
-}
-
 pub trait BehaviorActionState {
-    fn make_future<'a, H>(&self, handler: H) -> H::Output
-    where
-        H: BehaviorFutureHandler<'a>;
+    type F: std::future::Future<Output = bool>;
 
-    fn reset(&self);
+    fn create_future(&self) -> Self::F;
+    fn reset_future(&self, future: &mut Self::F);
 }
 
 pub trait IntoBehaviorActionState<R> {
-    type State: BehaviorActionState;
+    type State;
     fn to_state(self, runner: &mut R) -> Self::State;
 }
 

@@ -35,14 +35,18 @@ impl AsyncBehaviorTreeController {
     }
 }
 
-enum RootAsyncBehavior<AS, O> {
+enum RootAsyncBehavior<AS, O>
+where
+    AS: BehaviorActionState,
+{
     Once(AsyncBehavior<AS, O>),
     Loop(AsyncLoop<AsyncBehavior<AS, O>>),
 }
 
 impl<AS, O> std::future::Future for RootAsyncBehavior<AS, O>
 where
-    AS: BehaviorActionState,
+    AS: BehaviorActionState + Unpin,
+    AS::F: Unpin,
     O: BehaviorObserverRunner + Unpin,
 {
     type Output = bool;
@@ -73,12 +77,18 @@ where
     }
 }
 
-pub struct AsyncBehaviorTree<AS, O> {
+pub struct AsyncBehaviorTree<AS, O>
+where
+    AS: BehaviorActionState,
+{
     state: RootAsyncBehavior<AS, O>,
     control: Rc<Cell<Control>>,
 }
 
-impl<AS> AsyncBehaviorTree<AS, ()> {
+impl<AS> AsyncBehaviorTree<AS, ()>
+where
+    AS: BehaviorActionState,
+{
     pub fn from_behavior<A, R>(
         root_behavior: RootBehavior<A>,
         runner: &mut R,
@@ -107,6 +117,7 @@ impl<AS> AsyncBehaviorTree<AS, ()> {
 
 impl<AS, O> AsyncBehaviorTree<AS, AsyncBehaviorObserver<O>>
 where
+    AS: BehaviorActionState,
     O: BehaviorObserver,
 {
     pub fn from_behavior_with_observer<A, R>(
@@ -140,7 +151,8 @@ where
 
 impl<AS, O> std::future::Future for AsyncBehaviorTree<AS, O>
 where
-    AS: BehaviorActionState,
+    AS: BehaviorActionState + Unpin,
+    AS::F: Unpin,
     O: BehaviorObserverRunner + Unpin,
 {
     type Output = Option<bool>;

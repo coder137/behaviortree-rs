@@ -1,14 +1,15 @@
 use crate::{
     ActionName, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverBuilder,
     BehaviorObserverRunner, BehaviorObserverTree, BehaviorTreeReset, IntoBehaviorActionState,
-    behavior_nodes::{
-        AsyncAction, AsyncInvert, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes,
-    },
+    behavior_nodes::{AsyncInvert, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes},
     observer_builder::{AsyncBehaviorObserver, DefaultObserverBuilder, NoObserverBuilder},
 };
 
-pub(crate) enum AsyncBehaviorState<AS, O> {
-    Action(AsyncAction<AS>),
+pub(crate) enum AsyncBehaviorState<AS, O>
+where
+    AS: BehaviorActionState,
+{
+    Action(AS, AS::F),
     Invert(AsyncInvert<AsyncBehavior<AS, O>>),
     Sequence(AsyncSequence<AsyncBehavior<AS, O>>),
     Select(AsyncSelect<AsyncBehavior<AS, O>>),
@@ -18,7 +19,8 @@ pub(crate) enum AsyncBehaviorState<AS, O> {
 
 impl<AS, O> std::future::Future for AsyncBehaviorState<AS, O>
 where
-    AS: BehaviorActionState,
+    AS: BehaviorActionState + Unpin,
+    AS::F: Unpin,
     O: BehaviorObserverRunner + Unpin,
 {
     type Output = bool;
@@ -29,7 +31,7 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         match self.as_mut().get_mut() {
-            AsyncBehaviorState::Action(f) => std::pin::Pin::new(f).poll(cx),
+            AsyncBehaviorState::Action(_state, f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Invert(f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Sequence(f) => std::pin::Pin::new(f).poll(cx),
             AsyncBehaviorState::Select(f) => std::pin::Pin::new(f).poll(cx),
@@ -47,7 +49,10 @@ where
     #[inline(always)]
     fn reset(&mut self) {
         match self {
-            AsyncBehaviorState::Action(r) => r.reset(),
+            AsyncBehaviorState::Action(state, f) => {
+                //
+                state.reset_future(f)
+            }
             AsyncBehaviorState::Invert(r) => r.reset(),
             AsyncBehaviorState::Sequence(r) => r.reset(),
             AsyncBehaviorState::Select(r) => r.reset(),
@@ -57,12 +62,18 @@ where
     }
 }
 
-pub(crate) struct AsyncBehavior<AS, O> {
+pub(crate) struct AsyncBehavior<AS, O>
+where
+    AS: BehaviorActionState,
+{
     pub state: AsyncBehaviorState<AS, O>,
     pub observer: O,
 }
 
-impl<AS> AsyncBehavior<AS, ()> {
+impl<AS> AsyncBehavior<AS, ()>
+where
+    AS: BehaviorActionState,
+{
     pub fn new<A, R>(behavior: Behavior<A>, runner: &mut R) -> Self
     where
         A: IntoBehaviorActionState<R, State = AS>,
@@ -73,7 +84,10 @@ impl<AS> AsyncBehavior<AS, ()> {
     }
 }
 
-impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>> {
+impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>>
+where
+    AS: BehaviorActionState,
+{
     pub fn new_with_observer<A, R>(
         behavior: Behavior<A>,
         runner: &mut R,
@@ -107,7 +121,10 @@ impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>> {
 /// }
 ///
 /// tree = BehaviorObserverTree
-impl<AS, O> AsyncBehavior<AS, O> {
+impl<AS, O> AsyncBehavior<AS, O>
+where
+    AS: BehaviorActionState,
+{
     fn from_behavior<A, R, OB>(
         behavior: Behavior<A>,
         runner: &mut R,
@@ -123,7 +140,8 @@ impl<AS, O> AsyncBehavior<AS, O> {
             Behavior::Action(action) => {
                 let tree = OB::action(&action, this_id);
                 let action_state = action.to_state(runner);
-                let state = AsyncBehaviorState::Action(AsyncAction::new(action_state));
+                let future = action_state.create_future();
+                let state = AsyncBehaviorState::Action(action_state, future);
                 (state, tree)
             }
             Behavior::Invert(behavior) => {
@@ -165,7 +183,8 @@ impl<AS, O> AsyncBehavior<AS, O> {
 
 impl<AS, O> std::future::Future for AsyncBehavior<AS, O>
 where
-    AS: BehaviorActionState,
+    AS: BehaviorActionState + Unpin,
+    AS::F: Unpin,
     O: BehaviorObserverRunner + Unpin,
 {
     type Output = bool;
