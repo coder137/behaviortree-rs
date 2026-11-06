@@ -186,6 +186,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_async_behavior_tree_trait() {
+        static_assertions::assert_impl_all!(RootAsyncBehavior<(), ()>: Send, Sync);
+    }
+
+    #[test]
     fn test_behaviortree_no_loop_with_dhat() {
         let mut executor = ticked_async_executor::TickedAsyncExecutor::default();
 

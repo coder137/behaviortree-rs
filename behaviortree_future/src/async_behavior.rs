@@ -215,3 +215,14 @@ where
         self.observer.reset();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_async_behavior_trait() {
+        static_assertions::assert_impl_all!(AsyncBehavior<(), ()>: Send, Sync);
+        static_assertions::assert_impl_all!(AsyncBehaviorState<(), ()>: Send, Sync);
+    }
+}
