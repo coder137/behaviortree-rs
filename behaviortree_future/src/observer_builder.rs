@@ -1,9 +1,39 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     ActionName, BehaviorObserver, BehaviorObserverBuilder, BehaviorObserverRunner,
-    BehaviorObserverTree, Status,
+    BehaviorObserverTree, LocalBehaviorObserverTree, Status,
 };
+
+impl<O> BehaviorObserver for std::rc::Rc<O>
+where
+    O: BehaviorObserver,
+{
+    #[inline(always)]
+    fn init(&self, capacity: usize) {
+        self.as_ref().init(capacity);
+    }
+
+    #[inline(always)]
+    fn update(&self, id: usize, status: Option<Status>) {
+        self.as_ref().update(id, status);
+    }
+}
+
+impl<O> BehaviorObserver for std::sync::Arc<O>
+where
+    O: BehaviorObserver,
+{
+    #[inline(always)]
+    fn init(&self, capacity: usize) {
+        self.as_ref().init(capacity);
+    }
+
+    #[inline(always)]
+    fn update(&self, id: usize, status: Option<Status>) {
+        self.as_ref().update(id, status);
+    }
+}
 
 impl BehaviorObserverRunner for () {
     #[inline(always)]
@@ -16,6 +46,7 @@ impl BehaviorObserverRunner for () {
     fn reset(&mut self) {}
 }
 
+//
 pub struct NoObserverBuilder;
 
 impl<A> BehaviorObserverBuilder<A> for NoObserverBuilder {
@@ -43,11 +74,12 @@ impl<A> BehaviorObserverBuilder<A> for NoObserverBuilder {
     fn select(_id: usize, _children: Vec<Self::Tree>) -> Self::Tree {}
 
     #[inline(always)]
-    fn subtree(_name: std::rc::Rc<str>, _id: usize, _child: Self::Tree) -> Self::Tree {}
+    fn subtree(_name: String, _id: usize, _child: Self::Tree) -> Self::Tree {}
 }
 
+//
 pub struct AsyncBehaviorObserver<O> {
-    observer: Rc<O>,
+    observer: O,
     id: usize,
     started: bool,
 }
@@ -71,17 +103,14 @@ impl<O: BehaviorObserver> BehaviorObserverRunner for AsyncBehaviorObserver<O> {
     }
 }
 
-pub(crate) struct DefaultObserverBuilder<O> {
+pub(crate) struct ObserverBuilder<O> {
     id: usize,
-    observer: Rc<O>,
+    observer: O,
 }
 
-impl<O> DefaultObserverBuilder<O> {
+impl<O> ObserverBuilder<O> {
     pub fn new(observer: O) -> Self {
-        Self {
-            id: 0,
-            observer: Rc::new(observer),
-        }
+        Self { id: 0, observer }
     }
 
     pub fn transmit_init(&self)
@@ -92,8 +121,52 @@ impl<O> DefaultObserverBuilder<O> {
     }
 }
 
-impl<A: ActionName, O: BehaviorObserver> BehaviorObserverBuilder<A> for DefaultObserverBuilder<O> {
-    type Observer = AsyncBehaviorObserver<O>;
+impl<A: ActionName, O: BehaviorObserver> BehaviorObserverBuilder<A> for ObserverBuilder<Rc<O>> {
+    type Observer = AsyncBehaviorObserver<Rc<O>>;
+    type Tree = LocalBehaviorObserverTree;
+
+    fn new_id(&mut self) -> usize {
+        let this_id = self.id;
+        self.id += 1;
+        this_id
+    }
+
+    fn new_observer(&self, id: usize) -> Self::Observer {
+        AsyncBehaviorObserver {
+            observer: self.observer.clone(),
+            id,
+            started: false,
+        }
+    }
+
+    #[inline(always)]
+    fn action(action: &A, id: usize) -> Self::Tree {
+        Self::Tree::Action(action.action_name(), id)
+    }
+
+    #[inline(always)]
+    fn invert(id: usize, child: Self::Tree) -> Self::Tree {
+        Self::Tree::Invert(id, child.into())
+    }
+
+    #[inline(always)]
+    fn sequence(id: usize, children: Vec<Self::Tree>) -> Self::Tree {
+        Self::Tree::Sequence(id, children.into())
+    }
+
+    #[inline(always)]
+    fn select(id: usize, children: Vec<Self::Tree>) -> Self::Tree {
+        Self::Tree::Select(id, children.into())
+    }
+
+    #[inline(always)]
+    fn subtree(name: String, id: usize, child: Self::Tree) -> Self::Tree {
+        Self::Tree::Subtree(name.into(), id, child.into())
+    }
+}
+
+impl<A: ActionName, O: BehaviorObserver> BehaviorObserverBuilder<A> for ObserverBuilder<Arc<O>> {
+    type Observer = AsyncBehaviorObserver<Arc<O>>;
     type Tree = BehaviorObserverTree;
 
     fn new_id(&mut self) -> usize {
@@ -112,26 +185,26 @@ impl<A: ActionName, O: BehaviorObserver> BehaviorObserverBuilder<A> for DefaultO
 
     #[inline(always)]
     fn action(action: &A, id: usize) -> Self::Tree {
-        BehaviorObserverTree::Action(action.action_name(), id)
+        Self::Tree::Action(action.action_name(), id)
     }
 
     #[inline(always)]
     fn invert(id: usize, child: Self::Tree) -> Self::Tree {
-        BehaviorObserverTree::Invert(id, Rc::new(child))
+        Self::Tree::Invert(id, child.into())
     }
 
     #[inline(always)]
     fn sequence(id: usize, children: Vec<Self::Tree>) -> Self::Tree {
-        BehaviorObserverTree::Sequence(id, children.into())
+        Self::Tree::Sequence(id, children.into())
     }
 
     #[inline(always)]
     fn select(id: usize, children: Vec<Self::Tree>) -> Self::Tree {
-        BehaviorObserverTree::Select(id, children.into())
+        Self::Tree::Select(id, children.into())
     }
 
     #[inline(always)]
-    fn subtree(name: std::rc::Rc<str>, id: usize, child: Self::Tree) -> Self::Tree {
-        BehaviorObserverTree::Subtree(name, id, child.into())
+    fn subtree(name: String, id: usize, child: Self::Tree) -> Self::Tree {
+        Self::Tree::Subtree(name.into(), id, child.into())
     }
 }

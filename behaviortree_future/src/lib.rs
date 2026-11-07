@@ -16,8 +16,13 @@ pub use observer_tree::*;
 mod async_behavior_tree;
 pub use async_behavior_tree::*;
 
+mod async_local_behavior_tree;
+pub use async_local_behavior_tree::*;
+
 //
 mod async_behavior;
+mod async_generic_behavior_tree;
+mod async_root_behavior;
 mod behavior_nodes;
 mod observer_builder;
 

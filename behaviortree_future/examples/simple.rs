@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use behaviortree_future::{
-    ActionName, AsyncBehaviorTree, Behavior, BehaviorActionState, BehaviorObserver,
+    ActionName, AsyncLocalBehaviorTree, Behavior, BehaviorActionState, BehaviorObserver,
     IntoBehaviorActionState, RootBehavior, Status,
 };
 use ticked_async_executor::TickedAsyncExecutor;
@@ -183,9 +183,16 @@ impl BehaviorObserver for MyObserver {
 
     fn update(&self, id: usize, current_status: Option<Status>) {
         let mut b = self.map.borrow_mut();
-        if b[&id] != current_status {
-            b.insert(id, current_status);
-            println!("update: {} {:?}", id, current_status);
+        match b.get_mut(&id) {
+            Some(stored_status) => {
+                if *stored_status != current_status {
+                    b.insert(id, current_status);
+                    println!("update: {} {:?}", id, current_status);
+                }
+            }
+            None => {
+                panic!("ID: {} not found", id);
+            }
         }
     }
 }
@@ -228,8 +235,11 @@ fn main() -> anyhow::Result<()> {
     };
     let behavior = RootBehavior::Loop(behavior);
 
-    let (bt, _bt_controller, _bt_state_tree) =
-        AsyncBehaviorTree::from_behavior_with_observer(behavior.clone(), &mut runner, observer);
+    let (bt, _bt_controller, _bt_state_tree) = AsyncLocalBehaviorTree::from_behavior_with_observer(
+        behavior.clone(),
+        &mut runner,
+        observer,
+    );
     println!("Observer: {:#?}", _bt_state_tree);
 
     let cancel = CancellationToken::new();

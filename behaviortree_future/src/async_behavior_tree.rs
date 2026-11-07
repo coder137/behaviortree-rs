@@ -1,89 +1,20 @@
-use std::cell::Cell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use crate::ActionName;
 use crate::BehaviorActionState;
+
 use crate::BehaviorObserver;
-use crate::BehaviorObserverRunner;
 use crate::BehaviorObserverTree;
-use crate::BehaviorTreeReset;
 use crate::IntoBehaviorActionState;
 use crate::RootBehavior;
-use crate::async_behavior::AsyncBehavior;
-use crate::behavior_nodes::AsyncLoop;
+use crate::async_generic_behavior_tree::AsyncBehaviorTreeController;
+use crate::async_generic_behavior_tree::AsyncGenericBehaviorTree;
 use crate::observer_builder::AsyncBehaviorObserver;
+use crate::observer_builder::NoObserverBuilder;
+use crate::observer_builder::ObserverBuilder;
 
-#[derive(Clone, Copy)]
-enum Control {
-    None,
-    Reset,
-    Shutdown,
-}
-
-#[derive(Clone)]
-pub struct AsyncBehaviorTreeController {
-    control: Rc<Cell<Control>>,
-}
-
-impl AsyncBehaviorTreeController {
-    pub fn reset(&self) {
-        self.control.replace(Control::Reset);
-    }
-
-    pub fn shutdown(&self) {
-        self.control.replace(Control::Shutdown);
-    }
-}
-
-enum RootAsyncBehavior<AS, O>
-where
-    AS: BehaviorActionState,
-{
-    Once(AsyncBehavior<AS, O>),
-    Loop(AsyncLoop<AsyncBehavior<AS, O>>),
-}
-
-impl<AS, O> std::future::Future for RootAsyncBehavior<AS, O>
-where
-    AS: BehaviorActionState + Unpin,
-    AS::F: Unpin,
-    O: BehaviorObserverRunner + Unpin,
-{
-    type Output = bool;
-
-    #[inline(always)]
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        match self.as_mut().get_mut() {
-            RootAsyncBehavior::Once(f) => std::pin::Pin::new(f).poll(cx),
-            RootAsyncBehavior::Loop(f) => std::pin::Pin::new(f).poll(cx),
-        }
-    }
-}
-
-impl<AS, O> BehaviorTreeReset for RootAsyncBehavior<AS, O>
-where
-    O: BehaviorObserverRunner + Unpin,
-    AS: BehaviorActionState,
-{
-    #[inline(always)]
-    fn reset(&mut self) {
-        match self {
-            RootAsyncBehavior::Once(r) => r.reset(),
-            RootAsyncBehavior::Loop(r) => r.reset(),
-        }
-    }
-}
-
-pub struct AsyncBehaviorTree<AS, O>
-where
-    AS: BehaviorActionState,
-{
-    state: RootAsyncBehavior<AS, O>,
-    control: Rc<Cell<Control>>,
-}
+pub type AsyncBehaviorTree<AS, O> = AsyncGenericBehaviorTree<AS, O, Arc<AtomicBool>>;
 
 impl<AS> AsyncBehaviorTree<AS, ()>
 where
@@ -92,87 +23,46 @@ where
     pub fn from_behavior<A, R>(
         root_behavior: RootBehavior<A>,
         runner: &mut R,
-    ) -> (Self, AsyncBehaviorTreeController)
+    ) -> (Self, AsyncBehaviorTreeController<Arc<AtomicBool>>)
     where
         A: IntoBehaviorActionState<R, State = AS>,
         AS: BehaviorActionState,
     {
-        let state = match root_behavior {
-            RootBehavior::Once(behavior) => {
-                RootAsyncBehavior::Once(AsyncBehavior::new(behavior, runner))
-            }
-            RootBehavior::Loop(behavior) => {
-                RootAsyncBehavior::Loop(AsyncLoop::new(AsyncBehavior::new(behavior, runner)))
-            }
-        };
-        let control = Rc::new(Cell::new(Control::None));
-        let behaviortree = Self {
-            state,
-            control: control.clone(),
-        };
-        let behaviortree_controller = AsyncBehaviorTreeController { control };
-        (behaviortree, behaviortree_controller)
+        let (bt, bt_controller, _bt_tree) = AsyncBehaviorTree::from_behavior_and_observer_builder(
+            root_behavior,
+            runner,
+            &mut NoObserverBuilder,
+        );
+        (bt, bt_controller)
     }
 }
 
-impl<AS, O> AsyncBehaviorTree<AS, AsyncBehaviorObserver<O>>
+impl<AS, O> AsyncBehaviorTree<AS, AsyncBehaviorObserver<Arc<O>>>
 where
     AS: BehaviorActionState,
-    O: BehaviorObserver,
 {
     pub fn from_behavior_with_observer<A, R>(
         root_behavior: RootBehavior<A>,
         runner: &mut R,
         observer: O,
-    ) -> (Self, AsyncBehaviorTreeController, BehaviorObserverTree)
+    ) -> (
+        Self,
+        AsyncBehaviorTreeController<Arc<AtomicBool>>,
+        BehaviorObserverTree,
+    )
     where
         A: IntoBehaviorActionState<R, State = AS> + ActionName,
         AS: BehaviorActionState,
+        O: BehaviorObserver,
     {
-        let (state, tree) = match root_behavior {
-            RootBehavior::Once(behavior) => {
-                let (state, tree) = AsyncBehavior::new_with_observer(behavior, runner, observer);
-                (RootAsyncBehavior::Once(state), tree)
-            }
-            RootBehavior::Loop(behavior) => {
-                let (state, tree) = AsyncBehavior::new_with_observer(behavior, runner, observer);
-                (RootAsyncBehavior::Loop(AsyncLoop::new(state)), tree)
-            }
-        };
-        let control = Rc::new(Cell::new(Control::None));
-        let behaviortree = Self {
-            state,
-            control: control.clone(),
-        };
-        let behaviortree_controller = AsyncBehaviorTreeController { control };
-        (behaviortree, behaviortree_controller, tree)
-    }
-}
-
-impl<AS, O> std::future::Future for AsyncBehaviorTree<AS, O>
-where
-    AS: BehaviorActionState + Unpin,
-    AS::F: Unpin,
-    O: BehaviorObserverRunner + Unpin,
-{
-    type Output = Option<bool>;
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let bt = self.as_mut().get_mut();
-        match bt.control.get() {
-            Control::None => {}
-            Control::Reset => {
-                bt.control.replace(Control::None);
-                bt.state.reset();
-            }
-            Control::Shutdown => {
-                return std::task::Poll::Ready(None);
-            }
-        }
-        let state = std::pin::Pin::new(&mut bt.state);
-        state.poll(cx).map(Some)
+        let mut observer_builder = ObserverBuilder::new(Arc::new(observer));
+        let (bt, bt_controller, bt_tree) = AsyncBehaviorTree::from_behavior_and_observer_builder(
+            root_behavior,
+            runner,
+            &mut observer_builder,
+        );
+        observer_builder.transmit_init();
+        (bt, bt_controller, bt_tree)
     }
 }
 
@@ -186,8 +76,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_async_behavior_tree_trait() {
-        static_assertions::assert_impl_all!(RootAsyncBehavior<(), ()>: Send, Sync);
+    fn test_async_behavior_tree() {
+        static_assertions::assert_impl_all!(AsyncBehaviorTree<(), ()>: Send, Sync);
     }
 
     #[test]
@@ -210,7 +100,7 @@ mod tests {
             .spawn_local("_", async move {
                 let _profiler = DhatTester::new("test_behaviortree_no_loop_with_dhat_post");
                 let status = bt.await;
-                assert!(status.unwrap());
+                assert!(status);
             })
             .detach();
 
@@ -274,7 +164,7 @@ mod tests {
         let mut runner = TestOperationRunner::default();
         let inner = runner.num.clone();
 
-        let (bt, bt_controller) = {
+        let (bt, _bt_controller) = {
             let _profiler =
                 DhatTester::new("test_behaviortree_loop_with_early_shutdown_with_dhat_pre");
             let action = TestOperation::Add(1, 2, true, 1);
@@ -285,11 +175,13 @@ mod tests {
             (bt, bt_controller)
         };
 
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let cancel_clone = cancel.clone();
         executor
             .spawn_local("_", async move {
                 let _profiler =
                     DhatTester::new("test_behaviortree_loop_with_early_shutdown_with_dhat_post");
-                let status = bt.await;
+                let status = cancel_clone.run_until_cancelled_owned(bt).await;
                 assert!(status.is_none());
             })
             .detach();
@@ -312,7 +204,7 @@ mod tests {
         assert_eq!(inner.get(), 9);
 
         // shutdown gracefully
-        bt_controller.shutdown();
+        cancel.cancel();
         executor.tick(70.0, None);
         assert_eq!(executor.num_tasks(), 0);
     }
@@ -340,7 +232,6 @@ mod tests {
                 let _profiler =
                     DhatTester::new("test_behaviortree_no_loop_with_early_reset_with_dhat_post");
                 let status = bt.await;
-                let status = status.unwrap();
                 assert!(status);
             })
             .detach();

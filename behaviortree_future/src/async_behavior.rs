@@ -1,8 +1,7 @@
 use crate::{
-    ActionName, Behavior, BehaviorActionState, BehaviorObserver, BehaviorObserverBuilder,
-    BehaviorObserverRunner, BehaviorObserverTree, BehaviorTreeReset, IntoBehaviorActionState,
+    Behavior, BehaviorActionState, BehaviorObserverBuilder, BehaviorObserverRunner,
+    BehaviorTreeReset, IntoBehaviorActionState,
     behavior_nodes::{AsyncInvert, AsyncSelect, AsyncSequence, AsyncSubtree, AsyncTimes},
-    observer_builder::{AsyncBehaviorObserver, DefaultObserverBuilder, NoObserverBuilder},
 };
 
 pub(crate) enum AsyncBehaviorState<AS, O>
@@ -70,41 +69,6 @@ where
     pub observer: O,
 }
 
-impl<AS> AsyncBehavior<AS, ()>
-where
-    AS: BehaviorActionState,
-{
-    pub fn new<A, R>(behavior: Behavior<A>, runner: &mut R) -> Self
-    where
-        A: IntoBehaviorActionState<R, State = AS>,
-        AS: BehaviorActionState,
-    {
-        let (this, _tree) = Self::from_behavior(behavior, runner, &mut NoObserverBuilder);
-        this
-    }
-}
-
-impl<AS, O> AsyncBehavior<AS, AsyncBehaviorObserver<O>>
-where
-    AS: BehaviorActionState,
-{
-    pub fn new_with_observer<A, R>(
-        behavior: Behavior<A>,
-        runner: &mut R,
-        observer: O,
-    ) -> (Self, BehaviorObserverTree)
-    where
-        A: IntoBehaviorActionState<R, State = AS> + ActionName,
-        AS: BehaviorActionState,
-        O: BehaviorObserver,
-    {
-        let mut default_observer_builder = DefaultObserverBuilder::new(observer);
-        let (this, tree) = Self::from_behavior(behavior, runner, &mut default_observer_builder);
-        default_observer_builder.transmit_init();
-        (this, tree)
-    }
-}
-
 /// When no observer
 ///
 /// self = AsyncBehavior {
@@ -125,7 +89,7 @@ impl<AS, O> AsyncBehavior<AS, O>
 where
     AS: BehaviorActionState,
 {
-    fn from_behavior<A, R, OB>(
+    pub(crate) fn from_behavior<A, R, OB>(
         behavior: Behavior<A>,
         runner: &mut R,
         observer_builder: &mut OB,
@@ -171,7 +135,7 @@ where
             Behavior::Subtree(name, behavior) => {
                 let (child, child_tree) = Self::from_behavior(*behavior, runner, observer_builder);
                 let state = AsyncBehaviorState::Subtree(AsyncSubtree::new(child));
-                let tree = OB::subtree(name.into(), this_id, child_tree);
+                let tree = OB::subtree(name, this_id, child_tree);
                 (state, tree)
             }
         };
@@ -218,7 +182,23 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::observer_builder::NoObserverBuilder;
+
     use super::*;
+
+    impl<AS> AsyncBehavior<AS, ()>
+    where
+        AS: BehaviorActionState,
+    {
+        pub fn new<A, R>(behavior: Behavior<A>, runner: &mut R) -> Self
+        where
+            A: IntoBehaviorActionState<R, State = AS>,
+            AS: BehaviorActionState,
+        {
+            let (this, _tree) = Self::from_behavior(behavior, runner, &mut NoObserverBuilder);
+            this
+        }
+    }
 
     #[test]
     fn test_async_behavior_trait() {

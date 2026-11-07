@@ -23,6 +23,5 @@ pub enum Behavior<A> {
     /// Can be thought of as a short-circuited logical OR gate.
     Select(Vec<Behavior<A>>),
 
-    ///
     Subtree(String, Box<Behavior<A>>),
 }

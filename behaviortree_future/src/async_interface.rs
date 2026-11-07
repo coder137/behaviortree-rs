@@ -46,5 +46,5 @@ pub(crate) trait BehaviorObserverBuilder<A> {
     fn invert(id: usize, child: Self::Tree) -> Self::Tree;
     fn sequence(id: usize, children: Vec<Self::Tree>) -> Self::Tree;
     fn select(id: usize, children: Vec<Self::Tree>) -> Self::Tree;
-    fn subtree(name: std::rc::Rc<str>, id: usize, child: Self::Tree) -> Self::Tree;
+    fn subtree(name: String, id: usize, child: Self::Tree) -> Self::Tree;
 }
